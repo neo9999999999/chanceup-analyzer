@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#0a0a0b">
+<title>찬스업 당첨 분석기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #0a0a0b;
+  --card: #15151a;
+  --border: #27272a;
+  --text: #f4f4f5;
+  --text-dim: #a1a1aa;
+  --gold: #d4a849;
+  --purple: #a78bfa;
+  --green: #34d399;
+  --accent: var(--gold);
+}
+
+body.premium { --accent: var(--purple); }
+body.food { --accent: var(--green); }
+
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 20px 16px 40px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container { max-width: 720px; margin: 0 auto; }
+
+.header { text-align: center; margin-bottom: 24px; }
+.header .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.header h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 4px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6b7280;
+  flex-shrink: 0;
+}
+.sync-status.synced .sync-dot { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.sync-status.syncing .sync-dot { background: #eab308; animation: pulse 1s infinite; }
+.sync-status.error .sync-dot { background: #ef4444; }
+.sync-status.local .sync-dot { background: #6b7280; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 4px;
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.tab {
+  flex: 1;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.tab.active {
+  background: var(--accent);
+  color: #1a1a1a;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.card.highlight {
+  border-color: rgba(212, 168, 73, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+body.premium .card.highlight {
+  border-color: rgba(167, 139, 250, 0.4);
+}
+body.food .card.highlight {
+  border-color: rgba(52, 211, 153, 0.4);
+}
+.card.highlight::before {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 120px;
+  height: 120px;
+  background: var(--accent);
+  opacity: 0.08;
+  border-radius: 50%;
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  margin-bottom: 14px;
+}
+
+.input-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+input[type="number"] {
+  padding: 12px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+  width: 100%;
+  font-family: inherit;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]:focus { border-color: var(--accent); }
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #1a1a1a;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.2s;
+}
+.btn-primary:active { opacity: 0.8; }
+
+.best-range-display {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.best-range-num {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.best-range-meta {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.best-range-meta strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.hits-list, .rank-list, .repeat-list, .rounds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.rounds-list { max-height: 400px; }
+
+.hit-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.hit-round { color: var(--text-dim); min-width: 44px; flex-shrink: 0; }
+
+.rank-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: 10px;
+}
+.rank-left { display: flex; align-items: center; gap: 12px; }
+.rank-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--card);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.rank-range { font-size: 16px; font-weight: 700; }
+.rank-count { font-size: 13px; color: var(--accent); font-weight: 700; }
+
+.repeat-item {
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: 10px;
+}
+.repeat-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.repeat-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+  min-width: 44px;
+}
+.repeat-count { font-size: 12px; color: var(--text-dim); font-weight: 600; }
+.repeat-history {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding-left: 54px;
+  word-break: keep-all;
+}
+
+.round-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.round-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.round-num {
+  font-weight: 700;
+  color: var(--text);
+  min-width: 44px;
+}
+.badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+.badge-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+.badge-2 { background: linear-gradient(135deg, #d1d5db, #9ca3af); color: #1f2937; }
+.badge-3 { background: linear-gradient(135deg, #fb923c, #c2410c); }
+.badge-label { opacity: 0.7; font-size: 10px; }
+
+.delete-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 20px;
+  opacity: 0.5;
+  font-family: inherit;
+  flex-shrink: 0;
+  min-width: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.delete-btn:hover, .delete-btn:active {
+  opacity: 1;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+.delete-btn * {
+  pointer-events: none;
+}
+
+.empty-state {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.muted { font-size: 11px; color: var(--text-dim); }
+
+.footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 11px;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.footer-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.footer-btn {
+  padding: 8px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.footer-btn:hover, .footer-btn:active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 모바일 */
+@media (max-width: 480px) {
+  body { padding: 16px 12px 40px; }
+  .header h1 { font-size: 22px; }
+  .best-range-num { font-size: 26px; }
+  .input-row { grid-template-columns: 1fr 1fr; }
+  .input-row input:first-child { grid-column: 1 / -1; }
+  .card { padding: 16px; }
+  .repeat-history { padding-left: 0; margin-top: 6px; }
+}
+
+/* 스크롤바 */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="eyebrow">CHANCEUP ANALYZER</div>
+    <h1>찬스업 당첨 분석기</h1>
+    <div class="sync-status" id="sync-status">
+      <span class="sync-dot"></span>
+      <span class="sync-text">연결 중...</span>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="basic">🍫 기본</button>
+    <button class="tab" data-tab="premium">💎 프리미엄</button>
+    <button class="tab" data-tab="food">🍱 푸드박스</button>
+  </div>
+
+  <!-- 회차 등록 -->
+  <div class="card">
+    <div class="card-title">⊕ 회차 등록</div>
+    <div class="input-row">
+      <input type="number" id="inp-round" placeholder="회차" inputmode="numeric">
+      <input type="number" id="inp-first" placeholder="1등" inputmode="numeric">
+      <input type="number" id="inp-second" placeholder="2등" inputmode="numeric">
+      <input type="number" id="inp-third" placeholder="3등" inputmode="numeric">
+    </div>
+    <button class="btn-primary" id="btn-add">등록</button>
+  </div>
+
+  <!-- 최고 적중 구간 -->
+  <div class="card highlight" id="best-range-card" style="display:none;">
+    <div class="card-title">⭐ 최고 적중 구간 (1·2·3등 통합)</div>
+    <div class="best-range-display">
+      <div class="best-range-num" id="best-range-num">-</div>
+      <div class="best-range-meta" id="best-range-meta"></div>
+    </div>
+    <div class="hits-list" id="hits-list"></div>
+  </div>
+
+  <!-- 1등 핫 구간 TOP 5 -->
+  <div class="card" id="rank-card" style="display:none;">
+    <div class="card-title">🥇 1등 핫 구간 TOP 5</div>
+    <div class="rank-list" id="rank-list"></div>
+  </div>
+
+  <!-- 반복 적중 번호 -->
+  <div class="card" id="repeat-card" style="display:none;">
+    <div class="card-title">🔁 반복 적중 번호</div>
+    <div class="repeat-list" id="repeat-list"></div>
+  </div>
+
+  <!-- 회차별 당첨번호 -->
+  <div class="card">
+    <div class="flex-between">
+      <div class="card-title" style="margin-bottom:0;">📋 회차별 당첨번호</div>
+      <div class="muted" id="round-count">총 0회차</div>
+    </div>
+    <div class="rounds-list" id="rounds-list"></div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-actions">
+      <button class="footer-btn" id="btn-export">📤 백업</button>
+      <button class="footer-btn" id="btn-import">📥 복원</button>
+      <input type="file" id="file-input" accept="application/json" style="display:none;">
+    </div>
+    <div style="margin-top:14px;">데이터는 자동 저장됩니다 · NEO</div>
+  </div>
+</div>
+
+<script>
+// ============ 데이터 ============
+var INITIAL_BASIC = [
+  { round: 761, first: 43, second: 100, third: 45 },
+  { round: 762, first: 1, second: 2, third: 90 },
+  { round: 763, first: 49, second: 8, third: 24 },
+  { round: 764, first: 68, second: 71, third: 93 },
+  { round: 765, first: 4, second: 28, third: 85 },
+  { round: 766, first: 100, second: 54, third: 84 },
+  { round: 767, first: 92, second: 54, third: 23 },
+  { round: 768, first: 48, second: 51, third: 73 },
+  { round: 769, first: 84, second: 41, third: 85 },
+  { round: 770, first: 23, second: 38, third: 34 },
+  { round: 771, first: 20, second: 52, third: 16 },
+  { round: 772, first: 9, second: 68, third: 48 },
+  { round: 774, first: 4, second: 65, third: 48 },
+  { round: 775, first: 76, second: 64, third: 5 }
+];
+
+var INITIAL_PREMIUM = [
+  { round: 412, first: 59, second: 87, third: 96 },
+  { round: 413, first: 13, second: 60, third: 98 },
+  { round: 414, first: 98, second: 34, third: 76 },
+  { round: 415, first: 46, second: 20, third: 54 },
+  { round: 416, first: 24, second: 17, third: 4 },
+  { round: 417, first: 48, second: 66, third: 47 },
+  { round: 418, first: 90, second: 25, third: 16 },
+  { round: 419, first: 66, second: 63, third: 35 },
+  { round: 420, first: 14, second: 94, third: 57 },
+  { round: 421, first: 64, second: 69, third: 18 }
+];
+
+var INITIAL_FOOD = [
+  { round: 116, first: 50, second: 94, third: 16 },
+  { round: 117, first: 42, second: 13, third: 72 },
+  { round: 118, first: 20, second: 16, third: 45 },
+  { round: 119, first: 43, second: 1, third: 35 },
+  { round: 120, first: 25, second: 70, third: 61 },
+  { round: 121, first: 78, second: 73, third: 19 },
+  { round: 122, first: 84, second: 11, third: 19 },
+  { round: 123, first: 27, second: 49, third: 12 },
+  { round: 124, first: 48, second: 54, third: 87 }
+];
+
+var STORAGE_KEY_BASIC = 'chanceup_basic_data_v1';
+var STORAGE_KEY_PREMIUM = 'chanceup_premium_data_v1';
+var STORAGE_KEY_FOOD = 'chanceup_food_data_v1';
+
+// ============ Supabase 설정 (REST API 직접 호출) ============
+var SUPABASE_URL = 'https://ygypupzjqpuhohublidq.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_E3tJspMITEQV4Yw623u65Q_wV-oYYhb';
+var SUPABASE_TABLE = 'chanceup_data';
+var SUPABASE_ROW_ID = 'shared_data';
+var supabaseReady = false;
+var syncTimer = null;
+
+function initSupabase() {
+  // fetch 사용 가능하면 OK
+  supabaseReady = typeof fetch !== 'undefined';
+  return supabaseReady;
+}
+
+function setSyncStatus(status, text) {
+  var el = document.getElementById('sync-status');
+  if (!el) return;
+  el.className = 'sync-status ' + status;
+  el.querySelector('.sync-text').textContent = text;
+}
+
+function supabaseHeaders() {
+  return {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  };
+}
+
+async function loadFromSupabase() {
+  if (!supabaseReady) return null;
+  try {
+    setSyncStatus('syncing', '불러오는 중...');
+    var url = SUPABASE_URL + '/rest/v1/' + SUPABASE_TABLE + 
+              '?id=eq.' + encodeURIComponent(SUPABASE_ROW_ID) + 
+              '&select=payload,updated_at';
+    var res = await fetch(url, { headers: supabaseHeaders() });
+    
+    if (!res.ok) {
+      var errText = await res.text();
+      console.error('Supabase 로드 HTTP ' + res.status + ':', errText);
+      setSyncStatus('error', 'HTTP ' + res.status + ' (로컬 모드)');
+      return null;
+    }
+    
+    var rows = await res.json();
+    if (rows && rows.length > 0 && rows[0].payload) {
+      setSyncStatus('synced', '동기화됨');
+      return rows[0].payload;
+    } else {
+      setSyncStatus('synced', '동기화됨 (빈 상태)');
+      return null;
+    }
+  } catch (e) {
+    console.error('Supabase 로드 에러:', e.message || e);
+    setSyncStatus('error', '연결 실패: ' + (e.message || '알 수 없음'));
+    return null;
+  }
+}
+
+async function saveToSupabase() {
+  if (!supabaseReady) return false;
+  try {
+    setSyncStatus('syncing', '저장 중...');
+    var payload = {
+      basic: data.basic,
+      premium: data.premium,
+      food: data.food
+    };
+    var body = {
+      id: SUPABASE_ROW_ID,
+      payload: payload,
+      updated_at: new Date().toISOString()
+    };
+    
+    // upsert: on_conflict 파라미터로 id 충돌 시 업데이트
+    var url = SUPABASE_URL + '/rest/v1/' + SUPABASE_TABLE + '?on_conflict=id';
+    var headers = supabaseHeaders();
+    headers['Prefer'] = 'resolution=merge-duplicates,return=representation';
+    
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body)
+    });
+    
+    if (!res.ok) {
+      var errText = await res.text();
+      console.error('Supabase 저장 HTTP ' + res.status + ':', errText);
+      setSyncStatus('error', '저장 실패: HTTP ' + res.status);
+      return false;
+    }
+    
+    var now = new Date();
+    var timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
+                  now.getMinutes().toString().padStart(2, '0') + ':' +
+                  now.getSeconds().toString().padStart(2, '0');
+    setSyncStatus('synced', '저장됨 · ' + timeStr);
+    return true;
+  } catch (e) {
+    console.error('Supabase 저장 에러:', e.message || e);
+    setSyncStatus('error', '저장 실패: ' + (e.message || '알 수 없음'));
+    return false;
+  }
+}
+
+function debouncedSync() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(function () {
+    saveToSupabase();
+  }, 500);
+}
+
+// ============ 상태 ============
+var currentTab = 'basic';
+var data = { basic: [], premium: [], food: [] };
+
+// ============ 저장/로드 ============
+function loadData() {
+  try {
+    var b = localStorage.getItem(STORAGE_KEY_BASIC);
+    data.basic = b ? JSON.parse(b) : INITIAL_BASIC.slice();
+  } catch (e) {
+    data.basic = INITIAL_BASIC.slice();
+  }
+  try {
+    var p = localStorage.getItem(STORAGE_KEY_PREMIUM);
+    data.premium = p ? JSON.parse(p) : INITIAL_PREMIUM.slice();
+  } catch (e) {
+    data.premium = INITIAL_PREMIUM.slice();
+  }
+  try {
+    var f = localStorage.getItem(STORAGE_KEY_FOOD);
+    data.food = f ? JSON.parse(f) : INITIAL_FOOD.slice();
+  } catch (e) {
+    data.food = INITIAL_FOOD.slice();
+  }
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));
+    localStorage.setItem(STORAGE_KEY_PREMIUM, JSON.stringify(data.premium));
+    localStorage.setItem(STORAGE_KEY_FOOD, JSON.stringify(data.food));
+  } catch (e) {
+    console.error('localStorage 저장 실패:', e);
+  }
+  // Supabase에도 동기화 (debounced)
+  debouncedSync();
+}
+
+function getCurrent() {
+  return data[currentTab];
+}
+
+// ============ 분석 ============
+function findBestRange(rows) {
+  if (rows.length === 0) return null;
+  var bestCount = 0;
+  var bestStart = 1;
+  for (var start = 1; start <= 91; start++) {
+    var end = start + 9;
+    var count = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if ((r.first >= start && r.first <= end) ||
+          (r.second >= start && r.second <= end) ||
+          (r.third >= start && r.third <= end)) {
+        count++;
+      }
+    }
+    if (count > bestCount) {
+      bestCount = count;
+      bestStart = start;
+    }
+  }
+  return { start: bestStart, end: bestStart + 9, count: bestCount };
+}
+
+function getRangeHits(rows, start, end) {
+  var hits = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var inRange = [];
+    if (r.first >= start && r.first <= end) inRange.push('1등 ' + r.first);
+    if (r.second >= start && r.second <= end) inRange.push('2등 ' + r.second);
+    if (r.third >= start && r.third <= end) inRange.push('3등 ' + r.third);
+    if (inRange.length > 0) {
+      hits.push({ round: r.round, hits: inRange });
+    }
+  }
+  hits.sort(function (a, b) { return b.round - a.round; });
+  return hits;
+}
+
+function findFirstRankRanges(rows, topN) {
+  if (rows.length === 0) return [];
+  var rankings = [];
+  for (var start = 1; start <= 91; start++) {
+    var end = start + 9;
+    var count = 0;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].first >= start && rows[i].first <= end) count++;
+    }
+    rankings.push({ start: start, end: end, count: count });
+  }
+  rankings.sort(function (a, b) { return b.count - a.count; });
+  var picked = [];
+  for (var j = 0; j < rankings.length; j++) {
+    var item = rankings[j];
+    if (item.count === 0) break;
+    var tooClose = false;
+    for (var k = 0; k < picked.length; k++) {
+      if (Math.abs(item.start - picked[k].start) < 5) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (!tooClose) {
+      picked.push(item);
+      if (picked.length >= topN) break;
+    }
+  }
+  return picked;
+}
+
+function findRepeatNumbers(rows) {
+  if (rows.length === 0) return [];
+  var counter = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var nums = [
+      { n: r.first, label: r.round + '·1등' },
+      { n: r.second, label: r.round + '·2등' },
+      { n: r.third, label: r.round + '·3등' }
+    ];
+    for (var j = 0; j < nums.length; j++) {
+      var key = nums[j].n;
+      if (!counter[key]) counter[key] = [];
+      counter[key].push(nums[j].label);
+    }
+  }
+  var result = [];
+  for (var k in counter) {
+    if (counter[k].length >= 2) {
+      result.push({
+        number: parseInt(k, 10),
+        count: counter[k].length,
+        history: counter[k]
+      });
+    }
+  }
+  result.sort(function (a, b) {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.number - b.number;
+  });
+  return result;
+}
+
+// ============ 렌더링 ============
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function render() {
+  var rows = getCurrent();
+
+  // 탭 활성화
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {
+    if (tabs[i].dataset.tab === currentTab) {
+      tabs[i].classList.add('active');
+    } else {
+      tabs[i].classList.remove('active');
+    }
+  }
+  if (currentTab === 'premium') {
+    document.body.classList.add('premium');
+    document.body.classList.remove('food');
+  } else if (currentTab === 'food') {
+    document.body.classList.add('food');
+    document.body.classList.remove('premium');
+  } else {
+    document.body.classList.remove('premium');
+    document.body.classList.remove('food');
+  }
+
+  // 회차 카운트
+  document.getElementById('round-count').textContent = '총 ' + rows.length + '회차';
+
+  // 최고 적중 구간
+  var best = findBestRange(rows);
+  var bestCard = document.getElementById('best-range-card');
+  if (best && best.count > 0) {
+    bestCard.style.display = 'block';
+    document.getElementById('best-range-num').textContent = best.start + '~' + best.end;
+    var pct = Math.round(best.count / rows.length * 100);
+    document.getElementById('best-range-meta').innerHTML =
+      rows.length + '회 중 <strong>' + best.count + '회</strong> 적중 ' +
+      '<strong>(' + pct + '%)</strong>';
+
+    var hits = getRangeHits(rows, best.start, best.end);
+    var hitsHtml = '';
+    for (var i = 0; i < hits.length; i++) {
+      hitsHtml += '<div class="hit-item">' +
+        '<span class="hit-round">' + hits[i].round + '회</span>' +
+        '<span>' + escapeHtml(hits[i].hits.join(', ')) + '</span>' +
+        '</div>';
+    }
+    document.getElementById('hits-list').innerHTML = hitsHtml;
+  } else {
+    bestCard.style.display = 'none';
+  }
+
+  // 1등 핫 구간
+  var firstRanges = findFirstRankRanges(rows, 5);
+  var rankCard = document.getElementById('rank-card');
+  if (firstRanges.length > 0) {
+    rankCard.style.display = 'block';
+    var rankHtml = '';
+    for (var j = 0; j < firstRanges.length; j++) {
+      var fr = firstRanges[j];
+      var rPct = Math.round(fr.count / rows.length * 100);
+      rankHtml += '<div class="rank-item">' +
+        '<div class="rank-left">' +
+          '<span class="rank-pill">#' + (j + 1) + '</span>' +
+          '<span class="rank-range">' + fr.start + '~' + fr.end + '</span>' +
+        '</div>' +
+        '<div class="rank-count">' + fr.count + '회 (' + rPct + '%)</div>' +
+        '</div>';
+    }
+    document.getElementById('rank-list').innerHTML = rankHtml;
+  } else {
+    rankCard.style.display = 'none';
+  }
+
+  // 반복 번호
+  var repeats = findRepeatNumbers(rows);
+  var repeatCard = document.getElementById('repeat-card');
+  if (repeats.length > 0) {
+    repeatCard.style.display = 'block';
+    var repeatHtml = '';
+    var limit = Math.min(repeats.length, 8);
+    for (var m = 0; m < limit; m++) {
+      var rp = repeats[m];
+      repeatHtml += '<div class="repeat-item">' +
+        '<div class="repeat-header">' +
+          '<span class="repeat-num">' + rp.number + '</span>' +
+          '<span class="repeat-count">× ' + rp.count + '회</span>' +
+        '</div>' +
+        '<div class="repeat-history">' + escapeHtml(rp.history.join(', ')) + '</div>' +
+        '</div>';
+    }
+    document.getElementById('repeat-list').innerHTML = repeatHtml;
+  } else {
+    repeatCard.style.display = 'none';
+  }
+
+  // 회차별 테이블
+  var roundsList = document.getElementById('rounds-list');
+  if (rows.length === 0) {
+    roundsList.innerHTML = '<div class="empty-state">등록된 회차가 없습니다</div>';
+  } else {
+    var sorted = rows.slice();
+    sorted.sort(function (a, b) { return b.round - a.round; });
+    var roundsHtml = '';
+    for (var n = 0; n < sorted.length; n++) {
+      var row = sorted[n];
+      roundsHtml += '<div class="round-item">' +
+        '<div class="round-left">' +
+          '<span class="round-num">' + row.round + '</span>' +
+          '<div class="badges">' +
+            '<span class="badge badge-1"><span class="badge-label">1등</span>' + row.first + '</span>' +
+            '<span class="badge badge-2"><span class="badge-label">2등</span>' + row.second + '</span>' +
+            '<span class="badge badge-3"><span class="badge-label">3등</span>' + row.third + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<button class="delete-btn" data-round="' + row.round + '">×</button>' +
+        '</div>';
+    }
+    roundsList.innerHTML = roundsHtml;
+
+    // 삭제 버튼
+    var delBtns = roundsList.querySelectorAll('.delete-btn');
+    for (var d = 0; d < delBtns.length; d++) {
+      delBtns[d].addEventListener('click', function (e) {
+        e.stopPropagation();
+        var roundNum = parseInt(this.getAttribute('data-round'), 10);
+        if (!isNaN(roundNum)) {
+          handleDelete(roundNum);
+        }
+      });
+    }
+  }
+}
+
+// ============ 액션 ============
+function handleAdd() {
+  var r = parseInt(document.getElementById('inp-round').value, 10);
+  var f = parseInt(document.getElementById('inp-first').value, 10);
+  var s = parseInt(document.getElementById('inp-second').value, 10);
+  var t = parseInt(document.getElementById('inp-third').value, 10);
+
+  if (!r || !f || !s || !t) {
+    alert('모든 항목을 입력해주세요');
+    return;
+  }
+  if (f < 1 || f > 100 || s < 1 || s > 100 || t < 1 || t > 100) {
+    alert('번호는 1~100 사이여야 합니다');
+    return;
+  }
+
+  var current = getCurrent();
+  var existing = null;
+  for (var i = 0; i < current.length; i++) {
+    if (current[i].round === r) {
+      existing = current[i];
+      break;
+    }
+  }
+
+  if (existing) {
+    if (!confirm(r + '회차가 이미 존재합니다. 덮어쓸까요?')) return;
+    existing.first = f;
+    existing.second = s;
+    existing.third = t;
+  } else {
+    current.push({ round: r, first: f, second: s, third: t });
+    current.sort(function (a, b) { return a.round - b.round; });
+  }
+
+  saveData();
+  render();
+
+  // 입력 비우기
+  document.getElementById('inp-round').value = '';
+  document.getElementById('inp-first').value = '';
+  document.getElementById('inp-second').value = '';
+  document.getElementById('inp-third').value = '';
+  document.getElementById('inp-round').focus();
+}
+
+function handleDelete(roundNum) {
+  if (!confirm(roundNum + '회차를 삭제할까요?')) return;
+  var current = getCurrent();
+  var filtered = [];
+  for (var i = 0; i < current.length; i++) {
+    if (current[i].round !== roundNum) {
+      filtered.push(current[i]);
+    }
+  }
+  data[currentTab] = filtered;
+  saveData();
+  render();
+}
+
+function handleExport() {
+  var payload = {
+    version: 1,
+    exported_at: new Date().toISOString(),
+    basic: data.basic,
+    premium: data.premium,
+    food: data.food
+  };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var ts = new Date().toISOString().slice(0, 10);
+  a.download = 'chanceup-backup-' + ts + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function handleImport(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function (ev) {
+    try {
+      var parsed = JSON.parse(ev.target.result);
+      if (!parsed || (!parsed.basic && !parsed.premium && !parsed.food)) {
+        alert('잘못된 백업 파일입니다');
+        return;
+      }
+      var msg = '복원하면 현재 데이터가 덮어써집니다.\n계속할까요?\n\n';
+      if (parsed.basic) msg += '기본: ' + parsed.basic.length + '회차\n';
+      if (parsed.premium) msg += '프리미엄: ' + parsed.premium.length + '회차\n';
+      if (parsed.food) msg += '푸드박스: ' + parsed.food.length + '회차';
+      if (!confirm(msg)) return;
+
+      if (parsed.basic) data.basic = parsed.basic;
+      if (parsed.premium) data.premium = parsed.premium;
+      if (parsed.food) data.food = parsed.food;
+      saveData();
+      render();
+      alert('복원 완료!');
+    } catch (err) {
+      alert('파일을 읽을 수 없습니다: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ============ 초기화 ============
+async function init() {
+  // 일단 localStorage에서 로드 (즉시 렌더)
+  loadData();
+
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].addEventListener('click', function (e) {
+      currentTab = e.target.dataset.tab;
+      render();
+    });
+  }
+
+  document.getElementById('btn-add').addEventListener('click', handleAdd);
+
+  // 백업/복원
+  document.getElementById('btn-export').addEventListener('click', handleExport);
+  document.getElementById('btn-import').addEventListener('click', function () {
+    document.getElementById('file-input').click();
+  });
+  document.getElementById('file-input').addEventListener('change', handleImport);
+
+  // 엔터로 등록
+  var inputs = ['inp-round', 'inp-first', 'inp-second', 'inp-third'];
+  for (var j = 0; j < inputs.length; j++) {
+    document.getElementById(inputs[j]).addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') handleAdd();
+    });
+  }
+
+  render();
+
+  // Supabase 초기화 + 원격 데이터 로드
+  setSyncStatus('syncing', '연결 중...');
+  if (initSupabase()) {
+    var remote = await loadFromSupabase();
+    if (remote) {
+      // 원격 데이터가 있으면 로컬보다 우선 (마지막 저장이 ground truth)
+      if (Array.isArray(remote.basic)) data.basic = remote.basic;
+      if (Array.isArray(remote.premium)) data.premium = remote.premium;
+      if (Array.isArray(remote.food)) data.food = remote.food;
+      // 로컬에도 백업
+      try {
+        localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));
+        localStorage.setItem(STORAGE_KEY_PREMIUM, JSON.stringify(data.premium));
+        localStorage.setItem(STORAGE_KEY_FOOD, JSON.stringify(data.food));
+      } catch (e) {}
+      render();
+    } else {
+      // 원격에 데이터 없으면 로컬 데이터로 첫 동기화
+      var hasAny = data.basic.length > 0 || data.premium.length > 0 || data.food.length > 0;
+      if (hasAny) {
+        await saveToSupabase();
+      }
+    }
+  } else {
+    setSyncStatus('local', '로컬 모드');
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>

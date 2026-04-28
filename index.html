@@ -399,11 +399,103 @@ input::-webkit-inner-spin-button {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* 잠금 화면 */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+.lock-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+.lock-icon {
+  font-size: 36px;
+  margin-bottom: 14px;
+}
+.lock-title {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+.lock-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 22px;
+}
+.lock-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+  font-family: inherit;
+  letter-spacing: 0.3em;
+  transition: border-color 0.15s;
+}
+.lock-input:focus { border-color: var(--accent); }
+.lock-error {
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 10px;
+  min-height: 16px;
+  font-weight: 600;
+}
+.lock-btn {
+  width: 100%;
+  padding: 14px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #1a1a1a;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.2s;
+}
+.lock-btn:active { opacity: 0.8; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.lock-card.shake { animation: shake 0.3s; }
 </style>
 </head>
 <body>
 
-<div class="container">
+<!-- 잠금 화면 -->
+<div class="lock-screen" id="lock-screen">
+  <div class="lock-card" id="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">찬스업 분석기</div>
+    <div class="lock-sub">비밀번호를 입력하세요</div>
+    <input type="password" class="lock-input" id="lock-input" inputmode="numeric" autocomplete="off" autofocus>
+    <div class="lock-error" id="lock-error"></div>
+    <button class="lock-btn" id="lock-btn">잠금 해제</button>
+  </div>
+</div>
+
+<div class="container" id="main-content" style="display:none;">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
     <h1>찬스업 당첨 분석기</h1>
@@ -1090,10 +1182,65 @@ async function init() {
   }
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
+// ============ 비밀번호 게이트 ============
+var PASSWORD_HASH = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
+var AUTH_KEY = 'chanceup_auth_v1';
+
+async function sha256Hex(text) {
+  var buf = new TextEncoder().encode(text);
+  var hash = await crypto.subtle.digest('SHA-256', buf);
+  var arr = Array.from(new Uint8Array(hash));
+  return arr.map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+function unlock() {
+  document.getElementById('lock-screen').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
   init();
+}
+
+async function tryUnlock() {
+  var input = document.getElementById('lock-input');
+  var err = document.getElementById('lock-error');
+  var card = document.getElementById('lock-card');
+  var pw = input.value;
+  if (!pw) return;
+  var hash = await sha256Hex(pw);
+  if (hash === PASSWORD_HASH) {
+    try { localStorage.setItem(AUTH_KEY, 'true'); } catch (e) {}
+    unlock();
+  } else {
+    err.textContent = '비밀번호가 틀려요';
+    card.classList.add('shake');
+    setTimeout(function () { card.classList.remove('shake'); }, 300);
+    input.value = '';
+    input.focus();
+  }
+}
+
+function bootGate() {
+  // 이미 인증되어 있으면 바로 통과
+  try {
+    if (localStorage.getItem(AUTH_KEY) === 'true') {
+      unlock();
+      return;
+    }
+  } catch (e) {}
+
+  // 잠금 화면 이벤트 바인딩
+  var btn = document.getElementById('lock-btn');
+  var input = document.getElementById('lock-input');
+  btn.addEventListener('click', tryUnlock);
+  input.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') tryUnlock();
+  });
+  input.focus();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootGate);
+} else {
+  bootGate();
 }
 </script>
 </body>

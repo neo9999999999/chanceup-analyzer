@@ -214,6 +214,186 @@ input::-webkit-inner-spin-button {
   font-weight: 700;
 }
 
+/* 기간 필터 */
+.range-filter {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background: var(--bg);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.range-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.range-btn.active {
+  background: var(--accent);
+  color: #1a1a1a;
+}
+
+/* 순위 슬롯 (1위/2위) */
+.rank-slot {
+  padding: 14px;
+  background: var(--bg);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+}
+.rank-slot.rank-1 {
+  border-color: rgba(212, 168, 73, 0.5);
+}
+body.premium .rank-slot.rank-1 {
+  border-color: rgba(167, 139, 250, 0.5);
+}
+body.food .rank-slot.rank-1 {
+  border-color: rgba(52, 211, 153, 0.5);
+}
+.rank-slot-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.rank-slot-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.rank-slot.rank-1 .rank-slot-pill {
+  background: var(--accent);
+  color: #1a1a1a;
+}
+.rank-slot-range {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.rank-slot.rank-1 .rank-slot-range {
+  font-size: 28px;
+}
+.rank-slot-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.rank-slot-meta strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+.rank-slot-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+/* 1등 흐름 분석 */
+.flow-recent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 14px;
+  background: var(--bg);
+  border-radius: 12px;
+}
+.flow-step {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  background: var(--card);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.flow-step.latest {
+  background: var(--accent);
+  color: #1a1a1a;
+  border-color: var(--accent);
+}
+.flow-step-num {
+  opacity: 0.6;
+  font-size: 10px;
+  margin-left: 3px;
+}
+.flow-step.latest .flow-step-num { opacity: 0.8; }
+.flow-arrow {
+  color: var(--text-dim);
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+.flow-pred-header {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.flow-pred-header strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+.flow-pred-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.flow-pred-item {
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.flow-pred-item.top {
+  border: 1px solid var(--accent);
+}
+.flow-pred-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+.flow-pred-decade {
+  font-size: 14px;
+  font-weight: 700;
+}
+.flow-pred-stat {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
+}
+.flow-pred-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  opacity: 0.1;
+  border-radius: 10px;
+  transition: width 0.3s;
+}
+
 .hits-list, .rank-list, .repeat-list, .rounds-list {
   display: flex;
   flex-direction: column;
@@ -523,14 +703,22 @@ input::-webkit-inner-spin-button {
     <button class="btn-primary" id="btn-add">등록</button>
   </div>
 
+  <!-- 1등 흐름 분석 -->
+  <div class="card" id="flow-card" style="display:none;">
+    <div class="card-title">🌊 1등 당첨 흐름</div>
+    <div class="flow-recent" id="flow-recent"></div>
+    <div id="flow-prediction"></div>
+  </div>
+
   <!-- 최고 적중 구간 -->
   <div class="card highlight" id="best-range-card" style="display:none;">
     <div class="card-title">⭐ 최고 적중 구간 (1·2·3등 통합)</div>
-    <div class="best-range-display">
-      <div class="best-range-num" id="best-range-num">-</div>
-      <div class="best-range-meta" id="best-range-meta"></div>
+    <div class="range-filter">
+      <button class="range-btn active" data-range="all">전체</button>
+      <button class="range-btn" data-range="20">최근 20회</button>
+      <button class="range-btn" data-range="10">최근 10회</button>
     </div>
-    <div class="hits-list" id="hits-list"></div>
+    <div id="best-ranges-container"></div>
   </div>
 
   <!-- 1등 핫 구간 TOP 5 -->
@@ -580,7 +768,42 @@ var INITIAL_BASIC = [
   { round: 771, first: 20, second: 52, third: 16 },
   { round: 772, first: 9, second: 68, third: 48 },
   { round: 774, first: 4, second: 65, third: 48 },
-  { round: 775, first: 76, second: 64, third: 5 }
+  { round: 775, first: 76, second: 64, third: 5 },
+  { round: 776, first: 59, second: 10, third: 78 },
+  { round: 777, first: 34, second: 100, third: 2 },
+  { round: 778, first: 74, second: 69, third: 87 },
+  { round: 780, first: 55, second: 44, third: 21 },
+  { round: 781, first: 92, second: 21, third: 5 },
+  { round: 782, first: 43, second: 54, third: 75 },
+  { round: 783, first: 57, second: 72, third: 25 },
+  { round: 784, first: 94, second: 85, third: 66 },
+  { round: 785, first: 48, second: 26, third: 98 },
+  { round: 786, first: 32, second: 10, third: 52 },
+  { round: 787, first: 90, second: 70, third: 87 },
+  { round: 788, first: 91, second: 54, third: 15 },
+  { round: 789, first: 58, second: 90, third: 55 },
+  { round: 790, first: 48, second: 57, third: 78 },
+  { round: 791, first: 40, second: 61, third: 49 },
+  { round: 792, first: 24, second: 76, third: 79 },
+  { round: 793, first: 23, second: 60, third: 49 },
+  { round: 794, first: 93, second: 49, third: 5 },
+  { round: 795, first: 5, second: 46, third: 99 },
+  { round: 796, first: 55, second: 90, third: 36 },
+  { round: 797, first: 57, second: 69, third: 7 },
+  { round: 798, first: 38, second: 15, third: 85 },
+  { round: 799, first: 30, second: 99, third: 69 },
+  { round: 800, first: 49, second: 9, third: 50 },
+  { round: 801, first: 3, second: 34, third: 17 },
+  { round: 802, first: 32, second: 75, third: 28 },
+  { round: 803, first: 20, second: 43, third: 40 },
+  { round: 804, first: 72, second: 53, third: 64 },
+  { round: 805, first: 65, second: 83, third: 82 },
+  { round: 806, first: 83, second: 86, third: 6 },
+  { round: 807, first: 15, second: 8, third: 52 },
+  { round: 808, first: 39, second: 30, third: 50 },
+  { round: 809, first: 5, second: 59, third: 3 },
+  { round: 810, first: 2, second: 72, third: 84 },
+  { round: 811, first: 7, second: 23, third: 25 }
 ];
 
 var INITIAL_PREMIUM = [
@@ -593,7 +816,15 @@ var INITIAL_PREMIUM = [
   { round: 418, first: 90, second: 25, third: 16 },
   { round: 419, first: 66, second: 63, third: 35 },
   { round: 420, first: 14, second: 94, third: 57 },
-  { round: 421, first: 64, second: 69, third: 18 }
+  { round: 421, first: 64, second: 69, third: 18 },
+  { round: 422, first: 70, second: 80, third: 64 },
+  { round: 423, first: 25, second: 31, third: 9 },
+  { round: 424, first: 58, second: 42, third: 79 },
+  { round: 425, first: 73, second: 45, third: 51 },
+  { round: 426, first: 58, second: 44, third: 87 },
+  { round: 427, first: 75, second: 16, third: 38 },
+  { round: 428, first: 4, second: 83, third: 14 },
+  { round: 429, first: 71, second: 8, third: 20 }
 ];
 
 var INITIAL_FOOD = [
@@ -605,7 +836,19 @@ var INITIAL_FOOD = [
   { round: 121, first: 78, second: 73, third: 19 },
   { round: 122, first: 84, second: 11, third: 19 },
   { round: 123, first: 27, second: 49, third: 12 },
-  { round: 124, first: 48, second: 54, third: 87 }
+  { round: 124, first: 48, second: 54, third: 87 },
+  { round: 125, first: 42, second: 94, third: 97 },
+  { round: 126, first: 11, second: 83, third: 53 },
+  { round: 127, first: 13, second: 88, third: 42 },
+  { round: 128, first: 66, second: 74, third: 47 },
+  { round: 129, first: 89, second: 91, third: 28 },
+  { round: 130, first: 87, second: 60, third: 31 },
+  { round: 131, first: 48, second: 25, third: 63 },
+  { round: 132, first: 32, second: 29, third: 50 },
+  { round: 133, first: 19, second: 26, third: 98 },
+  { round: 134, first: 82, second: 1, third: 39 },
+  { round: 135, first: 38, second: 3, third: 74 },
+  { round: 136, first: 2, second: 59, third: 32 }
 ];
 
 var STORAGE_KEY_BASIC = 'chanceup_basic_data_v1';
@@ -729,6 +972,7 @@ function debouncedSync() {
 // ============ 상태 ============
 var currentTab = 'basic';
 var data = { basic: [], premium: [], food: [] };
+var rangeFilter = { basic: 'all', premium: 'all', food: 'all' };
 
 // ============ 저장/로드 ============
 function loadData() {
@@ -769,10 +1013,9 @@ function getCurrent() {
 }
 
 // ============ 분석 ============
-function findBestRange(rows) {
-  if (rows.length === 0) return null;
-  var bestCount = 0;
-  var bestStart = 1;
+function findTopRanges(rows, topN) {
+  if (rows.length === 0) return [];
+  var rankings = [];
   for (var start = 1; start <= 91; start++) {
     var end = start + 9;
     var count = 0;
@@ -784,12 +1027,27 @@ function findBestRange(rows) {
         count++;
       }
     }
-    if (count > bestCount) {
-      bestCount = count;
-      bestStart = start;
+    rankings.push({ start: start, end: end, count: count });
+  }
+  rankings.sort(function (a, b) { return b.count - a.count; });
+  // 5칸 이상 떨어진 구간들로 top N 선택 (겹침 방지)
+  var picked = [];
+  for (var j = 0; j < rankings.length; j++) {
+    var item = rankings[j];
+    if (item.count === 0) break;
+    var tooClose = false;
+    for (var k = 0; k < picked.length; k++) {
+      if (Math.abs(item.start - picked[k].start) < 5) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (!tooClose) {
+      picked.push(item);
+      if (picked.length >= topN) break;
     }
   }
-  return { start: bestStart, end: bestStart + 9, count: bestCount };
+  return picked;
 }
 
 function getRangeHits(rows, start, end) {
@@ -837,6 +1095,39 @@ function findFirstRankRanges(rows, topN) {
     }
   }
   return picked;
+}
+
+// 1등 번호 → 10단위 구간 (1: 1-10, 2: 11-20, ..., 10: 91-100)
+function getDecade(n) {
+  if (n === 100) return 10;
+  return Math.ceil(n / 10);
+}
+function decadeLabel(d) {
+  if (d === 1) return '1~10';
+  if (d === 10) return '91~100';
+  return ((d - 1) * 10 + 1) + '~' + (d * 10);
+}
+
+function analyzeFlow(rows) {
+  if (rows.length < 2) return null;
+  var sorted = rows.slice();
+  sorted.sort(function (a, b) { return a.round - b.round; });
+
+  var transitions = {};  // {fromDecade: {toDecade: count}}
+  var sequence = [];     // [{round, decade, num}]
+
+  for (var i = 0; i < sorted.length; i++) {
+    var d = getDecade(sorted[i].first);
+    sequence.push({ round: sorted[i].round, decade: d, num: sorted[i].first });
+    if (i > 0) {
+      var prev = getDecade(sorted[i - 1].first);
+      if (!transitions[prev]) transitions[prev] = {};
+      if (!transitions[prev][d]) transitions[prev][d] = 0;
+      transitions[prev][d]++;
+    }
+  }
+
+  return { sequence: sequence, transitions: transitions };
 }
 
 function findRepeatNumbers(rows) {
@@ -905,26 +1196,64 @@ function render() {
   // 회차 카운트
   document.getElementById('round-count').textContent = '총 ' + rows.length + '회차';
 
-  // 최고 적중 구간
-  var best = findBestRange(rows);
+  // 최고 적중 구간 (1위 + 2위, 기간 필터 적용)
   var bestCard = document.getElementById('best-range-card');
-  if (best && best.count > 0) {
-    bestCard.style.display = 'block';
-    document.getElementById('best-range-num').textContent = best.start + '~' + best.end;
-    var pct = Math.round(best.count / rows.length * 100);
-    document.getElementById('best-range-meta').innerHTML =
-      rows.length + '회 중 <strong>' + best.count + '회</strong> 적중 ' +
-      '<strong>(' + pct + '%)</strong>';
+  var filterMode = rangeFilter[currentTab] || 'all';
 
-    var hits = getRangeHits(rows, best.start, best.end);
-    var hitsHtml = '';
-    for (var i = 0; i < hits.length; i++) {
-      hitsHtml += '<div class="hit-item">' +
-        '<span class="hit-round">' + hits[i].round + '회</span>' +
-        '<span>' + escapeHtml(hits[i].hits.join(', ')) + '</span>' +
+  // 기간 필터 버튼 active 상태
+  var rangeBtns = bestCard.querySelectorAll('.range-btn');
+  for (var rb = 0; rb < rangeBtns.length; rb++) {
+    if (rangeBtns[rb].dataset.range === filterMode) {
+      rangeBtns[rb].classList.add('active');
+    } else {
+      rangeBtns[rb].classList.remove('active');
+    }
+  }
+
+  // 회차 정렬 후 최근 N개 추출 (회차 큰 순)
+  var sortedByRound = rows.slice();
+  sortedByRound.sort(function (a, b) { return b.round - a.round; });
+  var filteredRows;
+  if (filterMode === '20') {
+    filteredRows = sortedByRound.slice(0, 20);
+  } else if (filterMode === '10') {
+    filteredRows = sortedByRound.slice(0, 10);
+  } else {
+    filteredRows = sortedByRound;
+  }
+
+  var topRanges = findTopRanges(filteredRows, 2);
+  if (topRanges.length > 0 && filteredRows.length > 0) {
+    bestCard.style.display = 'block';
+    var rangesHtml = '';
+    for (var rIdx = 0; rIdx < topRanges.length; rIdx++) {
+      var tr = topRanges[rIdx];
+      var rPct = Math.round(tr.count / filteredRows.length * 100);
+      var rankClass = (rIdx === 0) ? 'rank-slot rank-1' : 'rank-slot rank-2';
+      var rankLabel = (rIdx === 0) ? '1위' : '2위';
+
+      var hits = getRangeHits(filteredRows, tr.start, tr.end);
+      var hitsHtml = '';
+      for (var hi = 0; hi < hits.length; hi++) {
+        hitsHtml += '<div class="hit-item">' +
+          '<span class="hit-round">' + hits[hi].round + '회</span>' +
+          '<span>' + escapeHtml(hits[hi].hits.join(', ')) + '</span>' +
+          '</div>';
+      }
+
+      rangesHtml += '<div class="' + rankClass + '">' +
+        '<div class="rank-slot-header">' +
+          '<span class="rank-slot-pill">' + rankLabel + '</span>' +
+          '<span class="rank-slot-range">' + tr.start + '~' + tr.end + '</span>' +
+          '<span class="rank-slot-meta">' +
+            filteredRows.length + '회 중 <strong>' + tr.count + '회</strong> ' +
+            '<strong>(' + rPct + '%)</strong>' +
+          '</span>' +
+        '</div>' +
+        '<div class="rank-slot-hits">' + hitsHtml + '</div>' +
         '</div>';
     }
-    document.getElementById('hits-list').innerHTML = hitsHtml;
+    document.getElementById('best-ranges-container').innerHTML = rangesHtml;
   } else {
     bestCard.style.display = 'none';
   }
@@ -949,6 +1278,67 @@ function render() {
     document.getElementById('rank-list').innerHTML = rankHtml;
   } else {
     rankCard.style.display = 'none';
+  }
+
+  // 1등 흐름 분석
+  var flow = analyzeFlow(rows);
+  var flowCard = document.getElementById('flow-card');
+  if (flow && flow.sequence.length >= 2) {
+    flowCard.style.display = 'block';
+
+    // 최근 흐름 (최대 7회)
+    var recent = flow.sequence.slice(-7);
+    var recentHtml = '';
+    for (var fi = 0; fi < recent.length; fi++) {
+      if (fi > 0) recentHtml += '<span class="flow-arrow">→</span>';
+      var isLatest = (fi === recent.length - 1);
+      recentHtml += '<span class="flow-step' + (isLatest ? ' latest' : '') + '">' +
+        decadeLabel(recent[fi].decade) +
+        '<span class="flow-step-num">' + recent[fi].num + '</span>' +
+        '</span>';
+    }
+    document.getElementById('flow-recent').innerHTML = recentHtml;
+
+    // 마지막 1등 구간 → 다음 예측
+    var lastEntry = flow.sequence[flow.sequence.length - 1];
+    var lastDecade = lastEntry.decade;
+    var nextStats = flow.transitions[lastDecade] || {};
+    var nextEntries = [];
+    var totalNext = 0;
+    for (var key in nextStats) {
+      nextEntries.push({ decade: parseInt(key, 10), count: nextStats[key] });
+      totalNext += nextStats[key];
+    }
+    nextEntries.sort(function (a, b) { return b.count - a.count; });
+
+    var predHtml = '<div class="flow-pred-header">' +
+      '마지막 1등 <strong>' + lastEntry.num + '번</strong> (' + decadeLabel(lastDecade) + ')<br>' +
+      '과거 ' + decadeLabel(lastDecade) + ' 다음 회차의 1등 분포' +
+      '</div>';
+
+    if (nextEntries.length === 0) {
+      predHtml += '<div class="muted">데이터 없음 (이 구간이 처음 나옴)</div>';
+    } else {
+      predHtml += '<div class="flow-pred-list">';
+      var maxCount = nextEntries[0].count;
+      for (var pi = 0; pi < nextEntries.length; pi++) {
+        var ne = nextEntries[pi];
+        var pPct = Math.round(ne.count / totalNext * 100);
+        var barWidth = Math.round(ne.count / maxCount * 100);
+        var topClass = (pi === 0 && ne.count >= 2) ? ' top' : '';
+        predHtml += '<div class="flow-pred-item' + topClass + '">' +
+          '<div class="flow-pred-bar" style="width:' + barWidth + '%;"></div>' +
+          '<div class="flow-pred-row">' +
+            '<span class="flow-pred-decade">' + decadeLabel(ne.decade) + '</span>' +
+            '<span class="flow-pred-stat">' + ne.count + '회 (' + pPct + '%)</span>' +
+          '</div>' +
+          '</div>';
+      }
+      predHtml += '</div>';
+    }
+    document.getElementById('flow-prediction').innerHTML = predHtml;
+  } else {
+    flowCard.style.display = 'none';
   }
 
   // 반복 번호
@@ -1137,6 +1527,15 @@ async function init() {
 
   document.getElementById('btn-add').addEventListener('click', handleAdd);
 
+  // 기간 필터 버튼
+  var rangeBtns = document.querySelectorAll('.range-btn');
+  for (var rb = 0; rb < rangeBtns.length; rb++) {
+    rangeBtns[rb].addEventListener('click', function (e) {
+      rangeFilter[currentTab] = e.currentTarget.dataset.range;
+      render();
+    });
+  }
+
   // 백업/복원
   document.getElementById('btn-export').addEventListener('click', handleExport);
   document.getElementById('btn-import').addEventListener('click', function () {
@@ -1245,4 +1644,3 @@ if (document.readyState === 'loading') {
 </script>
 </body>
 </html>
-

@@ -1709,8 +1709,14 @@ async function init() {
   var tabs = document.querySelectorAll('.tab');
   for (var i = 0; i < tabs.length; i++) {
     tabs[i].addEventListener('click', function (e) {
-      currentTab = e.target.dataset.tab;
+      currentTab = e.currentTarget.dataset.tab;
+      // 탭 전환 시 입력 필드 초기화 후 새 탭의 회차로 갱신
+      document.getElementById('inp-round').value = '';
+      document.getElementById('inp-first').value = '';
+      document.getElementById('inp-second').value = '';
+      document.getElementById('inp-third').value = '';
       render();
+      fillNextRound();
     });
   }
 

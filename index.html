@@ -394,6 +394,78 @@ body.food .rank-slot.rank-1 {
   transition: width 0.3s;
 }
 
+/* 흐름 예측 통계 */
+.flow-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.flow-stat-item {
+  padding: 12px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+.flow-stat-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.flow-stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+.flow-stat-value.success { color: #22c55e; }
+.flow-stat-value.fail { color: #ef4444; }
+
+/* 회차별 예측 히스토리 */
+.flow-hist-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 18px;
+  margin-bottom: 10px;
+  letter-spacing: 0.05em;
+}
+.flow-hist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.flow-hist-item {
+  display: grid;
+  grid-template-columns: 24px 50px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 12px;
+  border-left: 2px solid transparent;
+}
+.flow-hist-item.success { border-left-color: #22c55e; }
+.flow-hist-item.fail { border-left-color: #ef4444; opacity: 0.65; }
+.flow-hist-icon { font-size: 13px; }
+.flow-hist-round {
+  font-weight: 700;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.flow-hist-actual {
+  font-weight: 600;
+}
+.flow-hist-pred {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
 .hits-list, .rank-list, .repeat-list, .rounds-list {
   display: flex;
   flex-direction: column;
@@ -1127,7 +1199,49 @@ function analyzeFlow(rows) {
     }
   }
 
-  return { sequence: sequence, transitions: transitions };
+  // 매 회차 예측 검증 (i번째 시점에 i-1까지의 누적 데이터로 i를 예측했다면 성공/실패 판정)
+  // 기준 A (top1): 누적 분포에서 1위 구간이 실제 적중했는지
+  // 기준 B (any): 누적 분포에 한번이라도 등장한 구간이 실제 적중했는지
+  var predictions = [];
+  for (var k = 2; k < sorted.length; k++) {
+    // sorted[k]를 예측: sorted[0..k-1]까지의 데이터로 transitions 누적 계산
+    var pastTrans = {};
+    for (var m = 1; m < k; m++) {
+      var pPrev = getDecade(sorted[m - 1].first);
+      var pCurr = getDecade(sorted[m].first);
+      if (!pastTrans[pPrev]) pastTrans[pPrev] = {};
+      if (!pastTrans[pPrev][pCurr]) pastTrans[pPrev][pCurr] = 0;
+      pastTrans[pPrev][pCurr]++;
+    }
+    var fromDecade = getDecade(sorted[k - 1].first);
+    var actualDecade = getDecade(sorted[k].first);
+    var distrib = pastTrans[fromDecade] || {};
+    var distribEntries = [];
+    for (var dKey in distrib) {
+      distribEntries.push({ decade: parseInt(dKey, 10), count: distrib[dKey] });
+    }
+    distribEntries.sort(function (a, b) { return b.count - a.count; });
+
+    var hasData = distribEntries.length > 0;
+    var topDecade = hasData ? distribEntries[0].decade : null;
+    var topHit = hasData && (topDecade === actualDecade);
+    var anyHit = false;
+    for (var dei = 0; dei < distribEntries.length; dei++) {
+      if (distribEntries[dei].decade === actualDecade) { anyHit = true; break; }
+    }
+    predictions.push({
+      round: sorted[k].round,
+      fromDecade: fromDecade,
+      actualDecade: actualDecade,
+      actualNum: sorted[k].first,
+      topDecade: topDecade,
+      topHit: topHit,
+      anyHit: anyHit,
+      hasData: hasData
+    });
+  }
+
+  return { sequence: sequence, transitions: transitions, predictions: predictions };
 }
 
 function findRepeatNumbers(rows) {
@@ -1299,6 +1413,34 @@ function render() {
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;
 
+    // 예측 적중률 통계
+    var preds = flow.predictions || [];
+    var totalPreds = preds.length;
+    var topHits = 0;
+    for (var ph = 0; ph < preds.length; ph++) {
+      if (preds[ph].topHit) topHits++;
+    }
+    var topPct = totalPreds > 0 ? Math.round(topHits / totalPreds * 100) : 0;
+    var failCount = totalPreds - topHits;
+
+    var statsHtml = '';
+    if (totalPreds > 0) {
+      statsHtml = '<div class="flow-stats">' +
+        '<div class="flow-stat-item">' +
+          '<div class="flow-stat-label">예측 성공</div>' +
+          '<div class="flow-stat-value success">' + topHits + '회</div>' +
+        '</div>' +
+        '<div class="flow-stat-item">' +
+          '<div class="flow-stat-label">예측 실패</div>' +
+          '<div class="flow-stat-value fail">' + failCount + '회</div>' +
+        '</div>' +
+        '<div class="flow-stat-item">' +
+          '<div class="flow-stat-label">적중률</div>' +
+          '<div class="flow-stat-value">' + topPct + '%</div>' +
+        '</div>' +
+      '</div>';
+    }
+
     // 마지막 1등 구간 → 다음 예측
     var lastEntry = flow.sequence[flow.sequence.length - 1];
     var lastDecade = lastEntry.decade;
@@ -1311,7 +1453,8 @@ function render() {
     }
     nextEntries.sort(function (a, b) { return b.count - a.count; });
 
-    var predHtml = '<div class="flow-pred-header">' +
+    var predHtml = statsHtml +
+      '<div class="flow-pred-header">' +
       '마지막 1등 <strong>' + lastEntry.num + '번</strong> (' + decadeLabel(lastDecade) + ')<br>' +
       '과거 ' + decadeLabel(lastDecade) + ' 다음 회차의 1등 분포' +
       '</div>';
@@ -1336,6 +1479,32 @@ function render() {
       }
       predHtml += '</div>';
     }
+
+    // 회차별 예측 히스토리 (최근 → 과거 순)
+    if (preds.length > 0) {
+      var sortedPreds = preds.slice();
+      sortedPreds.sort(function (a, b) { return b.round - a.round; });
+      var histHtml = '<div class="flow-hist-title">📋 회차별 예측 결과</div><div class="flow-hist-list">';
+      for (var hp = 0; hp < sortedPreds.length; hp++) {
+        var pr = sortedPreds[hp];
+        var icon, statusClass;
+        if (pr.hasData && pr.topHit) {
+          icon = '✅'; statusClass = 'success';
+        } else {
+          icon = '❌'; statusClass = 'fail';
+        }
+        var predText = pr.hasData ? '예측: ' + decadeLabel(pr.topDecade) : '예측 데이터 없음';
+        histHtml += '<div class="flow-hist-item ' + statusClass + '">' +
+          '<span class="flow-hist-icon">' + icon + '</span>' +
+          '<span class="flow-hist-round">' + pr.round + '회</span>' +
+          '<span class="flow-hist-actual">' + pr.actualNum + ' (' + decadeLabel(pr.actualDecade) + ')</span>' +
+          '<span class="flow-hist-pred">' + predText + '</span>' +
+        '</div>';
+      }
+      histHtml += '</div>';
+      predHtml += histHtml;
+    }
+
     document.getElementById('flow-prediction').innerHTML = predHtml;
   } else {
     flowCard.style.display = 'none';
@@ -1399,6 +1568,12 @@ function render() {
       });
     }
   }
+
+  // 다음 회차 자동 채움 (입력 비어있을 때만)
+  var roundInput = document.getElementById('inp-round');
+  if (roundInput && !roundInput.value) {
+    fillNextRound();
+  }
 }
 
 // ============ 액션 ============
@@ -1439,12 +1614,26 @@ function handleAdd() {
   saveData();
   render();
 
-  // 입력 비우기
-  document.getElementById('inp-round').value = '';
+  // 입력 비우기 + 다음 회차 자동 채움
   document.getElementById('inp-first').value = '';
   document.getElementById('inp-second').value = '';
   document.getElementById('inp-third').value = '';
-  document.getElementById('inp-round').focus();
+  fillNextRound();
+  document.getElementById('inp-first').focus();
+}
+
+function fillNextRound() {
+  var current = getCurrent();
+  var roundInput = document.getElementById('inp-round');
+  if (current.length === 0) {
+    roundInput.value = '';
+    return;
+  }
+  var maxRound = 0;
+  for (var i = 0; i < current.length; i++) {
+    if (current[i].round > maxRound) maxRound = current[i].round;
+  }
+  roundInput.value = maxRound + 1;
 }
 
 function handleDelete(roundNum) {

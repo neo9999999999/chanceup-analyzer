@@ -469,18 +469,17 @@ body.food .rank-slot.rank-1 {
 .prob-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 360px;
+  gap: 8px;
+  max-height: 480px;
   overflow-y: auto;
 }
 .prob-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
   background: var(--bg);
-  border-radius: 10px;
+  border-radius: 12px;
   position: relative;
   overflow: hidden;
   border: 1px solid transparent;
@@ -494,25 +493,42 @@ body.food .rank-slot.rank-1 {
   top: 0;
   bottom: 0;
   background: var(--accent);
-  opacity: 0.12;
-  border-radius: 10px;
+  opacity: 0.1;
+  border-radius: 12px;
   pointer-events: none;
 }
-.prob-decade {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--text);
+.prob-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   position: relative;
   z-index: 1;
+}
+.prob-rank-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
   flex-shrink: 0;
+}
+.prob-item.top .prob-rank-pill {
+  background: var(--accent);
+  color: #1a1a1a;
+}
+.prob-decade {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
   letter-spacing: -0.01em;
+  flex-shrink: 0;
 }
 .prob-item.top .prob-decade { color: var(--accent); }
 .prob-meta {
   font-size: 12px;
   color: var(--text-dim);
-  position: relative;
-  z-index: 1;
   font-weight: 600;
   margin-left: auto;
   flex-shrink: 0;
@@ -521,11 +537,35 @@ body.food .rank-slot.rank-1 {
   font-size: 16px;
   font-weight: 800;
   color: var(--accent);
-  position: relative;
-  z-index: 1;
   flex-shrink: 0;
   min-width: 56px;
   text-align: right;
+}
+.prob-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  z-index: 1;
+  margin-top: 4px;
+}
+.prob-hit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--card);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.prob-hit-round {
+  color: var(--text-dim);
+  font-weight: 700;
+  min-width: 44px;
+}
+.prob-hit-num {
+  font-weight: 600;
+  color: var(--text);
 }
 .flow-hist-icon { font-size: 13px; }
 .flow-hist-round {
@@ -1382,7 +1422,7 @@ function analyzeFlow(rows) {
   return { sequence: sequence, transitions: transitions, predictions: predictions };
 }
 
-// 1등 10단위 구간 확률 (직전 회차 1등 구간 제외)
+// 1등 슬라이딩 10-window 구간 분석 (직전 회차 제외, 5칸 이상 떨어진 top 3)
 function analyzeFirstProb(rows, mode) {
   if (rows.length === 0) return null;
   var sorted = rows.slice();
@@ -1390,7 +1430,6 @@ function analyzeFirstProb(rows, mode) {
 
   var lastFirstNum = sorted[0].first;
   var lastRound = sorted[0].round;
-  var excludedDecade = getDecade(lastFirstNum);
 
   // 직전 회차 제외
   var pool = sorted.slice(1);
@@ -1404,41 +1443,52 @@ function analyzeFirstProb(rows, mode) {
 
   if (subset.length === 0) return null;
 
-  // 1~10대 ~ 91~100대 (1~10) 카운트, 직전 1등 구간은 제외
-  var counter = {};
-  var totalCount = 0;
-  for (var i = 0; i < subset.length; i++) {
-    var d = getDecade(subset[i].first);
-    if (d === excludedDecade) continue;
-    counter[d] = (counter[d] || 0) + 1;
-    totalCount++;
+  // 슬라이딩 10-window (1~10, 2~11, 3~12, ..., 91~100) 모두 카운트
+  var rankings = [];
+  for (var start = 1; start <= 91; start++) {
+    var end = start + 9;
+    var hits = [];
+    for (var i = 0; i < subset.length; i++) {
+      if (subset[i].first >= start && subset[i].first <= end) {
+        hits.push({ round: subset[i].round, num: subset[i].first });
+      }
+    }
+    rankings.push({ start: start, end: end, count: hits.length, hits: hits });
   }
-
-  if (totalCount === 0) return null;
-
-  var entries = [];
-  for (var k in counter) {
-    var dNum = parseInt(k, 10);
-    entries.push({
-      decade: dNum,
-      label: decadeLabel(dNum),
-      count: counter[k],
-      pct: Math.round(counter[k] / totalCount * 1000) / 10
-    });
-  }
-  entries.sort(function (a, b) {
+  rankings.sort(function (a, b) {
     if (b.count !== a.count) return b.count - a.count;
-    return a.decade - b.decade;
+    return a.start - b.start;
   });
+
+  // 5칸 이상 떨어진 top 3 (구간 겹침 방지)
+  var picked = [];
+  for (var j = 0; j < rankings.length; j++) {
+    var item = rankings[j];
+    if (item.count === 0) break;
+    var tooClose = false;
+    for (var k = 0; k < picked.length; k++) {
+      if (Math.abs(item.start - picked[k].start) < 5) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (!tooClose) {
+      // 회차 큰 순으로 정렬
+      item.hits.sort(function (a, b) { return b.round - a.round; });
+      // 퍼센트 계산
+      item.pct = Math.round(item.count / subset.length * 1000) / 10;
+      picked.push(item);
+      if (picked.length >= 3) break;
+    }
+  }
+
+  if (picked.length === 0) return null;
 
   return {
     excludedNum: lastFirstNum,
-    excludedDecade: excludedDecade,
-    excludedLabel: decadeLabel(excludedDecade),
     excludedRound: lastRound,
     subsetSize: subset.length,
-    totalCount: totalCount,
-    entries: entries
+    entries: picked
   };
 }
 
@@ -1727,8 +1777,8 @@ function render() {
     probCard.style.display = 'block';
     var modeLabel = probMode === 'all' ? '전체' : ('최근 ' + probMode + '회');
     document.getElementById('prob-info').innerHTML =
-      '직전 ' + probData.excludedRound + '회 1등 <strong>' + probData.excludedNum + '번 (' + probData.excludedLabel + ')</strong> 구간은 제외 · ' +
-      modeLabel + ' 분석 · 유효 ' + probData.totalCount + '건';
+      '직전 ' + probData.excludedRound + '회 (1등 <strong>' + probData.excludedNum + '번</strong>) 제외 · ' +
+      modeLabel + ' 분석 (' + probData.subsetSize + '회 데이터)';
 
     var probHtml = '<div class="prob-list">';
     var maxPct = probData.entries[0].pct;
@@ -1736,11 +1786,26 @@ function render() {
       var en = probData.entries[ei];
       var barWidth = Math.round(en.pct / maxPct * 100);
       var topClass = (ei === 0) ? ' top' : '';
+      var rankLabel = (ei === 0) ? '1위' : (ei === 1) ? '2위' : '3위';
+
+      // 당첨 회차 리스트 HTML
+      var hitsHtml = '';
+      for (var hi = 0; hi < en.hits.length; hi++) {
+        hitsHtml += '<div class="prob-hit">' +
+          '<span class="prob-hit-round">' + en.hits[hi].round + '회</span>' +
+          '<span class="prob-hit-num">1등 ' + en.hits[hi].num + '번</span>' +
+          '</div>';
+      }
+
       probHtml += '<div class="prob-item' + topClass + '">' +
         '<div class="prob-bar" style="width:' + barWidth + '%;"></div>' +
-        '<span class="prob-decade">' + en.label + '</span>' +
-        '<span class="prob-meta">' + en.count + '회</span>' +
-        '<span class="prob-pct">' + en.pct + '%</span>' +
+        '<div class="prob-header">' +
+          '<span class="prob-rank-pill">' + rankLabel + '</span>' +
+          '<span class="prob-decade">' + en.start + '~' + en.end + '</span>' +
+          '<span class="prob-meta">' + en.count + '회</span>' +
+          '<span class="prob-pct">' + en.pct + '%</span>' +
+        '</div>' +
+        '<div class="prob-hits">' + hitsHtml + '</div>' +
         '</div>';
     }
     probHtml += '</div>';

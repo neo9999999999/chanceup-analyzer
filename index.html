@@ -214,95 +214,99 @@ input::-webkit-inner-spin-button {
   font-weight: 700;
 }
 
-/* 기간 필터 */
-.range-filter {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 16px;
-  padding: 4px;
+/* 🎯 베팅 추천 카드 */
+.betting-info {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  line-height: 1.5;
+}
+.betting-info strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+.betting-section {
+  margin-bottom: 14px;
+}
+.betting-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 10px;
+  letter-spacing: 0.03em;
+}
+.betting-section-title.warn {
+  color: #ef4444;
+}
+.betting-numbers {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.betting-number {
+  background: var(--accent);
+  color: #1a1a1a;
+  border-radius: 10px;
+  padding: 14px 8px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  position: relative;
+}
+.betting-number .bn-count {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(0,0,0,0.2);
+  border-radius: 999px;
+  padding: 1px 6px;
+  letter-spacing: 0.03em;
+}
+.betting-numbers.warn .betting-number {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.betting-numbers.warn .betting-number .bn-count {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+}
+.betting-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 14px;
   background: var(--bg);
   border-radius: 10px;
   border: 1px solid var(--border);
 }
-.range-btn {
-  flex: 1;
-  padding: 8px 4px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-dim);
-  font-weight: 700;
-  font-size: 12px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s;
+.betting-stat {
+  text-align: center;
 }
-.range-btn.active {
-  background: var(--accent);
-  color: #1a1a1a;
-}
-
-/* 순위 슬롯 (1위/2위) */
-.rank-slot {
-  padding: 14px;
-  background: var(--bg);
-  border-radius: 12px;
-  margin-bottom: 10px;
-  border: 1px solid var(--border);
-}
-.rank-slot.rank-1 {
-  border-color: rgba(212, 168, 73, 0.5);
-}
-body.premium .rank-slot.rank-1 {
-  border-color: rgba(167, 139, 250, 0.5);
-}
-body.food .rank-slot.rank-1 {
-  border-color: rgba(52, 211, 153, 0.5);
-}
-.rank-slot-header {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-.rank-slot-pill {
+.betting-stat-label {
   font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--card);
   color: var(--text-dim);
+  font-weight: 600;
   letter-spacing: 0.05em;
-  flex-shrink: 0;
+  margin-bottom: 4px;
 }
-.rank-slot.rank-1 .rank-slot-pill {
-  background: var(--accent);
-  color: #1a1a1a;
-}
-.rank-slot-range {
-  font-size: 24px;
+.betting-stat-value {
+  font-size: 18px;
   font-weight: 800;
-  letter-spacing: -0.02em;
-}
-.rank-slot.rank-1 .rank-slot-range {
-  font-size: 28px;
-}
-.rank-slot-meta {
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.rank-slot-meta strong {
   color: var(--accent);
-  font-weight: 700;
 }
-.rank-slot-hits {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-  max-height: 180px;
-  overflow-y: auto;
+.betting-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-dim);
+  font-size: 13px;
 }
 
 /* 1등 흐름 분석 */
@@ -422,165 +426,84 @@ body.food .rank-slot.rank-1 {
 .flow-stat-value.success { color: #22c55e; }
 .flow-stat-value.fail { color: #ef4444; }
 
-/* 회차별 예측 히스토리 */
-.flow-hist-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--accent);
-  margin-top: 18px;
-  margin-bottom: 10px;
-  letter-spacing: 0.05em;
-}
-.flow-hist-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-.flow-hist-item {
-  display: grid;
-  grid-template-columns: 24px 50px 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding: 7px 10px;
-  background: var(--bg);
-  border-radius: 8px;
-  font-size: 12px;
-  border-left: 2px solid transparent;
-}
-.flow-hist-item.success { border-left-color: #22c55e; }
-.flow-hist-item.fail { border-left-color: #ef4444; opacity: 0.65; }
 
-/* 1등 확률 카드 */
-.prob-info {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  background: var(--bg);
-  border-radius: 8px;
-  line-height: 1.5;
-}
-.prob-info strong {
-  color: var(--accent);
-  font-weight: 700;
-}
-.prob-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 480px;
-  overflow-y: auto;
-}
-.prob-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  background: var(--bg);
-  border-radius: 12px;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid transparent;
-}
-.prob-item.top {
+/* 1등 흐름 색상 강조 (반복 패턴) */
+.flow-step.repeat-2 {
+  background: rgba(212, 168, 73, 0.25);
   border-color: var(--accent);
+  color: var(--accent);
 }
-.prob-bar {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  background: var(--accent);
-  opacity: 0.1;
-  border-radius: 12px;
-  pointer-events: none;
+body.premium .flow-step.repeat-2 {
+  background: rgba(167, 139, 250, 0.25);
 }
-.prob-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  position: relative;
-  z-index: 1;
+body.food .flow-step.repeat-2 {
+  background: rgba(52, 211, 153, 0.25);
 }
-.prob-rank-pill {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--text-dim);
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
-}
-.prob-item.top .prob-rank-pill {
+.flow-step.repeat-3 {
   background: var(--accent);
   color: #1a1a1a;
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(212, 168, 73, 0.4);
 }
-.prob-decade {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--text);
-  letter-spacing: -0.01em;
-  flex-shrink: 0;
+body.premium .flow-step.repeat-3 {
+  box-shadow: 0 0 12px rgba(167, 139, 250, 0.4);
 }
-.prob-item.top .prob-decade { color: var(--accent); }
-.prob-meta {
+body.food .flow-step.repeat-3 {
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.4);
+}
+
+/* 반복 적중 번호 테이블 */
+.repeat-table {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.repeat-row {
+  display: grid;
+  grid-template-columns: 56px 50px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--card);
   font-size: 12px;
-  color: var(--text-dim);
-  font-weight: 600;
-  margin-left: auto;
-  flex-shrink: 0;
 }
-.prob-pct {
+.repeat-row.head {
+  background: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  padding: 8px 14px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.rt-num {
   font-size: 16px;
   font-weight: 800;
   color: var(--accent);
-  flex-shrink: 0;
-  min-width: 56px;
-  text-align: right;
 }
-.prob-hits {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  position: relative;
-  z-index: 1;
-  margin-top: 4px;
-}
-.prob-hit {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  background: var(--card);
-  border-radius: 6px;
+.rt-count {
   font-size: 12px;
-}
-.prob-hit-round {
-  color: var(--text-dim);
-  font-weight: 700;
-  min-width: 44px;
-}
-.prob-hit-num {
-  font-weight: 600;
   color: var(--text);
-}
-.flow-hist-icon { font-size: 13px; }
-.flow-hist-round {
   font-weight: 700;
-  color: var(--text-dim);
-  font-size: 11px;
 }
-.flow-hist-actual {
-  font-weight: 600;
-}
-.flow-hist-pred {
+.rt-history {
   font-size: 11px;
   color: var(--text-dim);
+  word-break: keep-all;
+  line-height: 1.4;
+}
+.rt-history strong {
+  color: var(--text);
   font-weight: 600;
 }
+
 
 .hits-list, .rank-list, .repeat-list, .rounds-list {
   display: flex;
@@ -891,50 +814,35 @@ body.food .rank-slot.rank-1 {
     <button class="btn-primary" id="btn-add">등록</button>
   </div>
 
-  <!-- 1등 흐름 분석 -->
+  <!-- 🎯 베팅 추천 -->
+  <div class="card highlight" id="betting-card" style="display:none;">
+    <div class="card-title" id="betting-title">🎯 베팅 추천</div>
+    <div class="betting-info" id="betting-info"></div>
+    <div class="betting-section">
+      <div class="betting-section-title">🔥 추천 번호 10개 (2회 우선, 보충)</div>
+      <div class="betting-numbers" id="betting-numbers-2"></div>
+    </div>
+    <div class="betting-stats" id="betting-stats"></div>
+    <div class="betting-section" id="betting-warn-section" style="display:none;">
+      <div class="betting-section-title warn">⚠️ 제외 (3회+ 식어가는 번호)</div>
+      <div class="betting-numbers warn" id="betting-numbers-warn"></div>
+    </div>
+  </div>
+
+  <!-- 🌊 1등 흐름 분석 -->
   <div class="card" id="flow-card" style="display:none;">
     <div class="card-title">🌊 1등 당첨 흐름</div>
     <div class="flow-recent" id="flow-recent"></div>
-    <div id="flow-prediction"></div>
+    <div id="flow-stats-only"></div>
   </div>
 
-  <!-- 최고 적중 구간 -->
-  <div class="card highlight" id="best-range-card" style="display:none;">
-    <div class="card-title">⭐ 최고 적중 구간 (1·2·3등 통합)</div>
-    <div class="range-filter">
-      <button class="range-btn active" data-range="all">전체</button>
-      <button class="range-btn" data-range="20">최근 20회</button>
-      <button class="range-btn" data-range="10">최근 10회</button>
-    </div>
-    <div id="best-ranges-container"></div>
-  </div>
-
-  <!-- 1등 핫 구간 TOP 5 -->
-  <div class="card" id="rank-card" style="display:none;">
-    <div class="card-title">🥇 1등 핫 구간 TOP 5</div>
-    <div class="rank-list" id="rank-list"></div>
-  </div>
-
-  <!-- 1등 번호 확률 -->
-  <div class="card" id="prob-card" style="display:none;">
-    <div class="card-title">🎲 1등 번호 확률 (직전 1등 제외)</div>
-    <div class="range-filter">
-      <button class="range-btn prob-btn active" data-prob="10">최근 10회</button>
-      <button class="range-btn prob-btn" data-prob="20">최근 20회</button>
-      <button class="range-btn prob-btn" data-prob="30">최근 30회</button>
-      <button class="range-btn prob-btn" data-prob="all">전체</button>
-    </div>
-    <div class="prob-info" id="prob-info"></div>
-    <div id="prob-list"></div>
-  </div>
-
-  <!-- 반복 적중 번호 -->
+  <!-- 🔁 반복 적중 번호 -->
   <div class="card" id="repeat-card" style="display:none;">
     <div class="card-title">🔁 반복 적중 번호</div>
-    <div class="repeat-list" id="repeat-list"></div>
+    <div id="repeat-table"></div>
   </div>
 
-  <!-- 회차별 당첨번호 -->
+  <!-- 📋 회차별 당첨번호 -->
   <div class="card">
     <div class="flex-between">
       <div class="card-title" style="margin-bottom:0;">📋 회차별 당첨번호</div>
@@ -1202,8 +1110,6 @@ function debouncedSync() {
 // ============ 상태 ============
 var currentTab = 'basic';
 var data = { basic: [], premium: [], food: [] };
-var rangeFilter = { basic: 'all', premium: 'all', food: 'all' };
-var probFilter = { basic: '10', premium: '10', food: '10' };
 
 // ============ 저장/로드 ============
 // INITIAL 데이터와 localStorage 데이터를 병합 (회차 기준 dedupe)
@@ -1263,90 +1169,6 @@ function getCurrent() {
 }
 
 // ============ 분석 ============
-function findTopRanges(rows, topN) {
-  if (rows.length === 0) return [];
-  var rankings = [];
-  for (var start = 1; start <= 91; start++) {
-    var end = start + 9;
-    var count = 0;
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      if ((r.first >= start && r.first <= end) ||
-          (r.second >= start && r.second <= end) ||
-          (r.third >= start && r.third <= end)) {
-        count++;
-      }
-    }
-    rankings.push({ start: start, end: end, count: count });
-  }
-  rankings.sort(function (a, b) { return b.count - a.count; });
-  // 5칸 이상 떨어진 구간들로 top N 선택 (겹침 방지)
-  var picked = [];
-  for (var j = 0; j < rankings.length; j++) {
-    var item = rankings[j];
-    if (item.count === 0) break;
-    var tooClose = false;
-    for (var k = 0; k < picked.length; k++) {
-      if (Math.abs(item.start - picked[k].start) < 5) {
-        tooClose = true;
-        break;
-      }
-    }
-    if (!tooClose) {
-      picked.push(item);
-      if (picked.length >= topN) break;
-    }
-  }
-  return picked;
-}
-
-function getRangeHits(rows, start, end) {
-  var hits = [];
-  for (var i = 0; i < rows.length; i++) {
-    var r = rows[i];
-    var inRange = [];
-    if (r.first >= start && r.first <= end) inRange.push('1등 ' + r.first);
-    if (r.second >= start && r.second <= end) inRange.push('2등 ' + r.second);
-    if (r.third >= start && r.third <= end) inRange.push('3등 ' + r.third);
-    if (inRange.length > 0) {
-      hits.push({ round: r.round, hits: inRange });
-    }
-  }
-  hits.sort(function (a, b) { return b.round - a.round; });
-  return hits;
-}
-
-function findFirstRankRanges(rows, topN) {
-  if (rows.length === 0) return [];
-  var rankings = [];
-  for (var start = 1; start <= 91; start++) {
-    var end = start + 9;
-    var count = 0;
-    for (var i = 0; i < rows.length; i++) {
-      if (rows[i].first >= start && rows[i].first <= end) count++;
-    }
-    rankings.push({ start: start, end: end, count: count });
-  }
-  rankings.sort(function (a, b) { return b.count - a.count; });
-  var picked = [];
-  for (var j = 0; j < rankings.length; j++) {
-    var item = rankings[j];
-    if (item.count === 0) break;
-    var tooClose = false;
-    for (var k = 0; k < picked.length; k++) {
-      if (Math.abs(item.start - picked[k].start) < 5) {
-        tooClose = true;
-        break;
-      }
-    }
-    if (!tooClose) {
-      picked.push(item);
-      if (picked.length >= topN) break;
-    }
-  }
-  return picked;
-}
-
 // 1등 번호 → 10단위 구간 (1: 1-10, 2: 11-20, ..., 10: 91-100)
 function getDecade(n) {
   if (n === 100) return 10;
@@ -1422,73 +1244,88 @@ function analyzeFlow(rows) {
   return { sequence: sequence, transitions: transitions, predictions: predictions };
 }
 
-// 1등 슬라이딩 10-window 구간 분석 (직전 회차 제외, 5칸 이상 떨어진 top 3)
-function analyzeFirstProb(rows, mode) {
-  if (rows.length === 0) return null;
+// 게임별 백테스트 적중률 (딱 2회만 전략, 검증 결과)
+var BETTING_STATS = {
+  basic:   { p1: 19.4, p12: 36.1, pany: 50.0 },
+  premium: { p1: 19.4, p12: 36.1, pany: 50.0 }, // 표본부족, 기본 적용
+  food:    { p1: 28.6, p12: 28.6, pany: 28.6 }
+};
+
+// 🎯 베팅 추천 분석 (최근 20회 1·2·3등 빈도)
+function analyzeBetting(rows) {
+  if (rows.length < 5) return null;
+
   var sorted = rows.slice();
   sorted.sort(function (a, b) { return b.round - a.round; });
 
-  var lastFirstNum = sorted[0].first;
-  var lastRound = sorted[0].round;
+  // 최근 20회 (없으면 전체)
+  var subset = sorted.slice(0, Math.min(20, sorted.length));
+  var windowSize = subset.length;
 
-  // 직전 회차 제외
-  var pool = sorted.slice(1);
-
-  // 모드별 슬라이스
-  var subset;
-  if (mode === '10') subset = pool.slice(0, 10);
-  else if (mode === '20') subset = pool.slice(0, 20);
-  else if (mode === '30') subset = pool.slice(0, 30);
-  else subset = pool;
-
-  if (subset.length === 0) return null;
-
-  // 슬라이딩 10-window (1~10, 2~11, 3~12, ..., 91~100) 모두 카운트
-  var rankings = [];
-  for (var start = 1; start <= 91; start++) {
-    var end = start + 9;
-    var hits = [];
-    for (var i = 0; i < subset.length; i++) {
-      if (subset[i].first >= start && subset[i].first <= end) {
-        hits.push({ round: subset[i].round, num: subset[i].first });
-      }
+  // 번호별 카운트 + history + 가장 최신 회차
+  var counter = {};
+  var hist = {};
+  var lastSeen = {};
+  for (var i = 0; i < subset.length; i++) {
+    var r = subset[i];
+    var entries = [
+      { n: r.first,  label: r.round + '·1등' },
+      { n: r.second, label: r.round + '·2등' },
+      { n: r.third,  label: r.round + '·3등' }
+    ];
+    for (var j = 0; j < entries.length; j++) {
+      var k = entries[j].n;
+      counter[k] = (counter[k] || 0) + 1;
+      if (!hist[k]) hist[k] = [];
+      hist[k].push(entries[j].label);
+      // subset은 회차 desc로 정렬됨 → 첫 등장이 가장 최신
+      if (lastSeen[k] === undefined) lastSeen[k] = r.round;
     }
-    rankings.push({ start: start, end: end, count: hits.length, hits: hits });
   }
-  rankings.sort(function (a, b) {
-    if (b.count !== a.count) return b.count - a.count;
-    return a.start - b.start;
+
+  var dup2_pool = []; // 딱 2회 (최우선)
+  var dup1_pool = []; // 1회 (보충용)
+  var dup3 = [];      // 3회+ (제외)
+  for (var key in counter) {
+    var num = parseInt(key, 10);
+    var c = counter[key];
+    var item = { number: num, count: c, history: hist[key], lastRound: lastSeen[key] };
+    if (c === 2) dup2_pool.push(item);
+    else if (c === 1) dup1_pool.push(item);
+    else if (c >= 3) dup3.push(item);
+  }
+
+  // 정렬 기준: 빈도 desc → 최신 회차 desc → 번호 asc
+  dup2_pool.sort(function (a, b) {
+    if (b.lastRound !== a.lastRound) return b.lastRound - a.lastRound;
+    return a.number - b.number;
+  });
+  dup1_pool.sort(function (a, b) {
+    if (b.lastRound !== a.lastRound) return b.lastRound - a.lastRound;
+    return a.number - b.number;
   });
 
-  // 5칸 이상 떨어진 top 3 (구간 겹침 방지)
-  var picked = [];
-  for (var j = 0; j < rankings.length; j++) {
-    var item = rankings[j];
-    if (item.count === 0) break;
-    var tooClose = false;
-    for (var k = 0; k < picked.length; k++) {
-      if (Math.abs(item.start - picked[k].start) < 5) {
-        tooClose = true;
-        break;
-      }
-    }
-    if (!tooClose) {
-      // 회차 큰 순으로 정렬
-      item.hits.sort(function (a, b) { return b.round - a.round; });
-      // 퍼센트 계산
-      item.pct = Math.round(item.count / subset.length * 1000) / 10;
-      picked.push(item);
-      if (picked.length >= 3) break;
-    }
+  // 정확히 10개: 2회 우선 → 부족시 1회 최신 보충
+  var dup2 = [];
+  for (var p = 0; p < dup2_pool.length && dup2.length < 10; p++) {
+    dup2.push(dup2_pool[p]);
+  }
+  for (var q = 0; q < dup1_pool.length && dup2.length < 10; q++) {
+    dup2.push(dup1_pool[q]);
   }
 
-  if (picked.length === 0) return null;
+  // 표시용 정렬: 번호 작은 순
+  dup2.sort(function (a, b) { return a.number - b.number; });
+  dup3.sort(function (a, b) {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.number - b.number;
+  });
 
   return {
-    excludedNum: lastFirstNum,
-    excludedRound: lastRound,
-    subsetSize: subset.length,
-    entries: picked
+    windowSize: windowSize,
+    dup2: dup2,
+    dup3: dup3,
+    stats: BETTING_STATS[currentTab] || BETTING_STATS.basic
   };
 }
 
@@ -1558,110 +1395,108 @@ function render() {
   // 회차 카운트
   document.getElementById('round-count').textContent = '총 ' + rows.length + '회차';
 
-  // 최고 적중 구간 (1위 + 2위, 기간 필터 적용)
-  var bestCard = document.getElementById('best-range-card');
-  var filterMode = rangeFilter[currentTab] || 'all';
+  // 🎯 베팅 추천 (최근 20회 1·2·3등 빈도 분석)
+  var bettingCard = document.getElementById('betting-card');
+  var betting = analyzeBetting(rows);
+  if (betting) {
+    bettingCard.style.display = 'block';
 
-  // 기간 필터 버튼 active 상태
-  var rangeBtns = bestCard.querySelectorAll('.range-btn');
-  for (var rb = 0; rb < rangeBtns.length; rb++) {
-    if (rangeBtns[rb].dataset.range === filterMode) {
-      rangeBtns[rb].classList.add('active');
-    } else {
-      rangeBtns[rb].classList.remove('active');
+    // 다음 회차 번호
+    var maxR = 0;
+    for (var br = 0; br < rows.length; br++) {
+      if (rows[br].round > maxR) maxR = rows[br].round;
     }
-  }
+    var nextRound = maxR + 1;
 
-  // 회차 정렬 후 최근 N개 추출 (회차 큰 순)
-  var sortedByRound = rows.slice();
-  sortedByRound.sort(function (a, b) { return b.round - a.round; });
-  var filteredRows;
-  if (filterMode === '20') {
-    filteredRows = sortedByRound.slice(0, 20);
-  } else if (filterMode === '10') {
-    filteredRows = sortedByRound.slice(0, 10);
-  } else {
-    filteredRows = sortedByRound;
-  }
+    document.getElementById('betting-title').innerHTML =
+      '🎯 ' + nextRound + '회 베팅 추천';
+    document.getElementById('betting-info').innerHTML =
+      '최근 ' + betting.windowSize + '회 1·2·3등에서 <strong>2회 출현 우선</strong>으로 10개 추천' +
+      ' · 부족 시 최신 회차 보충';
 
-  var topRanges = findTopRanges(filteredRows, 2);
-  if (topRanges.length > 0 && filteredRows.length > 0) {
-    bestCard.style.display = 'block';
-    var rangesHtml = '';
-    for (var rIdx = 0; rIdx < topRanges.length; rIdx++) {
-      var tr = topRanges[rIdx];
-      var rPct = Math.round(tr.count / filteredRows.length * 100);
-      var rankClass = (rIdx === 0) ? 'rank-slot rank-1' : 'rank-slot rank-2';
-      var rankLabel = (rIdx === 0) ? '1위' : '2위';
-
-      var hits = getRangeHits(filteredRows, tr.start, tr.end);
-      var hitsHtml = '';
-      for (var hi = 0; hi < hits.length; hi++) {
-        hitsHtml += '<div class="hit-item">' +
-          '<span class="hit-round">' + hits[hi].round + '회</span>' +
-          '<span>' + escapeHtml(hits[hi].hits.join(', ')) + '</span>' +
+    // 추천 번호 (딱 2회만)
+    var dup2 = betting.dup2;
+    if (dup2.length > 0) {
+      var n2Html = '';
+      for (var i2 = 0; i2 < dup2.length; i2++) {
+        n2Html += '<div class="betting-number">' +
+          '<span class="bn-count">' + dup2[i2].count + '회</span>' +
+          dup2[i2].number +
           '</div>';
       }
-
-      rangesHtml += '<div class="' + rankClass + '">' +
-        '<div class="rank-slot-header">' +
-          '<span class="rank-slot-pill">' + rankLabel + '</span>' +
-          '<span class="rank-slot-range">' + tr.start + '~' + tr.end + '</span>' +
-          '<span class="rank-slot-meta">' +
-            filteredRows.length + '회 중 <strong>' + tr.count + '회</strong> ' +
-            '<strong>(' + rPct + '%)</strong>' +
-          '</span>' +
-        '</div>' +
-        '<div class="rank-slot-hits">' + hitsHtml + '</div>' +
-        '</div>';
+      document.getElementById('betting-numbers-2').innerHTML = n2Html;
+    } else {
+      document.getElementById('betting-numbers-2').innerHTML =
+        '<div class="betting-empty">최근 ' + betting.windowSize + '회 안에 2회 출현 번호가 없음</div>';
     }
-    document.getElementById('best-ranges-container').innerHTML = rangesHtml;
+
+    // 검증 적중률 (게임별)
+    var stats = betting.stats;
+    document.getElementById('betting-stats').innerHTML =
+      '<div class="betting-stat">' +
+        '<div class="betting-stat-label">1등 적중</div>' +
+        '<div class="betting-stat-value">' + stats.p1 + '%</div>' +
+      '</div>' +
+      '<div class="betting-stat">' +
+        '<div class="betting-stat-label">1·2등 적중</div>' +
+        '<div class="betting-stat-value">' + stats.p12 + '%</div>' +
+      '</div>' +
+      '<div class="betting-stat">' +
+        '<div class="betting-stat-label">1·2·3등 적중</div>' +
+        '<div class="betting-stat-value">' + stats.pany + '%</div>' +
+      '</div>';
+
+    // 식어가는 3회+ 번호 (제외 표시)
+    var dup3 = betting.dup3;
+    if (dup3.length > 0) {
+      document.getElementById('betting-warn-section').style.display = 'block';
+      var n3Html = '';
+      for (var i3 = 0; i3 < dup3.length; i3++) {
+        n3Html += '<div class="betting-number">' +
+          '<span class="bn-count">' + dup3[i3].count + '회</span>' +
+          dup3[i3].number +
+          '</div>';
+      }
+      document.getElementById('betting-numbers-warn').innerHTML = n3Html;
+    } else {
+      document.getElementById('betting-warn-section').style.display = 'none';
+    }
   } else {
-    bestCard.style.display = 'none';
+    bettingCard.style.display = 'none';
   }
 
-  // 1등 핫 구간
-  var firstRanges = findFirstRankRanges(rows, 5);
-  var rankCard = document.getElementById('rank-card');
-  if (firstRanges.length > 0) {
-    rankCard.style.display = 'block';
-    var rankHtml = '';
-    for (var j = 0; j < firstRanges.length; j++) {
-      var fr = firstRanges[j];
-      var rPct = Math.round(fr.count / rows.length * 100);
-      rankHtml += '<div class="rank-item">' +
-        '<div class="rank-left">' +
-          '<span class="rank-pill">#' + (j + 1) + '</span>' +
-          '<span class="rank-range">' + fr.start + '~' + fr.end + '</span>' +
-        '</div>' +
-        '<div class="rank-count">' + fr.count + '회 (' + rPct + '%)</div>' +
-        '</div>';
-    }
-    document.getElementById('rank-list').innerHTML = rankHtml;
-  } else {
-    rankCard.style.display = 'none';
-  }
-
-  // 1등 흐름 분석
+  // 🌊 1등 흐름 분석 (간소화, 반복 패턴 색상 강조)
   var flow = analyzeFlow(rows);
   var flowCard = document.getElementById('flow-card');
   if (flow && flow.sequence.length >= 2) {
     flowCard.style.display = 'block';
 
-    // 최근 흐름 (최대 7회)
+    // 최근 흐름 (최대 7회) + 반복 구간 색상 강조
     var recent = flow.sequence.slice(-7);
+    // 각 decade의 등장 횟수 카운트 (recent 안에서)
+    var decadeCount = {};
+    for (var fc = 0; fc < recent.length; fc++) {
+      var dc = recent[fc].decade;
+      decadeCount[dc] = (decadeCount[dc] || 0) + 1;
+    }
+
     var recentHtml = '';
     for (var fi = 0; fi < recent.length; fi++) {
       if (fi > 0) recentHtml += '<span class="flow-arrow">→</span>';
       var isLatest = (fi === recent.length - 1);
-      recentHtml += '<span class="flow-step' + (isLatest ? ' latest' : '') + '">' +
+      var dCount = decadeCount[recent[fi].decade];
+      var cls = 'flow-step';
+      if (isLatest) cls += ' latest';
+      else if (dCount >= 3) cls += ' repeat-3';
+      else if (dCount === 2) cls += ' repeat-2';
+      recentHtml += '<span class="' + cls + '">' +
         decadeLabel(recent[fi].decade) +
         '<span class="flow-step-num">' + recent[fi].num + '</span>' +
         '</span>';
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;
 
-    // 예측 적중률 통계
+    // 예측 적중률 통계 (예측성공/실패/적중률만)
     var preds = flow.predictions || [];
     var totalPreds = preds.length;
     var topHits = 0;
@@ -1688,150 +1523,38 @@ function render() {
         '</div>' +
       '</div>';
     }
-
-    // 마지막 1등 구간 → 다음 예측
-    var lastEntry = flow.sequence[flow.sequence.length - 1];
-    var lastDecade = lastEntry.decade;
-    var nextStats = flow.transitions[lastDecade] || {};
-    var nextEntries = [];
-    var totalNext = 0;
-    for (var key in nextStats) {
-      nextEntries.push({ decade: parseInt(key, 10), count: nextStats[key] });
-      totalNext += nextStats[key];
-    }
-    nextEntries.sort(function (a, b) { return b.count - a.count; });
-
-    var predHtml = statsHtml +
-      '<div class="flow-pred-header">' +
-      '마지막 1등 <strong>' + lastEntry.num + '번</strong> (' + decadeLabel(lastDecade) + ')<br>' +
-      '과거 ' + decadeLabel(lastDecade) + ' 다음 회차의 1등 분포' +
-      '</div>';
-
-    if (nextEntries.length === 0) {
-      predHtml += '<div class="muted">데이터 없음 (이 구간이 처음 나옴)</div>';
-    } else {
-      predHtml += '<div class="flow-pred-list">';
-      var maxCount = nextEntries[0].count;
-      for (var pi = 0; pi < nextEntries.length; pi++) {
-        var ne = nextEntries[pi];
-        var pPct = Math.round(ne.count / totalNext * 100);
-        var barWidth = Math.round(ne.count / maxCount * 100);
-        var topClass = (pi === 0 && ne.count >= 2) ? ' top' : '';
-        predHtml += '<div class="flow-pred-item' + topClass + '">' +
-          '<div class="flow-pred-bar" style="width:' + barWidth + '%;"></div>' +
-          '<div class="flow-pred-row">' +
-            '<span class="flow-pred-decade">' + decadeLabel(ne.decade) + '</span>' +
-            '<span class="flow-pred-stat">' + ne.count + '회 (' + pPct + '%)</span>' +
-          '</div>' +
-          '</div>';
-      }
-      predHtml += '</div>';
-    }
-
-    // 회차별 예측 히스토리 (최근 → 과거 순)
-    if (preds.length > 0) {
-      var sortedPreds = preds.slice();
-      sortedPreds.sort(function (a, b) { return b.round - a.round; });
-      var histHtml = '<div class="flow-hist-title">📋 회차별 예측 결과</div><div class="flow-hist-list">';
-      for (var hp = 0; hp < sortedPreds.length; hp++) {
-        var pr = sortedPreds[hp];
-        var icon, statusClass;
-        if (pr.hasData && pr.topHit) {
-          icon = '✅'; statusClass = 'success';
-        } else {
-          icon = '❌'; statusClass = 'fail';
-        }
-        var predText = pr.hasData ? '예측: ' + decadeLabel(pr.topDecade) : '예측 데이터 없음';
-        histHtml += '<div class="flow-hist-item ' + statusClass + '">' +
-          '<span class="flow-hist-icon">' + icon + '</span>' +
-          '<span class="flow-hist-round">' + pr.round + '회</span>' +
-          '<span class="flow-hist-actual">' + pr.actualNum + ' (' + decadeLabel(pr.actualDecade) + ')</span>' +
-          '<span class="flow-hist-pred">' + predText + '</span>' +
-        '</div>';
-      }
-      histHtml += '</div>';
-      predHtml += histHtml;
-    }
-
-    document.getElementById('flow-prediction').innerHTML = predHtml;
+    document.getElementById('flow-stats-only').innerHTML = statsHtml;
   } else {
     flowCard.style.display = 'none';
   }
 
-  // 1등 번호 확률 (직전 회차 제외)
-  var probCard = document.getElementById('prob-card');
-  var probMode = probFilter[currentTab] || '10';
-
-  // 확률 버튼 active 상태
-  var probBtns = probCard.querySelectorAll('.prob-btn');
-  for (var pbi = 0; pbi < probBtns.length; pbi++) {
-    if (probBtns[pbi].dataset.prob === probMode) {
-      probBtns[pbi].classList.add('active');
-    } else {
-      probBtns[pbi].classList.remove('active');
-    }
-  }
-
-  var probData = analyzeFirstProb(rows, probMode);
-  if (probData && probData.entries.length > 0) {
-    probCard.style.display = 'block';
-    var modeLabel = probMode === 'all' ? '전체' : ('최근 ' + probMode + '회');
-    document.getElementById('prob-info').innerHTML =
-      '직전 ' + probData.excludedRound + '회 (1등 <strong>' + probData.excludedNum + '번</strong>) 제외 · ' +
-      modeLabel + ' 분석 (' + probData.subsetSize + '회 데이터)';
-
-    var probHtml = '<div class="prob-list">';
-    var maxPct = probData.entries[0].pct;
-    for (var ei = 0; ei < probData.entries.length; ei++) {
-      var en = probData.entries[ei];
-      var barWidth = Math.round(en.pct / maxPct * 100);
-      var topClass = (ei === 0) ? ' top' : '';
-      var rankLabel = (ei === 0) ? '1위' : (ei === 1) ? '2위' : '3위';
-
-      // 당첨 회차 리스트 HTML
-      var hitsHtml = '';
-      for (var hi = 0; hi < en.hits.length; hi++) {
-        hitsHtml += '<div class="prob-hit">' +
-          '<span class="prob-hit-round">' + en.hits[hi].round + '회</span>' +
-          '<span class="prob-hit-num">1등 ' + en.hits[hi].num + '번</span>' +
-          '</div>';
-      }
-
-      probHtml += '<div class="prob-item' + topClass + '">' +
-        '<div class="prob-bar" style="width:' + barWidth + '%;"></div>' +
-        '<div class="prob-header">' +
-          '<span class="prob-rank-pill">' + rankLabel + '</span>' +
-          '<span class="prob-decade">' + en.start + '~' + en.end + '</span>' +
-          '<span class="prob-meta">' + en.count + '회</span>' +
-          '<span class="prob-pct">' + en.pct + '%</span>' +
-        '</div>' +
-        '<div class="prob-hits">' + hitsHtml + '</div>' +
-        '</div>';
-    }
-    probHtml += '</div>';
-    document.getElementById('prob-list').innerHTML = probHtml;
-  } else {
-    probCard.style.display = 'none';
-  }
-
-  // 반복 번호
+  // 🔁 반복 적중 번호 (테이블 형식)
   var repeats = findRepeatNumbers(rows);
   var repeatCard = document.getElementById('repeat-card');
   if (repeats.length > 0) {
     repeatCard.style.display = 'block';
-    var repeatHtml = '';
-    var limit = Math.min(repeats.length, 8);
-    for (var m = 0; m < limit; m++) {
-      var rp = repeats[m];
-      repeatHtml += '<div class="repeat-item">' +
-        '<div class="repeat-header">' +
-          '<span class="repeat-num">' + rp.number + '</span>' +
-          '<span class="repeat-count">× ' + rp.count + '회</span>' +
-        '</div>' +
-        '<div class="repeat-history">' + escapeHtml(rp.history.join(', ')) + '</div>' +
+    var rTable = '<div class="repeat-table">' +
+      '<div class="repeat-row head">' +
+        '<span>번호</span>' +
+        '<span>출현</span>' +
+        '<span>당첨 회차</span>' +
+      '</div>';
+    var rLimit = Math.min(repeats.length, 30);
+    for (var rm = 0; rm < rLimit; rm++) {
+      var rp = repeats[rm];
+      // 회차 history를 강조
+      var historyParts = [];
+      for (var rh = 0; rh < rp.history.length; rh++) {
+        historyParts.push('<strong>' + escapeHtml(rp.history[rh]) + '</strong>');
+      }
+      rTable += '<div class="repeat-row">' +
+        '<span class="rt-num">' + rp.number + '</span>' +
+        '<span class="rt-count">' + rp.count + '회</span>' +
+        '<span class="rt-history">' + historyParts.join(' · ') + '</span>' +
         '</div>';
     }
-    document.getElementById('repeat-list').innerHTML = repeatHtml;
+    rTable += '</div>';
+    document.getElementById('repeat-table').innerHTML = rTable;
   } else {
     repeatCard.style.display = 'none';
   }
@@ -2025,20 +1748,6 @@ async function init() {
   }
 
   document.getElementById('btn-add').addEventListener('click', handleAdd);
-
-  // 기간 필터 버튼 (data-range / data-prob 둘 다 처리)
-  var rangeBtns = document.querySelectorAll('.range-btn');
-  for (var rb = 0; rb < rangeBtns.length; rb++) {
-    rangeBtns[rb].addEventListener('click', function (e) {
-      var btn = e.currentTarget;
-      if (btn.dataset.prob !== undefined) {
-        probFilter[currentTab] = btn.dataset.prob;
-      } else if (btn.dataset.range !== undefined) {
-        rangeFilter[currentTab] = btn.dataset.range;
-      }
-      render();
-    });
-  }
 
   // 백업/복원
   document.getElementById('btn-export').addEventListener('click', handleExport);

@@ -451,6 +451,82 @@ body.food .rank-slot.rank-1 {
 }
 .flow-hist-item.success { border-left-color: #22c55e; }
 .flow-hist-item.fail { border-left-color: #ef4444; opacity: 0.65; }
+
+/* 1등 확률 카드 */
+.prob-info {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  line-height: 1.5;
+}
+.prob-info strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+.prob-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.prob-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+}
+.prob-item.top {
+  border-color: var(--accent);
+}
+.prob-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  opacity: 0.12;
+  border-radius: 10px;
+  pointer-events: none;
+}
+.prob-decade {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+.prob-item.top .prob-decade { color: var(--accent); }
+.prob-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  position: relative;
+  z-index: 1;
+  font-weight: 600;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.prob-pct {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--accent);
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  min-width: 56px;
+  text-align: right;
+}
 .flow-hist-icon { font-size: 13px; }
 .flow-hist-round {
   font-weight: 700;
@@ -799,6 +875,19 @@ body.food .rank-slot.rank-1 {
     <div class="rank-list" id="rank-list"></div>
   </div>
 
+  <!-- 1등 번호 확률 -->
+  <div class="card" id="prob-card" style="display:none;">
+    <div class="card-title">🎲 1등 번호 확률 (직전 1등 제외)</div>
+    <div class="range-filter">
+      <button class="range-btn prob-btn active" data-prob="10">최근 10회</button>
+      <button class="range-btn prob-btn" data-prob="20">최근 20회</button>
+      <button class="range-btn prob-btn" data-prob="30">최근 30회</button>
+      <button class="range-btn prob-btn" data-prob="all">전체</button>
+    </div>
+    <div class="prob-info" id="prob-info"></div>
+    <div id="prob-list"></div>
+  </div>
+
   <!-- 반복 적중 번호 -->
   <div class="card" id="repeat-card" style="display:none;">
     <div class="card-title">🔁 반복 적중 번호</div>
@@ -875,7 +964,24 @@ var INITIAL_BASIC = [
   { round: 808, first: 39, second: 30, third: 50 },
   { round: 809, first: 5, second: 59, third: 3 },
   { round: 810, first: 2, second: 72, third: 84 },
-  { round: 811, first: 7, second: 23, third: 25 }
+  { round: 811, first: 7, second: 23, third: 25 },
+  { round: 812, first: 43, second: 15, third: 48 },
+  { round: 813, first: 1, second: 39, third: 3 },
+  { round: 814, first: 11, second: 95, third: 34 },
+  { round: 815, first: 79, second: 80, third: 7 },
+  { round: 816, first: 69, second: 56, third: 74 },
+  { round: 817, first: 24, second: 91, third: 2 },
+  { round: 818, first: 86, second: 21, third: 43 },
+  { round: 819, first: 70, second: 64, third: 50 },
+  { round: 820, first: 11, second: 62, third: 75 },
+  { round: 821, first: 54, second: 95, third: 99 },
+  { round: 822, first: 99, second: 11, third: 91 },
+  { round: 823, first: 83, second: 5, third: 96 },
+  { round: 824, first: 71, second: 72, third: 36 },
+  { round: 825, first: 25, second: 22, third: 67 },
+  { round: 826, first: 82, second: 95, third: 74 },
+  { round: 827, first: 3, second: 66, third: 81 },
+  { round: 828, first: 83, second: 2, third: 22 }
 ];
 
 var INITIAL_PREMIUM = [
@@ -896,7 +1002,11 @@ var INITIAL_PREMIUM = [
   { round: 426, first: 58, second: 44, third: 87 },
   { round: 427, first: 75, second: 16, third: 38 },
   { round: 428, first: 4, second: 83, third: 14 },
-  { round: 429, first: 71, second: 8, third: 20 }
+  { round: 429, first: 71, second: 8, third: 20 },
+  { round: 430, first: 80, second: 24, third: 3 },
+  { round: 431, first: 39, second: 76, third: 58 },
+  { round: 432, first: 89, second: 71, third: 75 },
+  { round: 433, first: 46, second: 13, third: 36 }
 ];
 
 var INITIAL_FOOD = [
@@ -920,7 +1030,15 @@ var INITIAL_FOOD = [
   { round: 133, first: 19, second: 26, third: 98 },
   { round: 134, first: 82, second: 1, third: 39 },
   { round: 135, first: 38, second: 3, third: 74 },
-  { round: 136, first: 2, second: 59, third: 32 }
+  { round: 136, first: 2, second: 59, third: 32 },
+  { round: 137, first: 87, second: 3, third: 7 },
+  { round: 138, first: 14, second: 81, third: 72 },
+  { round: 139, first: 19, second: 54, third: 62 },
+  { round: 140, first: 82, second: 8, third: 76 },
+  { round: 141, first: 80, second: 47, third: 16 },
+  { round: 142, first: 53, second: 16, third: 20 },
+  { round: 143, first: 48, second: 57, third: 8 },
+  { round: 144, first: 65, second: 61, third: 98 }
 ];
 
 var STORAGE_KEY_BASIC = 'chanceup_basic_data_v1';
@@ -1045,24 +1163,44 @@ function debouncedSync() {
 var currentTab = 'basic';
 var data = { basic: [], premium: [], food: [] };
 var rangeFilter = { basic: 'all', premium: 'all', food: 'all' };
+var probFilter = { basic: '10', premium: '10', food: '10' };
 
 // ============ 저장/로드 ============
+// INITIAL 데이터와 localStorage 데이터를 병합 (회차 기준 dedupe)
+// localStorage에 같은 회차가 있으면 그걸 우선 사용 (사용자 수정값 보존)
+function mergeWithInitial(localArr, initialArr) {
+  var byRound = {};
+  for (var i = 0; i < initialArr.length; i++) {
+    byRound[initialArr[i].round] = initialArr[i];
+  }
+  for (var j = 0; j < localArr.length; j++) {
+    byRound[localArr[j].round] = localArr[j];  // local이 우선
+  }
+  var merged = [];
+  for (var k in byRound) merged.push(byRound[k]);
+  merged.sort(function (a, b) { return a.round - b.round; });
+  return merged;
+}
+
 function loadData() {
   try {
     var b = localStorage.getItem(STORAGE_KEY_BASIC);
-    data.basic = b ? JSON.parse(b) : INITIAL_BASIC.slice();
+    var localBasic = b ? JSON.parse(b) : [];
+    data.basic = mergeWithInitial(localBasic, INITIAL_BASIC);
   } catch (e) {
     data.basic = INITIAL_BASIC.slice();
   }
   try {
     var p = localStorage.getItem(STORAGE_KEY_PREMIUM);
-    data.premium = p ? JSON.parse(p) : INITIAL_PREMIUM.slice();
+    var localPremium = p ? JSON.parse(p) : [];
+    data.premium = mergeWithInitial(localPremium, INITIAL_PREMIUM);
   } catch (e) {
     data.premium = INITIAL_PREMIUM.slice();
   }
   try {
     var f = localStorage.getItem(STORAGE_KEY_FOOD);
-    data.food = f ? JSON.parse(f) : INITIAL_FOOD.slice();
+    var localFood = f ? JSON.parse(f) : [];
+    data.food = mergeWithInitial(localFood, INITIAL_FOOD);
   } catch (e) {
     data.food = INITIAL_FOOD.slice();
   }
@@ -1242,6 +1380,66 @@ function analyzeFlow(rows) {
   }
 
   return { sequence: sequence, transitions: transitions, predictions: predictions };
+}
+
+// 1등 10단위 구간 확률 (직전 회차 1등 구간 제외)
+function analyzeFirstProb(rows, mode) {
+  if (rows.length === 0) return null;
+  var sorted = rows.slice();
+  sorted.sort(function (a, b) { return b.round - a.round; });
+
+  var lastFirstNum = sorted[0].first;
+  var lastRound = sorted[0].round;
+  var excludedDecade = getDecade(lastFirstNum);
+
+  // 직전 회차 제외
+  var pool = sorted.slice(1);
+
+  // 모드별 슬라이스
+  var subset;
+  if (mode === '10') subset = pool.slice(0, 10);
+  else if (mode === '20') subset = pool.slice(0, 20);
+  else if (mode === '30') subset = pool.slice(0, 30);
+  else subset = pool;
+
+  if (subset.length === 0) return null;
+
+  // 1~10대 ~ 91~100대 (1~10) 카운트, 직전 1등 구간은 제외
+  var counter = {};
+  var totalCount = 0;
+  for (var i = 0; i < subset.length; i++) {
+    var d = getDecade(subset[i].first);
+    if (d === excludedDecade) continue;
+    counter[d] = (counter[d] || 0) + 1;
+    totalCount++;
+  }
+
+  if (totalCount === 0) return null;
+
+  var entries = [];
+  for (var k in counter) {
+    var dNum = parseInt(k, 10);
+    entries.push({
+      decade: dNum,
+      label: decadeLabel(dNum),
+      count: counter[k],
+      pct: Math.round(counter[k] / totalCount * 1000) / 10
+    });
+  }
+  entries.sort(function (a, b) {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.decade - b.decade;
+  });
+
+  return {
+    excludedNum: lastFirstNum,
+    excludedDecade: excludedDecade,
+    excludedLabel: decadeLabel(excludedDecade),
+    excludedRound: lastRound,
+    subsetSize: subset.length,
+    totalCount: totalCount,
+    entries: entries
+  };
 }
 
 function findRepeatNumbers(rows) {
@@ -1510,6 +1708,47 @@ function render() {
     flowCard.style.display = 'none';
   }
 
+  // 1등 번호 확률 (직전 회차 제외)
+  var probCard = document.getElementById('prob-card');
+  var probMode = probFilter[currentTab] || '10';
+
+  // 확률 버튼 active 상태
+  var probBtns = probCard.querySelectorAll('.prob-btn');
+  for (var pbi = 0; pbi < probBtns.length; pbi++) {
+    if (probBtns[pbi].dataset.prob === probMode) {
+      probBtns[pbi].classList.add('active');
+    } else {
+      probBtns[pbi].classList.remove('active');
+    }
+  }
+
+  var probData = analyzeFirstProb(rows, probMode);
+  if (probData && probData.entries.length > 0) {
+    probCard.style.display = 'block';
+    var modeLabel = probMode === 'all' ? '전체' : ('최근 ' + probMode + '회');
+    document.getElementById('prob-info').innerHTML =
+      '직전 ' + probData.excludedRound + '회 1등 <strong>' + probData.excludedNum + '번 (' + probData.excludedLabel + ')</strong> 구간은 제외 · ' +
+      modeLabel + ' 분석 · 유효 ' + probData.totalCount + '건';
+
+    var probHtml = '<div class="prob-list">';
+    var maxPct = probData.entries[0].pct;
+    for (var ei = 0; ei < probData.entries.length; ei++) {
+      var en = probData.entries[ei];
+      var barWidth = Math.round(en.pct / maxPct * 100);
+      var topClass = (ei === 0) ? ' top' : '';
+      probHtml += '<div class="prob-item' + topClass + '">' +
+        '<div class="prob-bar" style="width:' + barWidth + '%;"></div>' +
+        '<span class="prob-decade">' + en.label + '</span>' +
+        '<span class="prob-meta">' + en.count + '회</span>' +
+        '<span class="prob-pct">' + en.pct + '%</span>' +
+        '</div>';
+    }
+    probHtml += '</div>';
+    document.getElementById('prob-list').innerHTML = probHtml;
+  } else {
+    probCard.style.display = 'none';
+  }
+
   // 반복 번호
   var repeats = findRepeatNumbers(rows);
   var repeatCard = document.getElementById('repeat-card');
@@ -1722,11 +1961,16 @@ async function init() {
 
   document.getElementById('btn-add').addEventListener('click', handleAdd);
 
-  // 기간 필터 버튼
+  // 기간 필터 버튼 (data-range / data-prob 둘 다 처리)
   var rangeBtns = document.querySelectorAll('.range-btn');
   for (var rb = 0; rb < rangeBtns.length; rb++) {
     rangeBtns[rb].addEventListener('click', function (e) {
-      rangeFilter[currentTab] = e.currentTarget.dataset.range;
+      var btn = e.currentTarget;
+      if (btn.dataset.prob !== undefined) {
+        probFilter[currentTab] = btn.dataset.prob;
+      } else if (btn.dataset.range !== undefined) {
+        rangeFilter[currentTab] = btn.dataset.range;
+      }
       render();
     });
   }

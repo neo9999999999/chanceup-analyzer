@@ -313,6 +313,8 @@ input::-webkit-inner-spin-button {
 .flow-recent {
   display: flex;
   flex-wrap: wrap;
+  row-gap: 6px;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
   margin-bottom: 14px;
@@ -1329,6 +1331,54 @@ function analyzeBetting(rows) {
   };
 }
 
+
+function analyzeBettingBacktest(rows) {
+  if (rows.length < 21) return null;
+  var sorted = rows.slice();
+  sorted.sort(function(a, b) { return a.round - b.round; });
+
+  function pickFromWindow(win) {
+    var counter = {}, lastSeen = {};
+    for (var i = win.length - 1; i >= 0; i--) {
+      var r = win[i];
+      var nums = [r.first, r.second, r.third];
+      for (var j = 0; j < 3; j++) {
+        var n = nums[j];
+        counter[n] = (counter[n] || 0) + 1;
+        if (lastSeen[n] === undefined) lastSeen[n] = r.round;
+      }
+    }
+    var dup2 = [], dup1 = [];
+    for (var k in counter) {
+      var item = { n: parseInt(k, 10), lr: lastSeen[k] };
+      if (counter[k] === 2) dup2.push(item);
+      else if (counter[k] === 1) dup1.push(item);
+    }
+    var sorter = function(a, b) {
+      if (b.lr !== a.lr) return b.lr - a.lr;
+      return a.n - b.n;
+    };
+    dup2.sort(sorter); dup1.sort(sorter);
+    var picked = {};
+    var cnt = 0;
+    for (var p = 0; p < dup2.length && cnt < 10; p++) { picked[dup2[p].n] = true; cnt++; }
+    for (var q = 0; q < dup1.length && cnt < 10; q++) { picked[dup1[q].n] = true; cnt++; }
+    return picked;
+  }
+
+  var h1 = 0, h2 = 0, h3 = 0, total = 0;
+  for (var k = 20; k < sorted.length; k++) {
+    var win = sorted.slice(k - 20, k);
+    var picked = pickFromWindow(win);
+    var actual = sorted[k];
+    if (picked[actual.first]) h1++;
+    if (picked[actual.second]) h2++;
+    if (picked[actual.third]) h3++;
+    total++;
+  }
+  return { h1: h1, h2: h2, h3: h3, total: total };
+}
+
 function findRepeatNumbers(rows) {
   if (rows.length === 0) return [];
   var counter = {};
@@ -1472,7 +1522,7 @@ function render() {
     flowCard.style.display = 'block';
 
     // 최근 흐름 (최대 7회) + 반복 구간 색상 강조
-    var recent = flow.sequence.slice(-7);
+    var recent = flow.sequence.slice(-20);
     // 각 decade의 등장 횟수 카운트 (recent 안에서)
     var decadeCount = {};
     for (var fc = 0; fc < recent.length; fc++) {
@@ -1496,32 +1546,25 @@ function render() {
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;
 
-    // 예측 적중률 통계 (예측성공/실패/적중률만)
-    var preds = flow.predictions || [];
-    var totalPreds = preds.length;
-    var topHits = 0;
-    for (var ph = 0; ph < preds.length; ph++) {
-      if (preds[ph].topHit) topHits++;
-    }
-    var topPct = totalPreds > 0 ? Math.round(topHits / totalPreds * 100) : 0;
-    var failCount = totalPreds - topHits;
-
+    // 베팅 추천 백테스트 통계 (1등/2등/3등 적중)
+    var bt = analyzeBettingBacktest(rows);
     var statsHtml = '';
-    if (totalPreds > 0) {
+    if (bt && bt.total > 0) {
       statsHtml = '<div class="flow-stats">' +
         '<div class="flow-stat-item">' +
-          '<div class="flow-stat-label">예측 성공</div>' +
-          '<div class="flow-stat-value success">' + topHits + '회</div>' +
+          '<div class="flow-stat-label">1등 적중</div>' +
+          '<div class="flow-stat-value success">' + bt.h1 + '/' + bt.total + '</div>' +
         '</div>' +
         '<div class="flow-stat-item">' +
-          '<div class="flow-stat-label">예측 실패</div>' +
-          '<div class="flow-stat-value fail">' + failCount + '회</div>' +
+          '<div class="flow-stat-label">2등 적중</div>' +
+          '<div class="flow-stat-value success">' + bt.h2 + '/' + bt.total + '</div>' +
         '</div>' +
         '<div class="flow-stat-item">' +
-          '<div class="flow-stat-label">적중률</div>' +
-          '<div class="flow-stat-value">' + topPct + '%</div>' +
+          '<div class="flow-stat-label">3등 적중</div>' +
+          '<div class="flow-stat-value success">' + bt.h3 + '/' + bt.total + '</div>' +
         '</div>' +
-      '</div>';
+      '</div>' +
+      '<div class="muted" style="text-align:center;font-size:11px;margin-top:8px;">베팅 추천 기준 · 21회차부터 ' + bt.total + '회 검증</div>';
     }
     document.getElementById('flow-stats-only').innerHTML = statsHtml;
   } else {

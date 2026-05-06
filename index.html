@@ -1251,7 +1251,6 @@ var BETTING_STATS = {
 
 // 🎯 베팅 추천 분석 (최근 20회 1·2·3등 빈도)
 function analyzeBetting(rows) {
-  // 알고리즘 H: 1·2·3등 가중치 + tier 우선 + 인접±1 보너스
   if (rows.length < 1) {
     return { picked: [], dup3: [], windowSize: 0, stats: BETTING_STATS[currentTab] || BETTING_STATS.basic };
   }
@@ -1313,8 +1312,7 @@ function analyzeBetting(rows) {
     windowSize: window20.length,
     stats: BETTING_STATS[currentTab] || BETTING_STATS.basic
   };
-}
-function analyzeBettingBacktest(rows) {
+}function analyzeBettingBacktest(rows) {
   // 새 H 알고리즘으로 백테스트 (윈도우 20)
   if (rows.length < 21) return null;
   var sorted = rows.slice();

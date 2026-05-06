@@ -1873,7 +1873,13 @@ async function tryUnlock() {
 function bootGate() {
   // 비밀번호 제거: 항상 자동 해제
   try { localStorage.setItem(AUTH_KEY, 'true'); } catch(e) {}
-  unlock();
+  try { unlock(); } catch(e) {}
+  try {
+    var ls = document.getElementById('lock-screen');
+    if (ls) ls.style.display = 'none';
+    var mc = document.getElementById('main-content');
+    if (mc) mc.style.display = '';
+  } catch(e) {}
   return;
   // 아래는 비활성화 (남겨두지만 도달 안 함)
   try {

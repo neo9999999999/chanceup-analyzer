@@ -1251,18 +1251,14 @@ var BETTING_STATS = {
 
 // 🎯 베팅 추천 분석 (최근 20회 1·2·3등 빈도)
 function analyzeBetting(rows) {
-  if (rows.lenfunction analyzeBetting(rows) {
-  // H 알고리즘: 1·2·3등 가중치 (3:2:1) + 3회+ 우선 + 인접 ±1 보충
-  // 윈도우: 최근 20회
-  if (rows.length === 0) {
+  // 알고리즘 H: 1·2·3등 가중치 + tier 우선 + 인접±1 보너스
+  if (rows.length < 1) {
     return { picked: [], dup3: [], windowSize: 0, stats: BETTING_STATS[currentTab] || BETTING_STATS.basic };
   }
   var sorted = rows.slice();
   sorted.sort(function(a, b) { return a.round - b.round; });
   var window20 = sorted.slice(-20);
-
-  // 가중치 카운팅 (1등×3, 2등×2, 3등×1)
-  var counter = {}, lastSeen = {};
+  var counter = {}, lastSeen = {}, rawCount = {};
   for (var i = window20.length - 1; i >= 0; i--) {
     var r = window20[i];
     var nums = [r.first, r.second, r.third];
@@ -1270,55 +1266,47 @@ function analyzeBetting(rows) {
     for (var j = 0; j < 3; j++) {
       var n = nums[j];
       counter[n] = (counter[n] || 0) + weights[j];
+      rawCount[n] = (rawCount[n] || 0) + 1;
       if (lastSeen[n] === undefined) lastSeen[n] = r.round;
     }
   }
-
-  // 임계값: 8점 이상=핵심(코어), 4점 이상=강세, 미만=일반
-  var coreList = [], strongList = [], normalList = [];
+  var tier1 = [], tier2 = [], tier3 = [];
   for (var k in counter) {
-    var item = { n: parseInt(k, 10), score: counter[k], lr: lastSeen[k] };
-    if (counter[k] >= 8) coreList.push(item);
-    else if (counter[k] >= 4) strongList.push(item);
-    else normalList.push(item);
+    var item = { n: parseInt(k, 10), score: counter[k], cnt: rawCount[k], lr: lastSeen[k] };
+    if (counter[k] >= 8) tier1.push(item);
+    else if (counter[k] >= 4) tier2.push(item);
+    else tier3.push(item);
   }
   var sorter = function(a, b) {
     if (b.score !== a.score) return b.score - a.score;
     if (b.lr !== a.lr) return b.lr - a.lr;
     return a.n - b.n;
   };
-  coreList.sort(sorter); strongList.sort(sorter); normalList.sort(sorter);
-
-  var picked = [];
-  var pickedSet = {};
-  function tryAdd(n) {
-    if (n < 1 || n > 100) return false;
+  tier1.sort(sorter); tier2.sort(sorter); tier3.sort(sorter);
+  var pickedSet = {}, pickedArr = [];
+  function add(n, src) {
+    if (pickedArr.length >= 10) return false;
     if (pickedSet[n]) return false;
-    if (picked.length >= 10) return false;
     pickedSet[n] = true;
-    picked.push(n);
+    pickedArr.push({ n: n, source: src });
     return true;
   }
-  // 1순위: 코어
-  for (var p = 0; p < coreList.length; p++) tryAdd(coreList[p].n);
-  // 2순위: 강세
-  for (var q = 0; q < strongList.length; q++) tryAdd(strongList[q].n);
-  // 3순위: 인접 ±1 (코어와 강세의 인접번호)
-  var pivots = coreList.concat(strongList);
-  for (var r2 = 0; r2 < pivots.length && picked.length < 10; r2++) {
-    tryAdd(pivots[r2].n - 1);
-    if (picked.length < 10) tryAdd(pivots[r2].n + 1);
+  for (var p1 = 0; p1 < tier1.length; p1++) add(tier1[p1].n, 'core');
+  for (var p2 = 0; p2 < tier2.length; p2++) add(tier2[p2].n, 'mid');
+  if (pickedArr.length < 10) {
+    var pivots = tier1.concat(tier2);
+    for (var pv = 0; pv < pivots.length && pickedArr.length < 10; pv++) {
+      var pn = pivots[pv].n;
+      if (pn > 1) add(pn - 1, 'neighbor');
+      if (pickedArr.length >= 10) break;
+      if (pn < 100) add(pn + 1, 'neighbor');
+    }
   }
-  // 4순위: 일반 (1~3점) 채움
-  for (var s = 0; s < normalList.length && picked.length < 10; s++) tryAdd(normalList[s].n);
-
-  // dup3 = 핵심 번호 (코어): 강세 번호로 표시
-  var dup3 = coreList.map(function(it) { return it.n; });
-
-  // 화면 표시용 정렬 (번호 오름차순)
-  picked.sort(function(a, b) { return a - b; });
+  for (var p3 = 0; p3 < tier3.length && pickedArr.length < 10; p3++) add(tier3[p3].n, 'low');
+  var picked = pickedArr.slice();
+  picked.sort(function(a, b) { return a.n - b.n; });
+  var dup3 = tier1.map(function(t) { return t.n; });
   dup3.sort(function(a, b) { return a - b; });
-
   return {
     picked: picked,
     dup3: dup3,
@@ -1326,7 +1314,6 @@ function analyzeBetting(rows) {
     stats: BETTING_STATS[currentTab] || BETTING_STATS.basic
   };
 }
-
 function analyzeBettingBacktest(rows) {
   // 새 H 알고리즘으로 백테스트 (윈도우 20)
   if (rows.length < 21) return null;
@@ -1884,7 +1871,11 @@ async function tryUnlock() {
 }
 
 function bootGate() {
-  // 이미 인증되어 있으면 바로 통과
+  // 비밀번호 제거: 항상 자동 해제
+  try { localStorage.setItem(AUTH_KEY, 'true'); } catch(e) {}
+  unlock();
+  return;
+  // 아래는 비활성화 (남겨두지만 도달 안 함)
   try {
     if (localStorage.getItem(AUTH_KEY) === 'true') {
       unlock();

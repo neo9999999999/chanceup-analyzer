@@ -324,11 +324,12 @@ input::-webkit-inner-spin-button {
 }
 .flow-step {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   padding: 6px 10px;
-  background: var(--card);
+  background: rgba(255,255,255,0.03);
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-dim);
   white-space: nowrap;
 }
 .flow-step.latest {
@@ -430,28 +431,23 @@ input::-webkit-inner-spin-button {
 
 
 /* 1등 흐름 색상 강조 (반복 패턴) */
-.flow-step.repeat-2 {
-  background: rgba(212, 168, 73, 0.25);
-  border-color: var(--accent);
+.flow-step.repeat-2,
+.flow-step.repeat-3 {
+  background: rgba(212, 168, 73, 0.08);
+  border-color: rgba(212, 168, 73, 0.3);
   color: var(--accent);
 }
-body.premium .flow-step.repeat-2 {
-  background: rgba(167, 139, 250, 0.25);
-}
-body.food .flow-step.repeat-2 {
-  background: rgba(52, 211, 153, 0.25);
-}
-.flow-step.repeat-3 {
-  background: var(--accent);
-  color: #1a1a1a;
-  border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(212, 168, 73, 0.4);
-}
+body.premium .flow-step.repeat-2,
 body.premium .flow-step.repeat-3 {
-  box-shadow: 0 0 12px rgba(167, 139, 250, 0.4);
+  background: rgba(167, 139, 250, 0.08);
+  border-color: rgba(167, 139, 250, 0.3);
+  color: var(--purple);
 }
+body.food .flow-step.repeat-2,
 body.food .flow-step.repeat-3 {
-  box-shadow: 0 0 12px rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.08);
+  border-color: rgba(52, 211, 153, 0.3);
+  color: var(--green);
 }
 
 /* 반복 적중 번호 테이블 */
@@ -1255,84 +1251,84 @@ var BETTING_STATS = {
 
 // 🎯 베팅 추천 분석 (최근 20회 1·2·3등 빈도)
 function analyzeBetting(rows) {
-  if (rows.length < 5) return null;
-
+  if (rows.lenfunction analyzeBetting(rows) {
+  // H 알고리즘: 1·2·3등 가중치 (3:2:1) + 3회+ 우선 + 인접 ±1 보충
+  // 윈도우: 최근 20회
+  if (rows.length === 0) {
+    return { picked: [], dup3: [], windowSize: 0, stats: BETTING_STATS[currentTab] || BETTING_STATS.basic };
+  }
   var sorted = rows.slice();
-  sorted.sort(function (a, b) { return b.round - a.round; });
+  sorted.sort(function(a, b) { return a.round - b.round; });
+  var window20 = sorted.slice(-20);
 
-  // 최근 20회 (없으면 전체)
-  var subset = sorted.slice(0, Math.min(20, sorted.length));
-  var windowSize = subset.length;
-
-  // 번호별 카운트 + history + 가장 최신 회차
-  var counter = {};
-  var hist = {};
-  var lastSeen = {};
-  for (var i = 0; i < subset.length; i++) {
-    var r = subset[i];
-    var entries = [
-      { n: r.first,  label: r.round + '·1등' },
-      { n: r.second, label: r.round + '·2등' },
-      { n: r.third,  label: r.round + '·3등' }
-    ];
-    for (var j = 0; j < entries.length; j++) {
-      var k = entries[j].n;
-      counter[k] = (counter[k] || 0) + 1;
-      if (!hist[k]) hist[k] = [];
-      hist[k].push(entries[j].label);
-      // subset은 회차 desc로 정렬됨 → 첫 등장이 가장 최신
-      if (lastSeen[k] === undefined) lastSeen[k] = r.round;
+  // 가중치 카운팅 (1등×3, 2등×2, 3등×1)
+  var counter = {}, lastSeen = {};
+  for (var i = window20.length - 1; i >= 0; i--) {
+    var r = window20[i];
+    var nums = [r.first, r.second, r.third];
+    var weights = [3, 2, 1];
+    for (var j = 0; j < 3; j++) {
+      var n = nums[j];
+      counter[n] = (counter[n] || 0) + weights[j];
+      if (lastSeen[n] === undefined) lastSeen[n] = r.round;
     }
   }
 
-  var dup2_pool = []; // 딱 2회 (최우선)
-  var dup1_pool = []; // 1회 (보충용)
-  var dup3 = [];      // 3회+ (제외)
-  for (var key in counter) {
-    var num = parseInt(key, 10);
-    var c = counter[key];
-    var item = { number: num, count: c, history: hist[key], lastRound: lastSeen[key] };
-    if (c === 2) dup2_pool.push(item);
-    else if (c === 1) dup1_pool.push(item);
-    else if (c >= 3) dup3.push(item);
+  // 임계값: 8점 이상=핵심(코어), 4점 이상=강세, 미만=일반
+  var coreList = [], strongList = [], normalList = [];
+  for (var k in counter) {
+    var item = { n: parseInt(k, 10), score: counter[k], lr: lastSeen[k] };
+    if (counter[k] >= 8) coreList.push(item);
+    else if (counter[k] >= 4) strongList.push(item);
+    else normalList.push(item);
   }
+  var sorter = function(a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.lr !== a.lr) return b.lr - a.lr;
+    return a.n - b.n;
+  };
+  coreList.sort(sorter); strongList.sort(sorter); normalList.sort(sorter);
 
-  // 정렬 기준: 빈도 desc → 최신 회차 desc → 번호 asc
-  dup2_pool.sort(function (a, b) {
-    if (b.lastRound !== a.lastRound) return b.lastRound - a.lastRound;
-    return a.number - b.number;
-  });
-  dup1_pool.sort(function (a, b) {
-    if (b.lastRound !== a.lastRound) return b.lastRound - a.lastRound;
-    return a.number - b.number;
-  });
-
-  // 정확히 10개: 2회 우선 → 부족시 1회 최신 보충
-  var dup2 = [];
-  for (var p = 0; p < dup2_pool.length && dup2.length < 10; p++) {
-    dup2.push(dup2_pool[p]);
+  var picked = [];
+  var pickedSet = {};
+  function tryAdd(n) {
+    if (n < 1 || n > 100) return false;
+    if (pickedSet[n]) return false;
+    if (picked.length >= 10) return false;
+    pickedSet[n] = true;
+    picked.push(n);
+    return true;
   }
-  for (var q = 0; q < dup1_pool.length && dup2.length < 10; q++) {
-    dup2.push(dup1_pool[q]);
+  // 1순위: 코어
+  for (var p = 0; p < coreList.length; p++) tryAdd(coreList[p].n);
+  // 2순위: 강세
+  for (var q = 0; q < strongList.length; q++) tryAdd(strongList[q].n);
+  // 3순위: 인접 ±1 (코어와 강세의 인접번호)
+  var pivots = coreList.concat(strongList);
+  for (var r2 = 0; r2 < pivots.length && picked.length < 10; r2++) {
+    tryAdd(pivots[r2].n - 1);
+    if (picked.length < 10) tryAdd(pivots[r2].n + 1);
   }
+  // 4순위: 일반 (1~3점) 채움
+  for (var s = 0; s < normalList.length && picked.length < 10; s++) tryAdd(normalList[s].n);
 
-  // 표시용 정렬: 번호 작은 순
-  dup2.sort(function (a, b) { return a.number - b.number; });
-  dup3.sort(function (a, b) {
-    if (b.count !== a.count) return b.count - a.count;
-    return a.number - b.number;
-  });
+  // dup3 = 핵심 번호 (코어): 강세 번호로 표시
+  var dup3 = coreList.map(function(it) { return it.n; });
+
+  // 화면 표시용 정렬 (번호 오름차순)
+  picked.sort(function(a, b) { return a - b; });
+  dup3.sort(function(a, b) { return a - b; });
 
   return {
-    windowSize: windowSize,
-    dup2: dup2,
+    picked: picked,
     dup3: dup3,
+    windowSize: window20.length,
     stats: BETTING_STATS[currentTab] || BETTING_STATS.basic
   };
 }
 
-
 function analyzeBettingBacktest(rows) {
+  // 새 H 알고리즘으로 백테스트 (윈도우 20)
   if (rows.length < 21) return null;
   var sorted = rows.slice();
   sorted.sort(function(a, b) { return a.round - b.round; });
@@ -1342,27 +1338,43 @@ function analyzeBettingBacktest(rows) {
     for (var i = win.length - 1; i >= 0; i--) {
       var r = win[i];
       var nums = [r.first, r.second, r.third];
+      var weights = [3, 2, 1];
       for (var j = 0; j < 3; j++) {
         var n = nums[j];
-        counter[n] = (counter[n] || 0) + 1;
+        counter[n] = (counter[n] || 0) + weights[j];
         if (lastSeen[n] === undefined) lastSeen[n] = r.round;
       }
     }
-    var dup2 = [], dup1 = [];
+    var coreList = [], strongList = [], normalList = [];
     for (var k in counter) {
-      var item = { n: parseInt(k, 10), lr: lastSeen[k] };
-      if (counter[k] === 2) dup2.push(item);
-      else if (counter[k] === 1) dup1.push(item);
+      var item = { n: parseInt(k, 10), score: counter[k], lr: lastSeen[k] };
+      if (counter[k] >= 8) coreList.push(item);
+      else if (counter[k] >= 4) strongList.push(item);
+      else normalList.push(item);
     }
     var sorter = function(a, b) {
+      if (b.score !== a.score) return b.score - a.score;
       if (b.lr !== a.lr) return b.lr - a.lr;
       return a.n - b.n;
     };
-    dup2.sort(sorter); dup1.sort(sorter);
-    var picked = {};
-    var cnt = 0;
-    for (var p = 0; p < dup2.length && cnt < 10; p++) { picked[dup2[p].n] = true; cnt++; }
-    for (var q = 0; q < dup1.length && cnt < 10; q++) { picked[dup1[q].n] = true; cnt++; }
+    coreList.sort(sorter); strongList.sort(sorter); normalList.sort(sorter);
+
+    var picked = {}, cnt = 0;
+    function tryAdd(n) {
+      if (n < 1 || n > 100) return;
+      if (picked[n]) return;
+      if (cnt >= 10) return;
+      picked[n] = true;
+      cnt++;
+    }
+    for (var p = 0; p < coreList.length; p++) tryAdd(coreList[p].n);
+    for (var q = 0; q < strongList.length; q++) tryAdd(strongList[q].n);
+    var pivots = coreList.concat(strongList);
+    for (var r2 = 0; r2 < pivots.length && cnt < 10; r2++) {
+      tryAdd(pivots[r2].n - 1);
+      if (cnt < 10) tryAdd(pivots[r2].n + 1);
+    }
+    for (var s = 0; s < normalList.length && cnt < 10; s++) tryAdd(normalList[s].n);
     return picked;
   }
 
@@ -1378,9 +1390,7 @@ function analyzeBettingBacktest(rows) {
   }
   return { h1: h1, h2: h2, h3: h3, total: total };
 }
-
-function findRepeatNumbers(rows) {
-  if (rows.length === 0) return [];
+.length === 0) return [];
   var counter = {};
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];

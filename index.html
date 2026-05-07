@@ -1860,7 +1860,13 @@ async function tryUnlock() {
 }
 
 function bootGate() {
-  // 이미 인증되어 있으면 바로 통과
+  // 비밀번호 제거: 항상 자동 통과 + init 호출
+  try { localStorage.setItem(AUTH_KEY, 'true'); } catch(e) {}
+  try { var ls0 = document.getElementById('lock-screen'); if (ls0) ls0.style.display = 'none'; } catch(e) {}
+  try { var mc0 = document.getElementById('main-content'); if (mc0) mc0.style.display = ''; } catch(e) {}
+  try { if (typeof init === 'function') init(); } catch(e) {}
+  return;
+  // 이미 인증되어 있으면 바로 통과 (도달 안 함)
   try {
     if (localStorage.getItem(AUTH_KEY) === 'true') {
       unlock();

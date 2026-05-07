@@ -821,12 +821,12 @@ body.food .flow-step.repeat-3 {
     <div class="card-title" id="betting-title">🎯 베팅 추천</div>
     <div class="betting-info" id="betting-info"></div>
     <div class="betting-section">
-      <div class="betting-section-title">🔥 추천 번호 10개 (2회 우선, 보충)</div>
+      <div class="betting-section-title">🔥 추천 번호 10개 (가중치 + 인접)</div>
       <div class="betting-numbers" id="betting-numbers-2"></div>
     </div>
     <div class="betting-stats" id="betting-stats"></div>
     <div class="betting-section" id="betting-warn-section" style="display:none;">
-      <div class="betting-section-title warn">⚠️ 제외 (3회+ 식어가는 번호)</div>
+      <div class="betting-section-title warn">🔥 핫존 (Tier 1, 핵심 추천)</div>
       <div class="betting-numbers warn" id="betting-numbers-warn"></div>
     </div>
   </div>
@@ -1447,8 +1447,8 @@ function render() {
     document.getElementById('betting-title').innerHTML =
       '🎯 ' + nextRound + '회 베팅 추천';
     document.getElementById('betting-info').innerHTML =
-      '최근 ' + betting.windowSize + '회 1·2·3등에서 <strong>2회 출현 우선</strong>으로 10개 추천' +
-      ' · 부족 시 최신 회차 보충';
+      '최근 ' + betting.windowSize + '회 1·2·3등에서 <strong>가중치+인접</strong>으로 10개 추천' +
+      ' · 1등×3+2등×2+3등×1 → 8점+ → 4점+ → ±1 인접';
 
     // 추천 번호 (딱 2회만)
     var dup2 = betting.dup2;
@@ -1456,7 +1456,7 @@ function render() {
       var n2Html = '';
       for (var i2 = 0; i2 < dup2.length; i2++) {
         n2Html += '<div class="betting-number">' +
-          '<span class="bn-count">' + dup2[i2].count + '회</span>' +
+          '<span class="bn-count">' + (dup2[i2].count > 0 ? dup2[i2].count + '회' : '인접') + '</span>' +
           dup2[i2].number +
           '</div>';
       }

@@ -1255,68 +1255,69 @@ var BETTING_STATS = {
 
 // 🎯 베팅 추천 분석 (최근 20회 1·2·3등 빈도)
 function analyzeBetting(rows) {
-  if (rows.length < 1) {
-    return { picked: [], dup3: [], windowSize: 0, stats: BETTING_STATS[currentTab] || BETTING_STATS.basic };
+  if (!rows || rows.length < 1) {
+    return { picked: [], dup1: [], dup2: [], dup3: [], windowSize: 0, stats: BETTING_STATS[currentTab] || BETTING_STATS.basic };
   }
   var sorted = rows.slice();
   sorted.sort(function(a, b) { return a.round - b.round; });
-  var window20 = sorted.slice(-20);
+  var win = sorted.slice(-20);
   var counter = {}, lastSeen = {}, rawCount = {};
-  for (var i = window20.length - 1; i >= 0; i--) {
-    var rr = window20[i];
-    var nums = [rr.first, rr.second, rr.third];
+  for (var i = win.length - 1; i >= 0; i--) {
+    var r = win[i];
+    var nums = [r.first, r.second, r.third];
     var weights = [3, 2, 1];
     for (var j = 0; j < 3; j++) {
       var n = nums[j];
       counter[n] = (counter[n] || 0) + weights[j];
       rawCount[n] = (rawCount[n] || 0) + 1;
-      if (lastSeen[n] === undefined) lastSeen[n] = rr.round;
+      if (lastSeen[n] === undefined) lastSeen[n] = r.round;
     }
   }
-  var tier1 = [], tier2 = [], tier3 = [];
+  var t1 = [], t2 = [], t3 = [];
   for (var k in counter) {
-    var item = { n: parseInt(k, 10), score: counter[k], cnt: rawCount[k], lr: lastSeen[k] };
-    if (counter[k] >= 8) tier1.push(item);
-    else if (counter[k] >= 4) tier2.push(item);
-    else tier3.push(item);
+    var item = { number: parseInt(k, 10), count: rawCount[k], score: counter[k], lr: lastSeen[k] };
+    if (counter[k] >= 8) t1.push(item);
+    else if (counter[k] >= 4) t2.push(item);
+    else t3.push(item);
   }
   var sorter = function(a, b) {
     if (b.score !== a.score) return b.score - a.score;
     if (b.lr !== a.lr) return b.lr - a.lr;
-    return a.n - b.n;
+    return a.number - b.number;
   };
-  tier1.sort(sorter); tier2.sort(sorter); tier3.sort(sorter);
-  var pickedSet = {}, pickedArr = [];
-  for (var p = 0; p < tier1.length && pickedArr.length < 10; p++) {
-    if (!pickedSet[tier1[p].n]) { pickedSet[tier1[p].n] = true; pickedArr.push({ n: tier1[p].n, source: 'core' }); }
+  t1.sort(sorter); t2.sort(sorter); t3.sort(sorter);
+  var pickedSet = {}, picked = [];
+  function add(item) {
+    if (picked.length >= 10) return false;
+    if (pickedSet[item.number]) return false;
+    pickedSet[item.number] = true;
+    picked.push(item);
+    return true;
   }
-  for (var q = 0; q < tier2.length && pickedArr.length < 10; q++) {
-    if (!pickedSet[tier2[q].n]) { pickedSet[tier2[q].n] = true; pickedArr.push({ n: tier2[q].n, source: 'mid' }); }
-  }
-  if (pickedArr.length < 10) {
-    var pivots = tier1.concat(tier2);
-    for (var pv = 0; pv < pivots.length && pickedArr.length < 10; pv++) {
-      var pn = pivots[pv].n;
-      if (pn > 1 && !pickedSet[pn - 1]) { pickedSet[pn - 1] = true; pickedArr.push({ n: pn - 1, source: 'neighbor' }); }
-      if (pickedArr.length >= 10) break;
-      if (pn < 100 && !pickedSet[pn + 1]) { pickedSet[pn + 1] = true; pickedArr.push({ n: pn + 1, source: 'neighbor' }); }
+  for (var p1 = 0; p1 < t1.length; p1++) add(t1[p1]);
+  for (var p2 = 0; p2 < t2.length; p2++) add(t2[p2]);
+  if (picked.length < 10) {
+    var pivots = t1.concat(t2);
+    for (var pv = 0; pv < pivots.length && picked.length < 10; pv++) {
+      var pn = pivots[pv].number;
+      if (pn > 1 && !pickedSet[pn - 1]) add({ number: pn - 1, count: 0, score: 0, lr: 0 });
+      if (picked.length >= 10) break;
+      if (pn < 100 && !pickedSet[pn + 1]) add({ number: pn + 1, count: 0, score: 0, lr: 0 });
     }
   }
-  for (var r2 = 0; r2 < tier3.length && pickedArr.length < 10; r2++) {
-    if (!pickedSet[tier3[r2].n]) { pickedSet[tier3[r2].n] = true; pickedArr.push({ n: tier3[r2].n, source: 'low' }); }
-  }
-  var picked = pickedArr.slice();
-  picked.sort(function(a, b) { return a.n - b.n; });
-  var dup3 = tier1.map(function(t) { return t.n; });
-  dup3.sort(function(a, b) { return a - b; });
+  for (var p3 = 0; p3 < t3.length && picked.length < 10; p3++) add(t3[p3]);
+  picked.sort(function(a, b) { return a.number - b.number; });
+  var dup3 = t1.map(function(t) { return { number: t.number, count: t.count }; });
+  dup3.sort(function(a, b) { return a.number - b.number; });
   return {
     picked: picked,
+    dup1: [],
+    dup2: picked,
     dup3: dup3,
-    windowSize: window20.length,
+    windowSize: win.length,
     stats: BETTING_STATS[currentTab] || BETTING_STATS.basic
   };
 }
-
 function analyzeBettingBacktest(rows) {
   if (rows.length < 21) return null;
   var sorted = rows.slice();

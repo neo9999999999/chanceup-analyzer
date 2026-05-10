@@ -277,6 +277,10 @@ input::-webkit-inner-spin-button {
   background: rgba(168, 85, 247, 0.85);
   color: #fff;
 }
+.betting-number .bn-count.bn-markov {
+  background: rgba(34, 197, 94, 0.85);
+  color: #fff;
+}
 .betting-numbers.warn .betting-number {
   background: rgba(239, 68, 68, 0.15);
   color: #fca5a5;
@@ -1255,20 +1259,20 @@ function analyzeFlow(rows) {
   return { sequence: sequence, transitions: transitions, predictions: predictions };
 }
 
-// 게임별 백테스트 적중률 (v2 알고리즘, 2026-05-10 측정)
-//   basic   = HYBR-COLD W20, w=(1,1,1), cold=0.5@20  (n=62)
-//   premium = HYBR-COLD W20, w=(1,1,1), cold=0.8@20  (n=6, 표본부족)
+// 게임별 백테스트 적중률 (v3 알고리즘, 2026-05-10 측정)
+//   basic   = HYBR-COLD W20, w=(1,1,1), cold=0.3@15  (n=62)
+//   premium = MARKOV (직전회차→다음회차 전이확률) (n=6, 표본부족)
 //   food    = ENS (10,20),  w=(4,2,1)                (n=20)
 var BETTING_STATS = {
-  basic:   { p1: 24.2, p12: 37.1, pany: 43.5 },
-  premium: { p1: 33.3, p12: 33.3, pany: 33.3 }, // n=6, 통계 신뢰도 낮음
+  basic:   { p1: 24.2, p12: 38.7, pany: 48.4 },
+  premium: { p1: 33.3, p12: 33.3, pany: 50.0 }, // n=6, 통계 신뢰도 낮음
   food:    { p1: 40.0, p12: 40.0, pany: 45.0 }
 };
 
 // 게임별 알고리즘 설정 (백테스트 그리드 서치로 선정)
 var ALGO_CONFIG = {
-  basic:   { kind: 'hybrid_cold', window: 20, weights: [1,1,1], decay: 1.0, cold_weight: 0.5, cold_window: 20 },
-  premium: { kind: 'hybrid_cold', window: 20, weights: [1,1,1], decay: 1.0, cold_weight: 0.8, cold_window: 20 },
+  basic:   { kind: 'hybrid_cold', window: 20, weights: [1,1,1], decay: 1.0, cold_weight: 0.3, cold_window: 15 },
+  premium: { kind: 'markov',      lookback: null }, // 전체 데이터로 전이확률 학습
   food:    { kind: 'ensemble',    windows: [10, 20], weights: [4,2,1] }
 };
 
@@ -1346,6 +1350,60 @@ function _predictHybridCold(rounds, cfg) {
   return top;
 }
 
+// 마르코프 체인: 직전 회차 번호 → 다음 회차 번호 전이 확률
+function _predictMarkov(rounds, cfg) {
+  var rs = cfg.lookback ? (rounds.length >= cfg.lookback ? rounds.slice(-cfg.lookback) : rounds.slice()) : rounds.slice();
+  if (rs.length < 2) {
+    var fallback = [];
+    for (var n = 1; n <= 10; n++) fallback.push({ n: n, s: 0, rawHot: 0, rawCold: 0, kind: 'mix' });
+    return fallback;
+  }
+  var transitions = {}, counts = {};
+  for (var i = 0; i < rs.length - 1; i++) {
+    var prev = [rs[i].first, rs[i].second, rs[i].third];
+    var next = [rs[i+1].first, rs[i+1].second, rs[i+1].third];
+    for (var p = 0; p < prev.length; p++) {
+      var pn = prev[p];
+      counts[pn] = (counts[pn] || 0) + 1;
+      if (!transitions[pn]) transitions[pn] = {};
+      for (var q = 0; q < next.length; q++) {
+        var nn = next[q];
+        transitions[pn][nn] = (transitions[pn][nn] || 0) + 1;
+      }
+    }
+  }
+  var last = rounds[rounds.length - 1];
+  var lastSet = [last.first, last.second, last.third];
+  var score = {};
+  for (var s = 0; s < lastSet.length; s++) {
+    var lp = lastSet[s];
+    if (!counts[lp] || !transitions[lp]) continue;
+    for (var k in transitions[lp]) {
+      score[k] = (score[k] || 0) + transitions[lp][k] / counts[lp];
+    }
+  }
+  // 최근 출현 빈도도 보조로 (마르코프 예측 0이면 아무것도 안 나옴 방지)
+  var recentHot = _scoreWindow(rounds, 20, 1, 1, 1, 1.0);
+  var maxRecent = 0;
+  for (var k2 in recentHot) if (recentHot[k2] > maxRecent) maxRecent = recentHot[k2];
+  for (var n2 = 1; n2 <= 100; n2++) {
+    if (!score[n2]) score[n2] = 0;
+    score[n2] += (recentHot[n2] || 0) / Math.max(maxRecent, 1) * 0.05; // 작은 가중치
+  }
+  var top = _pickTopK(score, 10);
+  for (var t = 0; t < top.length; t++) {
+    var num = top[t].n;
+    top[t].rawHot = recentHot[num] || 0;
+    top[t].rawCold = 0;
+    // 마르코프 신호가 강하면 "전이", 핫 위주면 "핫", 없으면 "믹스"
+    var markovStrong = (score[num] - (recentHot[num]||0)/Math.max(maxRecent,1)*0.05) > 0.5;
+    if (markovStrong) top[t].kind = 'markov';
+    else if (recentHot[num] >= 3) top[t].kind = 'hot';
+    else top[t].kind = 'mix';
+  }
+  return top;
+}
+
 // 윈도우 다른 핫 점수들의 정규화 합산
 function _predictEnsemble(rounds, cfg) {
   var combined = {};
@@ -1388,6 +1446,10 @@ function analyzeBetting(rows) {
     top = _predictHybridCold(sorted, cfg);
     windowSize = Math.min(cfg.window, sorted.length);
     algoLabel = '핫(W' + cfg.window + ', ' + cfg.weights.join(':') + ') + 콜드(W' + cfg.cold_window + ', ×' + cfg.cold_weight + ')';
+  } else if (cfg.kind === 'markov') {
+    top = _predictMarkov(sorted, cfg);
+    windowSize = sorted.length;
+    algoLabel = '마르코프 체인 (직전회차→다음회차 전이확률)';
   } else {
     top = _predictEnsemble(sorted, cfg);
     windowSize = Math.min(Math.max.apply(null, cfg.windows), sorted.length);
@@ -1562,6 +1624,9 @@ function render() {
         } else if (item.kind === 'cold') {
           badge = '콜드 ' + Math.round(item.cold) + '↑';
           badgeClass = 'bn-count bn-cold';
+        } else if (item.kind === 'markov') {
+          badge = '전이';
+          badgeClass = 'bn-count bn-markov';
         } else {
           badge = '믹스';
           badgeClass = 'bn-count bn-mix';

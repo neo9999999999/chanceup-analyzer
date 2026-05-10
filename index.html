@@ -263,10 +263,19 @@ input::-webkit-inner-spin-button {
   right: 6px;
   font-size: 9px;
   font-weight: 700;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.25);
+  color: #1a1a1a;
   border-radius: 999px;
   padding: 1px 6px;
   letter-spacing: 0.03em;
+}
+.betting-number .bn-count.bn-cold {
+  background: rgba(59, 130, 246, 0.85);
+  color: #fff;
+}
+.betting-number .bn-count.bn-mix {
+  background: rgba(168, 85, 247, 0.85);
+  color: #fff;
 }
 .betting-numbers.warn .betting-number {
   background: rgba(239, 68, 68, 0.15);
@@ -821,7 +830,7 @@ body.food .flow-step.repeat-3 {
     <div class="card-title" id="betting-title">🎯 베팅 추천</div>
     <div class="betting-info" id="betting-info"></div>
     <div class="betting-section">
-      <div class="betting-section-title">🔥 추천 번호 10개 (가중치 + 인접)</div>
+      <div class="betting-section-title" id="betting-section-title">🔥 추천 번호 10개 (핫 + 콜드 반등)</div>
       <div class="betting-numbers" id="betting-numbers-2"></div>
     </div>
     <div class="betting-stats" id="betting-stats"></div>
@@ -1246,76 +1255,167 @@ function analyzeFlow(rows) {
   return { sequence: sequence, transitions: transitions, predictions: predictions };
 }
 
-// 게임별 백테스트 적중률 (딱 2회만 전략, 검증 결과)
+// 게임별 백테스트 적중률 (v2 알고리즘, 2026-05-10 측정)
+//   basic   = HYBR-COLD W20, w=(1,1,1), cold=0.5@20  (n=62)
+//   premium = HYBR-COLD W20, w=(1,1,1), cold=0.8@20  (n=6, 표본부족)
+//   food    = ENS (10,20),  w=(4,2,1)                (n=20)
 var BETTING_STATS = {
-  basic:   { p1: 19.4, p12: 36.1, pany: 50.0 },
-  premium: { p1: 19.4, p12: 36.1, pany: 50.0 }, // 표본부족, 기본 적용
-  food:    { p1: 28.6, p12: 28.6, pany: 28.6 }
+  basic:   { p1: 24.2, p12: 37.1, pany: 43.5 },
+  premium: { p1: 33.3, p12: 33.3, pany: 33.3 }, // n=6, 통계 신뢰도 낮음
+  food:    { p1: 40.0, p12: 40.0, pany: 45.0 }
 };
 
-// 🎯 베팅 추천 분석 (최근 20회 1·2·3등 빈도)
-function analyzeBetting(rows) {
-  if (!rows || rows.length < 1) {
-    return { picked: [], dup1: [], dup2: [], dup3: [], windowSize: 0, stats: BETTING_STATS[currentTab] || BETTING_STATS.basic };
-  }
-  var sorted = rows.slice();
-  sorted.sort(function(a, b) { return a.round - b.round; });
-  var win = sorted.slice(-20);
-  var counter = {}, lastSeen = {}, rawCount = {};
-  for (var i = win.length - 1; i >= 0; i--) {
+// 게임별 알고리즘 설정 (백테스트 그리드 서치로 선정)
+var ALGO_CONFIG = {
+  basic:   { kind: 'hybrid_cold', window: 20, weights: [1,1,1], decay: 1.0, cold_weight: 0.5, cold_window: 20 },
+  premium: { kind: 'hybrid_cold', window: 20, weights: [1,1,1], decay: 1.0, cold_weight: 0.8, cold_window: 20 },
+  food:    { kind: 'ensemble',    windows: [10, 20], weights: [4,2,1] }
+};
+
+// 핫 점수: 최근 N회 1·2·3등 가중치 합 (decay 시간 감쇠)
+function _scoreWindow(rounds, window, w1, w2, w3, decay) {
+  var win = rounds.length >= window ? rounds.slice(-window) : rounds.slice();
+  var sc = {}, n = win.length;
+  for (var i = 0; i < n; i++) {
     var r = win[i];
-    var nums = [r.first, r.second, r.third];
-    var weights = [3, 2, 1];
-    for (var j = 0; j < 3; j++) {
-      var n = nums[j];
-      counter[n] = (counter[n] || 0) + weights[j];
-      rawCount[n] = (rawCount[n] || 0) + 1;
-      if (lastSeen[n] === undefined) lastSeen[n] = r.round;
-    }
+    var wt = Math.pow(decay, n - 1 - i);
+    sc[r.first]  = (sc[r.first]  || 0) + w1 * wt;
+    sc[r.second] = (sc[r.second] || 0) + w2 * wt;
+    sc[r.third]  = (sc[r.third]  || 0) + w3 * wt;
   }
-  var t1 = [], t2 = [], t3 = [];
-  for (var k in counter) {
-    var item = { number: parseInt(k, 10), count: rawCount[k], score: counter[k], lr: lastSeen[k] };
-    if (counter[k] >= 8) t1.push(item);
-    else if (counter[k] >= 4) t2.push(item);
-    else t3.push(item);
+  return sc;
+}
+
+// 콜드 점수: 최근 윈도우 내 마지막 등장 이후 경과 회차 수
+function _coldScore(rounds, window) {
+  var win = rounds.length >= window ? rounds.slice(-window) : rounds.slice();
+  var lastIdx = {};
+  for (var i = 0; i < win.length; i++) {
+    var r = win[i];
+    lastIdx[r.first] = i; lastIdx[r.second] = i; lastIdx[r.third] = i;
   }
-  var sorter = function(a, b) {
-    if (b.score !== a.score) return b.score - a.score;
-    if (b.lr !== a.lr) return b.lr - a.lr;
-    return a.number - b.number;
-  };
-  t1.sort(sorter); t2.sort(sorter); t3.sort(sorter);
-  var pickedSet = {}, picked = [];
-  function add(item) {
-    if (picked.length >= 10) return false;
-    if (pickedSet[item.number]) return false;
-    pickedSet[item.number] = true;
-    picked.push(item);
-    return true;
+  var cold = {};
+  for (var n = 1; n <= 100; n++) {
+    cold[n] = (lastIdx[n] !== undefined) ? (win.length - 1 - lastIdx[n]) : win.length;
   }
-  for (var p1 = 0; p1 < t1.length; p1++) add(t1[p1]);
-  for (var p2 = 0; p2 < t2.length; p2++) add(t2[p2]);
-  if (picked.length < 10) {
-    var pivots = t1.concat(t2);
-    for (var pv = 0; pv < pivots.length && picked.length < 10; pv++) {
-      var pn = pivots[pv].number;
-      if (pn > 1 && !pickedSet[pn - 1]) add({ number: pn - 1, count: 0, score: 0, lr: 0 });
-      if (picked.length >= 10) break;
-      if (pn < 100 && !pickedSet[pn + 1]) add({ number: pn + 1, count: 0, score: 0, lr: 0 });
-    }
+  return cold;
+}
+
+function _pickTopK(scores, slots) {
+  var arr = [];
+  for (var k in scores) arr.push({ n: parseInt(k, 10), s: scores[k] });
+  arr.sort(function(a, b) { return (b.s !== a.s) ? (b.s - a.s) : (a.n - b.n); });
+  var picked = arr.slice(0, slots);
+  var used = {};
+  for (var i = 0; i < picked.length; i++) used[picked[i].n] = true;
+  for (var n = 1; n <= 100 && picked.length < slots; n++) {
+    if (!used[n]) { picked.push({ n: n, s: 0 }); used[n] = true; }
   }
-  for (var p3 = 0; p3 < t3.length && picked.length < 10; p3++) add(t3[p3]);
-  picked.sort(function(a, b) { return a.number - b.number; });
-  var dup3 = t1.map(function(t) { return { number: t.number, count: t.count }; });
-  dup3.sort(function(a, b) { return a.number - b.number; });
+  return picked;
+}
+
+// 핫(빈도) + 콜드(반등) 결합 스코어
+function _predictHybridCold(rounds, cfg) {
+  var hot = _scoreWindow(rounds, cfg.window, cfg.weights[0], cfg.weights[1], cfg.weights[2], cfg.decay);
+  var cold = _coldScore(rounds, cfg.cold_window);
+  var maxHot = 0, maxCold = 0;
+  for (var k in hot) if (hot[k] > maxHot) maxHot = hot[k];
+  for (var k2 in cold) if (cold[k2] > maxCold) maxCold = cold[k2];
+  if (maxHot === 0) maxHot = 1;
+  if (maxCold === 0) maxCold = 1;
+  var combined = {}, hotPart = {}, coldPart = {};
+  for (var n = 1; n <= 100; n++) {
+    var h = (hot[n] || 0) / maxHot;
+    var c = (cold[n] || 0) / maxCold * cfg.cold_weight;
+    combined[n] = h + c;
+    hotPart[n] = hot[n] || 0;
+    coldPart[n] = cold[n] || 0;
+  }
+  var top = _pickTopK(combined, 10);
+  for (var i = 0; i < top.length; i++) {
+    var num = top[i].n;
+    top[i].rawHot = hotPart[num];
+    top[i].rawCold = coldPart[num];
+    // 신호 강도 비교 (cold_weight 영향 제외, 순수 정규화 강도로 분류)
+    var hPct = (hotPart[num] || 0) / maxHot;
+    var cPct = (coldPart[num] || 0) / maxCold;
+    if (hPct - cPct > 0.2) top[i].kind = 'hot';
+    else if (cPct - hPct > 0.2) top[i].kind = 'cold';
+    else top[i].kind = 'mix';
+  }
+  return top;
+}
+
+// 윈도우 다른 핫 점수들의 정규화 합산
+function _predictEnsemble(rounds, cfg) {
+  var combined = {};
+  for (var w = 0; w < cfg.windows.length; w++) {
+    var sc = _scoreWindow(rounds, cfg.windows[w], cfg.weights[0], cfg.weights[1], cfg.weights[2], 1.0);
+    var mx = 0;
+    for (var k in sc) if (sc[k] > mx) mx = sc[k];
+    if (mx === 0) mx = 1;
+    for (var k2 in sc) combined[k2] = (combined[k2] || 0) + sc[k2] / mx;
+  }
+  // 원시 출현횟수: 가장 작은 윈도우 기준 (사용자에게 의미 있는 숫자)
+  var smallWin = Math.min.apply(null, cfg.windows);
+  var rawCount = {};
+  var winSlice = rounds.length >= smallWin ? rounds.slice(-smallWin) : rounds.slice();
+  for (var i = 0; i < winSlice.length; i++) {
+    var r = winSlice[i];
+    rawCount[r.first]  = (rawCount[r.first]  || 0) + 1;
+    rawCount[r.second] = (rawCount[r.second] || 0) + 1;
+    rawCount[r.third]  = (rawCount[r.third]  || 0) + 1;
+  }
+  var top = _pickTopK(combined, 10);
+  for (var j = 0; j < top.length; j++) {
+    top[j].rawHot = rawCount[top[j].n] || 0;
+    top[j].rawCold = 0;
+    top[j].kind = (top[j].rawHot >= 2 ? 'hot' : 'mix');
+  }
+  return top;
+}
+
+// 🎯 베팅 추천 분석 (게임별 BEST 알고리즘)
+function analyzeBetting(rows) {
+  var stats = BETTING_STATS[currentTab] || BETTING_STATS.basic;
+  if (!rows || rows.length < 1) {
+    return { picked: [], dup1: [], dup2: [], dup3: [], windowSize: 0, stats: stats, algoLabel: '', algoKind: '' };
+  }
+  var sorted = rows.slice().sort(function(a, b){ return a.round - b.round; });
+  var cfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
+  var top, windowSize, algoLabel;
+  if (cfg.kind === 'hybrid_cold') {
+    top = _predictHybridCold(sorted, cfg);
+    windowSize = Math.min(cfg.window, sorted.length);
+    algoLabel = '핫(W' + cfg.window + ', ' + cfg.weights.join(':') + ') + 콜드(W' + cfg.cold_window + ', ×' + cfg.cold_weight + ')';
+  } else {
+    top = _predictEnsemble(sorted, cfg);
+    windowSize = Math.min(Math.max.apply(null, cfg.windows), sorted.length);
+    algoLabel = '앙상블 W' + cfg.windows.join('+') + ' (' + cfg.weights.join(':') + ')';
+  }
+  var dup2 = [], dup3 = [];
+  for (var i = 0; i < top.length; i++) {
+    var t = top[i];
+    dup2.push({
+      number: t.n,
+      count: Math.round(t.rawHot),
+      score: t.s,
+      kind: t.kind,
+      cold: t.rawCold
+    });
+    if (t.rawHot >= 3) dup3.push({ number: t.n, count: Math.round(t.rawHot) });
+  }
+  dup2.sort(function(a, b){ return a.number - b.number; });
+  dup3.sort(function(a, b){ return a.number - b.number; });
   return {
-    picked: picked,
+    picked: dup2,
     dup1: [],
-    dup2: picked,
+    dup2: dup2,
     dup3: dup3,
-    windowSize: win.length,
-    stats: BETTING_STATS[currentTab] || BETTING_STATS.basic
+    windowSize: windowSize,
+    stats: stats,
+    algoLabel: algoLabel,
+    algoKind: cfg.kind
   };
 }
 function analyzeBettingBacktest(rows) {
@@ -1447,23 +1547,34 @@ function render() {
     document.getElementById('betting-title').innerHTML =
       '🎯 ' + nextRound + '회 베팅 추천';
     document.getElementById('betting-info').innerHTML =
-      '최근 ' + betting.windowSize + '회 1·2·3등에서 <strong>가중치+인접</strong>으로 10개 추천' +
-      ' · 1등×3+2등×2+3등×1 → 8점+ → 4점+ → ±1 인접';
+      '최근 ' + betting.windowSize + '회 분석 · <strong>' + betting.algoLabel + '</strong>';
 
-    // 추천 번호 (딱 2회만)
+    // 추천 번호 (게임별 BEST 알고리즘)
     var dup2 = betting.dup2;
     if (dup2.length > 0) {
       var n2Html = '';
       for (var i2 = 0; i2 < dup2.length; i2++) {
+        var item = dup2[i2];
+        var badge, badgeClass;
+        if (item.kind === 'hot') {
+          badge = '핫' + (item.count > 0 ? ' ' + item.count : '');
+          badgeClass = 'bn-count';
+        } else if (item.kind === 'cold') {
+          badge = '콜드 ' + Math.round(item.cold) + '↑';
+          badgeClass = 'bn-count bn-cold';
+        } else {
+          badge = '믹스';
+          badgeClass = 'bn-count bn-mix';
+        }
         n2Html += '<div class="betting-number">' +
-          '<span class="bn-count">' + (dup2[i2].count > 0 ? dup2[i2].count + '회' : '인접') + '</span>' +
-          dup2[i2].number +
+          '<span class="' + badgeClass + '">' + badge + '</span>' +
+          item.number +
           '</div>';
       }
       document.getElementById('betting-numbers-2').innerHTML = n2Html;
     } else {
       document.getElementById('betting-numbers-2').innerHTML =
-        '<div class="betting-empty">최근 ' + betting.windowSize + '회 안에 2회 출현 번호가 없음</div>';
+        '<div class="betting-empty">데이터 부족</div>';
     }
 
     // 검증 적중률 (게임별)

@@ -429,6 +429,30 @@ input::-webkit-inner-spin-button {
   text-align: center;
   margin: 14px 0;
 }
+/* 1등 기반 시퀀스 — 금색 톤 (베팅 카드의 1·2·3 합산 그린과 구분) */
+.seq-main-card.seq-first {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(245, 158, 11, 0.12));
+  border-color: rgba(251, 191, 36, 0.5);
+}
+.seq-main-card.seq-first .seq-main-label {
+  color: rgba(252, 211, 77, 1);
+}
+.seq-first-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(251, 191, 36, 0.2);
+  font-size: 11px;
+  color: var(--muted);
+}
+.seq-first-stats strong {
+  display: block;
+  color: rgba(252, 211, 77, 1);
+  font-size: 14px;
+  margin-top: 2px;
+}
 .seq-main-label {
   font-size: 12px;
   color: rgba(187, 247, 208, 1);
@@ -1009,7 +1033,18 @@ body.food .flow-step.repeat-3 {
     <button class="btn-primary" id="btn-add">등록</button>
   </div>
 
-  <!-- 🎯 베팅 추천 -->
+  <!-- 🌊 1등 흐름 분석 (먼저 표시) -->
+  <div class="card" id="flow-card" style="display:none;">
+    <div class="card-title">🌊 1등 당첨 흐름</div>
+    <div class="flow-recent" id="flow-recent"></div>
+    <!-- 1등 기반 최고 시퀀스 추천 -->
+    <div id="flow-first-sequence"></div>
+    <!-- 자주 나온 1등 번호 TOP3 -->
+    <div id="flow-next-pred"></div>
+    <div id="flow-stats-only"></div>
+  </div>
+
+  <!-- 🎯 베팅 추천 (1·2·3등 합산 기반) -->
   <div class="card highlight" id="betting-card" style="display:none;">
     <div class="card-title" id="betting-title">🎯 베팅 추천</div>
     <div class="betting-info" id="betting-info"></div>
@@ -1022,14 +1057,6 @@ body.food .flow-step.repeat-3 {
     </div>
     <!-- 백테스트 적중률 (이 시퀀스의 1·2·3등 적중률) -->
     <div class="betting-stats" id="betting-stats"></div>
-  </div>
-
-  <!-- 🌊 1등 흐름 분석 -->
-  <div class="card" id="flow-card" style="display:none;">
-    <div class="card-title">🌊 1등 당첨 흐름</div>
-    <div class="flow-recent" id="flow-recent"></div>
-    <div id="flow-next-pred"></div>
-    <div id="flow-stats-only"></div>
   </div>
 
   <!-- 🏆 최근 1등 빈도 TOP 10 -->
@@ -1561,15 +1588,18 @@ function analyzeFlow(rows) {
   };
 }
 
-// 게임별 백테스트 적중률 (v7 알고리즘 = Sliding TOP1 시퀀스, 2026-05-22 측정)
-//   추천 = sliding window 1·2·3등 가중합 TOP1 연속 10개 시퀀스
-//   basic   W=20 (n=100): 1등 17.0 / 2등 10.0 / 3등 12.0 / 통합 35.0
-//   premium W=20 (n=11) : 1등  9.1 / 2등  0.0 / 3등 36.4 / 통합 45.5  (표본 부족)
-//   food    W=30 (n=45) : 1등 11.1 / 2등 11.1 / 3등 11.1 / 통합 28.9
+// 게임별 백테스트 적중률 (v8.1 = Sliding TOP1, 2026-05-22 측정)
+//   BETTING_STATS      = 1·2·3등 가중합 sliding TOP1 (베팅 카드)
+//   FLOW_FIRST_STATS  = 1등만 sliding TOP1 (흐름 카드)
 var BETTING_STATS = {
   basic:   { p1: 17.0, p2: 10.0, p3: 12.0, p12: 26.0, pany: 35.0 },
   premium: { p1:  9.1, p2:  0.0, p3: 36.4, p12:  9.1, pany: 45.5 },
   food:    { p1: 11.1, p2: 11.1, p3: 11.1, p12: 22.2, pany: 28.9 }
+};
+var FLOW_FIRST_STATS = {
+  basic:   { p1: 13.0, p2: 10.0, p3: 14.0, pany: 34.0 },
+  premium: { p1:  0.0, p2:  0.0, p3: 27.3, pany: 27.3 },
+  food:    { p1:  6.7, p2:  2.2, p3:  8.9, pany: 17.8 }
 };
 
 // 게임별 알고리즘 설정 — 추천 = sliding TOP1 시퀀스. 흐름·베팅 둘 다 동일 방식.
@@ -2006,6 +2036,28 @@ function render() {
         '</span>';
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;
+
+    // 🥇 1등 기반 최고 시퀀스 (sliding window, weights=[1,0,0])
+    var sortedRows = rows.slice().sort(function(a, b){ return a.round - b.round; });
+    var firstHr = _slidingHotRange(sortedRows, (ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic).window || 20, [1, 0, 0]);
+    var firstStats = FLOW_FIRST_STATS[currentTab] || FLOW_FIRST_STATS.basic;
+    var firstSeqHtml = '';
+    if (firstHr && firstHr.top && firstHr.top[0]) {
+      var ft1 = firstHr.top[0];
+      var ftpct = Math.round(ft1.pct * 100);
+      firstSeqHtml += '<div class="seq-main-card seq-first">' +
+        '<div class="seq-main-label">🥇 1등만 기반 최고 시퀀스 (10개 연속)</div>' +
+        '<div class="seq-main-range">' + ft1.start + ' ~ ' + ft1.end + '</div>' +
+        '<div class="seq-main-sub">최근 ' + firstHr.windowSize + '회 1등 ' + firstHr.totalHits + '개 중 ' + ft1.hits + '개 (' + ftpct + '%) 집중</div>' +
+        '<div class="seq-first-stats">' +
+          '<span>1등 적중 <strong>' + firstStats.p1 + '%</strong></span>' +
+          '<span>2등 <strong>' + firstStats.p2 + '%</strong></span>' +
+          '<span>3등 <strong>' + firstStats.p3 + '%</strong></span>' +
+          '<span>통합 <strong>' + firstStats.pany + '%</strong></span>' +
+        '</div>' +
+        '</div>';
+    }
+    document.getElementById('flow-first-sequence').innerHTML = firstSeqHtml;
 
     // 1등 흐름 통계 — 시퀀스 안 가장 자주 나온 1등 번호 TOP 3 (확률 표시)
     var nextHtml = '';

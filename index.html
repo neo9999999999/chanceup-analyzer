@@ -1876,11 +1876,11 @@ var BETTING_STATS = {
   premium: { p1:  9.1, p2:  0.0, p3: 36.4, p12:  9.1, pany: 45.5 },
   food:    { p1: 11.1, p2: 11.1, p3: 11.1, p12: 22.2, pany: 28.9 }
 };
-// FLOW_FIRST_STATS v10.7 — 다음 흐름 마르코프 예측의 OOS 적중률 (단순 빈도 X)
+// FLOW_FIRST_STATS v10.7 — 다음 흐름 마르코프 예측 OOS walk-forward 적중률 (2026-05-23)
 var FLOW_FIRST_STATS = {
   basic:   { p1: 14.3, p2: 14.3, p3: 12.1, pany: 38.5 },  // OOS n=91
-  premium: { p1:  9.1, p2:  9.1, p3:  9.1, pany: 27.3 },  // 표본 작음
-  food:    { p1:  8.0, p2:  6.7, p3:  9.3, pany: 21.0 }
+  premium: { p1:  0.0, p2:  0.0, p3:  0.0, pany:  0.0 },  // OOS n=1 (표본 부족)
+  food:    { p1:  8.8, p2:  8.8, p3: 11.8, pany: 26.5 }   // OOS n=34
 };
 
 // 게임별 알고리즘 설정 — 자동 학습으로 갱신됨 (페이지 로드 / 회차 추가 시)

@@ -257,34 +257,33 @@ input::-webkit-inner-spin-button {
   letter-spacing: -0.02em;
   position: relative;
 }
-/* 1·2·3등 카운트 배지 — 흰색 계열 통일 (사용자 요청) */
+/* 카운트 배지 기본 (흰색 계열) */
 .betting-number .bn-count {
   position: absolute;
   top: 4px;
   right: 6px;
   font-size: 9px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.9);
   color: #1a1a1a;
   border-radius: 999px;
   padding: 1px 6px;
   letter-spacing: 0.03em;
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
-/* 변형 — 모두 흰색 계열, 보더만 약하게 차별화 */
-.betting-number .bn-count.bn-cold,
-.betting-number .bn-count.bn-mix,
-.betting-number .bn-count.bn-markov,
-.betting-number .bn-count.bn-gold {
-  background: rgba(255, 255, 255, 0.92);
+/* 🥇 1등 배지 — 강조 (금색, 글로우) */
+.betting-number .bn-count.bn-first {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
   color: #1a1a1a;
+  border: 1.5px solid #f59e0b;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+  font-size: 10px;
+  padding: 2px 8px;
 }
-.betting-number .bn-count.bn-cold {
-  border: 1px dashed rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.78);
-}
+/* 2·3등 — 약하게 표시 */
 .betting-number .bn-count.bn-mix {
   background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 /* 1등 흐름의 시퀀스 박스 배경 — 탭별 accent (시각적 구분) */
 .betting-numbers.betting-numbers-gold .betting-number {
@@ -387,28 +386,34 @@ input::-webkit-inner-spin-button {
 body.premium .flow-step.repeat-3 { background: rgba(167, 139, 250, 0.1); }
 body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 
-/* 1등 번호 — 메인 강조 (큰 글씨, 진한 색) */
-.flow-step-num {
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--text);
-  margin: 0;
-  line-height: 1;
-}
-/* 그룹 라벨 — 보조 (작게, 흐리게) */
+/* 시퀀스 그룹 라벨 — 메인 (큰 글씨) */
 .flow-step-group {
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--text-dim);
-  margin-top: 2px;
-  letter-spacing: 0.02em;
-  opacity: 0.75;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
 }
-.flow-step.latest .flow-step-num { color: #1a1a1a; }
-.flow-step.latest .flow-step-group { color: #1a1a1a; opacity: 0.65; }
-.flow-step.in-hot-range .flow-step-num { color: #d1fae5; }
-.flow-step.in-hot-range .flow-step-group { color: #6ee7b7; opacity: 0.8; }
+/* 1등 번호 — 강조 배지 (둥근 배지, 금색) */
+.flow-step-num {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.95);
+  color: #1a1a1a;
+  margin-top: 4px;
+  letter-spacing: 0.01em;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  box-shadow: 0 1px 3px rgba(251, 191, 36, 0.3);
+}
+.flow-step.latest .flow-step-group { color: #1a1a1a; }
+.flow-step.latest .flow-step-num {
+  background: #1a1a1a;
+  color: rgba(251, 191, 36, 1);
+  border-color: rgba(251, 191, 36, 0.7);
+}
+.flow-step.in-hot-range .flow-step-group { color: #d1fae5; }
 
 /* 흐름 카드 범례 */
 .flow-legend {
@@ -2011,21 +2016,24 @@ function render() {
       seqMain.innerHTML = '';
     }
 
-    // 시퀀스 안 10개 번호 (1·2·3등 출현 색상 마킹)
+    // 시퀀스 안 10개 번호 (1등/2·3등만 배지, 신규는 배지 없음)
     var dup2 = betting.dup2;
     if (dup2.length > 0) {
       var n2Html = '';
       for (var i2 = 0; i2 < dup2.length; i2++) {
         var item = dup2[i2];
-        // 각 번호의 1·2·3등 출현 양상으로 배지 결정
-        var badge, badgeClass;
-        if (item.c1 >= 2) { badge = '1등 ' + item.c1; badgeClass = 'bn-count'; }
-        else if (item.c1 >= 1) { badge = '1등 ' + item.c1; badgeClass = 'bn-count'; }
-        else if (item.c2 + item.c3 >= 2) { badge = '2·3등 ' + (item.c2 + item.c3); badgeClass = 'bn-count bn-mix'; }
-        else if (item.count === 0) { badge = '신규'; badgeClass = 'bn-count bn-cold'; }
-        else { badge = item.count + '회'; badgeClass = 'bn-count bn-mix'; }
+        var badge = '', badgeClass = '';
+        if (item.c1 >= 1) {
+          badge = '1등 ' + item.c1;
+          badgeClass = 'bn-count bn-first';
+        } else if (item.c2 + item.c3 >= 1) {
+          badge = '2·3등 ' + (item.c2 + item.c3);
+          badgeClass = 'bn-count bn-mix';
+        }
+        // 신규는 배지 없음 (제거)
+        var badgeHtml = badge ? '<span class="' + badgeClass + '">' + badge + '</span>' : '';
         n2Html += '<div class="betting-number">' +
-          '<span class="' + badgeClass + '">' + badge + '</span>' +
+          badgeHtml +
           item.number +
           '</div>';
       }
@@ -2093,10 +2101,10 @@ function render() {
       else if (inHot) cls += ' in-hot-range';
       else if (dCount >= 3) cls += ' repeat-3';
       else if (dCount === 2) cls += ' repeat-2';
-      // 박스 안: 1등 번호 크게 (메인) + 시퀀스 라벨 작게 (보조)
+      // 박스 안: 시퀀스 그룹 (메인) + 1등 번호 강조 배지
       recentHtml += '<span class="' + cls + '">' +
-        '<span class="flow-step-num">' + recent[fi].num + '</span>' +
         '<span class="flow-step-group">' + decadeLabel(recent[fi].decade) + '</span>' +
+        '<span class="flow-step-num">' + recent[fi].num + '</span>' +
         '</span>';
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;
@@ -2128,13 +2136,18 @@ function render() {
         '<div class="betting-numbers betting-numbers-gold">';
       for (var fn = ft1.start; fn <= ft1.end; fn++) {
         var fc = _numberRankCounts(sortedRows, fn, flowWin);
-        var fbadge, fbadgeClass;
-        if (fc.c1 >= 2) { fbadge = '1등 ' + fc.c1; fbadgeClass = 'bn-count bn-gold'; }
-        else if (fc.c1 === 1) { fbadge = '1등 1'; fbadgeClass = 'bn-count bn-gold'; }
-        else if (fc.c2 + fc.c3 >= 1) { fbadge = '2·3등 ' + (fc.c2 + fc.c3); fbadgeClass = 'bn-count bn-mix'; }
-        else { fbadge = '신규'; fbadgeClass = 'bn-count bn-cold'; }
+        var fbadge = '', fbadgeClass = '';
+        if (fc.c1 >= 1) {
+          fbadge = '1등 ' + fc.c1;
+          fbadgeClass = 'bn-count bn-first';
+        } else if (fc.c2 + fc.c3 >= 1) {
+          fbadge = '2·3등 ' + (fc.c2 + fc.c3);
+          fbadgeClass = 'bn-count bn-mix';
+        }
+        // 신규는 배지 없음
+        var fbadgeHtml = fbadge ? '<span class="' + fbadgeClass + '">' + fbadge + '</span>' : '';
         firstSeqHtml += '<div class="betting-number bn-flow">' +
-          '<span class="' + fbadgeClass + '">' + fbadge + '</span>' +
+          fbadgeHtml +
           fn +
           '</div>';
       }

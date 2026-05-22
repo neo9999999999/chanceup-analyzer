@@ -413,6 +413,83 @@ input::-webkit-inner-spin-button {
   transition: width 0.3s;
 }
 
+/* 다음 회차 예상 흐름 (그룹 마르코프) */
+.flow-next-card {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(59, 130, 246, 0.08));
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 14px 0;
+}
+.flow-next-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(134, 239, 172, 1);
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+}
+.flow-next-row {
+  display: grid;
+  grid-template-columns: 90px 50px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  font-size: 13px;
+}
+.flow-next-row .decade-label {
+  color: var(--text);
+  font-weight: 600;
+}
+.flow-next-row .decade-pct {
+  color: rgba(134, 239, 172, 1);
+  font-weight: 700;
+  text-align: right;
+}
+.flow-next-row .decade-bar {
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.flow-next-row .decade-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(34,197,94,0.7), rgba(59,130,246,0.7));
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+.flow-sim-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 12px 0 6px;
+  letter-spacing: 0.02em;
+}
+.flow-sim-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+.flow-sim-step {
+  padding: 4px 8px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 6px;
+  color: var(--text);
+  font-weight: 600;
+}
+.flow-sim-step .sim-round {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  margin-right: 4px;
+}
+.flow-sim-arrow {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 /* 흐름 예측 통계 */
 .flow-stats {
   display: grid;
@@ -848,6 +925,7 @@ body.food .flow-step.repeat-3 {
   <div class="card" id="flow-card" style="display:none;">
     <div class="card-title">🌊 1등 당첨 흐름</div>
     <div class="flow-recent" id="flow-recent"></div>
+    <div id="flow-next-pred"></div>
     <div id="flow-stats-only"></div>
   </div>
 
@@ -1195,6 +1273,41 @@ function decadeLabel(d) {
   return ((d - 1) * 10 + 1) + '~' + (d * 10);
 }
 
+// 십의자리 그룹 마르코프 체인 — 다음 회차 예상 그룹 TOP-K + 시퀀스 시뮬레이션
+function _groupMarkovDecades(sortedRows, topK) {
+  if (!sortedRows || sortedRows.length < 2) return { topDecades: [], simSequence: [] };
+  var tr = {}, ct = {};
+  for (var i = 0; i < sortedRows.length - 1; i++) {
+    var dp = getDecade(sortedRows[i].first);
+    var dn = getDecade(sortedRows[i+1].first);
+    if (!tr[dp]) tr[dp] = {};
+    tr[dp][dn] = (tr[dp][dn] || 0) + 1;
+    ct[dp] = (ct[dp] || 0) + 1;
+  }
+  var lastD = getDecade(sortedRows[sortedRows.length-1].first);
+  var probs = [];
+  if (ct[lastD] && tr[lastD]) {
+    for (var k in tr[lastD]) {
+      probs.push({ decade: parseInt(k, 10), p: tr[lastD][k] / ct[lastD] });
+    }
+    probs.sort(function(a, b){ return b.p - a.p; });
+  }
+  // 시퀀스 시뮬레이션: 다음 5회차 argmax 체인
+  var sim = [];
+  var cur = lastD;
+  for (var s = 0; s < 5; s++) {
+    if (!ct[cur] || !tr[cur]) break;
+    var bestD = null, bestC = 0;
+    for (var k2 in tr[cur]) {
+      if (tr[cur][k2] > bestC) { bestC = tr[cur][k2]; bestD = parseInt(k2, 10); }
+    }
+    if (bestD === null) break;
+    sim.push({ decade: bestD, p: bestC / ct[cur] });
+    cur = bestD;
+  }
+  return { topDecades: probs.slice(0, topK || 5), simSequence: sim };
+}
+
 function analyzeFlow(rows) {
   if (rows.length < 2) return null;
   var sorted = rows.slice();
@@ -1256,24 +1369,34 @@ function analyzeFlow(rows) {
     });
   }
 
-  return { sequence: sequence, transitions: transitions, predictions: predictions };
+  // 다음 회차 예상 흐름 (그룹 마르코프)
+  var flowPred = _groupMarkovDecades(sorted, 5);
+
+  return {
+    sequence: sequence,
+    transitions: transitions,
+    predictions: predictions,
+    nextDecades: flowPred.topDecades,
+    simSequence: flowPred.simSequence,
+    nextRound: sorted[sorted.length - 1].round + 1
+  };
 }
 
-// 게임별 백테스트 적중률 (v3 알고리즘, 2026-05-10 측정)
-//   basic   = HYBR-COLD W20, w=(1,1,1), cold=0.3@15  (n=62)
-//   premium = MARKOV (직전회차→다음회차 전이확률) (n=6, 표본부족)
-//   food    = ENS (10,20),  w=(4,2,1)                (n=20)
+// 게임별 백테스트 적중률 (v4 알고리즘, 2026-05-22 측정 — 표본 확대 후 재선정)
+//   basic   = HYBR-COLD W20, w=(1,1,1), cold=0.5@10  (n=100)
+//   premium = HYBR-COLD W30, w=(2,1,1), cold=0.7@30  (n=11, 표본 여전히 작음)
+//   food    = ENS (12,20,30), w=(4,2,1)              (n=45)
 var BETTING_STATS = {
-  basic:   { p1: 24.2, p12: 38.7, pany: 48.4 },
-  premium: { p1: 33.3, p12: 33.3, pany: 50.0 }, // n=6, 통계 신뢰도 낮음
-  food:    { p1: 40.0, p12: 40.0, pany: 45.0 }
+  basic:   { p1: 22.0, p12: 33.0, pany: 39.0 },
+  premium: { p1: 27.3, p12: 27.3, pany: 36.4 },
+  food:    { p1: 22.2, p12: 31.1, pany: 35.6 }
 };
 
 // 게임별 알고리즘 설정 (백테스트 그리드 서치로 선정)
 var ALGO_CONFIG = {
-  basic:   { kind: 'hybrid_cold', window: 20, weights: [1,1,1], decay: 1.0, cold_weight: 0.3, cold_window: 15 },
-  premium: { kind: 'markov',      lookback: null }, // 전체 데이터로 전이확률 학습
-  food:    { kind: 'ensemble',    windows: [10, 20], weights: [4,2,1] }
+  basic:   { kind: 'hybrid_cold', window: 20, weights: [1,1,1], decay: 1.0, cold_weight: 0.5, cold_window: 10 },
+  premium: { kind: 'hybrid_cold', window: 30, weights: [2,1,1], decay: 1.0, cold_weight: 0.7, cold_window: 30 },
+  food:    { kind: 'ensemble',    windows: [12, 20, 30], weights: [4,2,1] }
 };
 
 // 핫 점수: 최근 N회 1·2·3등 가중치 합 (decay 시간 감쇠)
@@ -1707,6 +1830,38 @@ function render() {
         '</span>';
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;
+
+    // 🔮 다음 회차 예상 흐름 (그룹 마르코프 체인)
+    var nextHtml = '';
+    if (flow.nextDecades && flow.nextDecades.length > 0) {
+      nextHtml += '<div class="flow-next-card">';
+      nextHtml += '<div class="flow-next-title">🔮 ' + flow.nextRound + '회 예상 흐름 (1등 십의자리)</div>';
+      for (var nd = 0; nd < Math.min(flow.nextDecades.length, 5); nd++) {
+        var ndItem = flow.nextDecades[nd];
+        var pct = Math.round(ndItem.p * 100);
+        nextHtml += '<div class="flow-next-row">' +
+          '<span class="decade-label">' + decadeLabel(ndItem.decade) + '</span>' +
+          '<span class="decade-pct">' + pct + '%</span>' +
+          '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + pct + '%"></div></div>' +
+          '</div>';
+      }
+      // 시퀀스 시뮬레이션
+      if (flow.simSequence && flow.simSequence.length > 0) {
+        nextHtml += '<div class="flow-sim-title">📍 예상 시퀀스 (다음 ' + flow.simSequence.length + '회차, 최빈 체인)</div>';
+        nextHtml += '<div class="flow-sim-row">';
+        for (var sq = 0; sq < flow.simSequence.length; sq++) {
+          if (sq > 0) nextHtml += '<span class="flow-sim-arrow">→</span>';
+          var stepRound = flow.nextRound + sq;
+          nextHtml += '<span class="flow-sim-step">' +
+            '<span class="sim-round">' + stepRound + '</span>' +
+            decadeLabel(flow.simSequence[sq].decade) +
+            '</span>';
+        }
+        nextHtml += '</div>';
+      }
+      nextHtml += '</div>';
+    }
+    document.getElementById('flow-next-pred').innerHTML = nextHtml;
 
     // 베팅 추천 백테스트 통계 (1등/2등/3등 적중)
     var bt = analyzeBettingBacktest(rows);

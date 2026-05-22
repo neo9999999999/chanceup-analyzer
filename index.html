@@ -1135,14 +1135,20 @@ tr.topfreq-rank-top3 .col-num {
     <button class="btn-primary" id="btn-add">등록</button>
   </div>
 
-  <!-- 🌊 1등 당첨 흐름 (1등만 표시) -->
+  <!-- 🌊 1등 흐름 카드 (추천 흐름 + 당첨 흐름 분기) -->
   <div class="card" id="flow-card" style="display:none;">
-    <div class="card-title">🌊 1등 당첨 흐름</div>
+    <div class="card-title">🌊 1등 흐름 분석</div>
     <div class="flow-legend">
       <div class="flow-legend-item"><span class="flow-legend-swatch latest"></span>최신 회차</div>
-      <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>추천 적중</div>
+      <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>추천 적중 (OOS 진짜)</div>
       <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 시퀀스 반복</div>
     </div>
+    <!-- 🎯 1등 추천 흐름 (위) -->
+    <div class="flow-rank-label">🎯 1등 추천 흐름 (각 회차 직전 데이터로 추천 → 실제 1등 적중 여부)</div>
+    <div class="flow-recent" id="flow-recommend"></div>
+    <div style="font-size:11px;color:var(--text-dim);margin:6px 0 0;" id="flow-recommend-stat"></div>
+    <!-- 🌊 1등 당첨 흐름 (아래) -->
+    <div class="flow-rank-label" style="margin-top:20px;">🌊 1등 당첨 흐름 (실제 1등 시퀀스)</div>
     <div class="flow-recent" id="flow-recent"></div>
     <!-- 🔁 흐름 트랜지션 마르코프 (시퀀스 이동 패턴) -->
     <div id="flow-transition"></div>
@@ -1707,6 +1713,39 @@ function _flowSequenceCombined(sorted) {
   return seq;
 }
 
+// 🎯 1등 추천 흐름 — 각 회차 R-1까지의 데이터로 만든 sliding TOP1 추천 (1등만 기준)
+// 시퀀스 라벨 = 그 시점 추천. 실제 1등이 그 추천 안 들어가면 miss.
+// → 진짜 OOS. 면처리는 hit=true일 때만.
+function _recommendationFlow(sorted) {
+  var seq = [];
+  var win = 20;
+  for (var i = 1; i < sorted.length; i++) {
+    var prevData = sorted.slice(0, i);
+    if (prevData.length < 5) {
+      seq.push({ round: sorted[i].round, num: sorted[i].first, seqLabel: '데이터부족', hit: false, recStart: null, recEnd: null });
+      continue;
+    }
+    // 1등만 기준 sliding TOP1 (1등 노린 추천)
+    var hr = _slidingHotRange(prevData, win, [1, 0, 0]);
+    if (!hr || !hr.top || !hr.top[0]) {
+      seq.push({ round: sorted[i].round, num: sorted[i].first, seqLabel: '?', hit: false, recStart: null, recEnd: null });
+      continue;
+    }
+    var t = hr.top[0];
+    var actualFirst = sorted[i].first;
+    var hit = (actualFirst >= t.start && actualFirst <= t.end);
+    seq.push({
+      round: sorted[i].round,
+      num: actualFirst,
+      seqLabel: t.start + '~' + t.end,
+      seqStart: t.start,
+      seqEnd: t.end,
+      hit: hit
+    });
+  }
+  return seq;
+}
+
 // 2·3등 흐름 시퀀스 계산 (1등 흐름과 동일 로직, rank만 다름)
 function _flowSequenceForRank(sorted, rankKey) {
   var flowCfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
@@ -1849,18 +1888,18 @@ function analyzeFlow(rows) {
     });
   }
 
-  // 다음 회차 예상 핫 구간 (Sliding window 1·2·3등 합산 — 백테스트 +5~6%p 우월)
   var cfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
-  // 흐름 카드의 핫 구간 = 베팅 시퀀스와 동일 (cfg.window, cfg.weights) — 일관성 유지
   var hotRange = _slidingHotRange(sorted, cfg.window || 20, cfg.weights || [1,1,1]);
-  // 2·3등 흐름 추가
   var sequenceSecond = _flowSequenceForRank(sorted, 'second');
   var sequenceThird  = _flowSequenceForRank(sorted, 'third');
+  // ★ 1등 추천 흐름 (진짜 OOS)
+  var recommendationFlow = _recommendationFlow(sorted);
 
   return {
     sequence: sequence,
     sequenceSecond: sequenceSecond,
     sequenceThird: sequenceThird,
+    recommendationFlow: recommendationFlow,
     transitions: transitions,
     predictions: predictions,
     hotRange: hotRange,
@@ -2581,8 +2620,8 @@ function render() {
     flowCard.style.display = 'block';
 
     // 최근 흐름 (최대 7회) + 반복 구간 색상 강조
-    // 흐름 시퀀스 박스 렌더 (1·2·3등 공통)
-    function renderFlowRow(sequence) {
+    // 추천 흐름: 면처리는 진짜 OOS 적중 시만. 라인 처리 시퀀스 반복.
+    function renderRecommendRow(sequence) {
       if (!sequence || sequence.length === 0) return '';
       var rec = sequence.slice(-20);
       var labelCount = {};
@@ -2595,7 +2634,7 @@ function render() {
         var isLatest = (fi === rec.length - 1);
         var sCount = labelCount[rec[fi].seqLabel];
         var cls = 'flow-step seq-box';
-        if (rec[fi].hit) cls += ' in-hot-range';
+        if (rec[fi].hit) cls += ' in-hot-range'; // 면처리: OOS hit만
         if (isLatest) cls += ' latest';
         if (!isLatest && sCount >= 2) cls += ' repeat-2';
         html += '<span class="' + cls + '">' +
@@ -2605,7 +2644,38 @@ function render() {
       }
       return html;
     }
-    document.getElementById('flow-recent').innerHTML = renderFlowRow(flow.sequence);
+    // 당첨 흐름: 면처리 X (그냥 시계열). 라인은 시퀀스 반복.
+    function renderActualRow(sequence) {
+      if (!sequence || sequence.length === 0) return '';
+      var rec = sequence.slice(-20);
+      var labelCount = {};
+      for (var fc = 0; fc < rec.length; fc++) {
+        labelCount[rec[fc].seqLabel] = (labelCount[rec[fc].seqLabel] || 0) + 1;
+      }
+      var html = '';
+      for (var fi = 0; fi < rec.length; fi++) {
+        if (fi > 0) html += '<span class="flow-arrow">→</span>';
+        var isLatest = (fi === rec.length - 1);
+        var sCount = labelCount[rec[fi].seqLabel];
+        var cls = 'flow-step seq-box';
+        if (isLatest) cls += ' latest';
+        if (!isLatest && sCount >= 2) cls += ' repeat-2';
+        html += '<span class="' + cls + '">' +
+          '<span class="flow-step-group">' + rec[fi].seqLabel + '</span>' +
+          '<span class="flow-step-num">' + rec[fi].num + '</span>' +
+          '</span>';
+      }
+      return html;
+    }
+    document.getElementById('flow-recommend').innerHTML = renderRecommendRow(flow.recommendationFlow);
+    document.getElementById('flow-recent').innerHTML = renderActualRow(flow.sequence);
+    // 추천 흐름 적중률 표시
+    if (flow.recommendationFlow && flow.recommendationFlow.length > 0) {
+      var recent20 = flow.recommendationFlow.slice(-20);
+      var hitCount = recent20.filter(function(x){ return x.hit; }).length;
+      document.getElementById('flow-recommend-stat').innerHTML =
+        '<strong>추천 적중 (최근 ' + recent20.length + '회): ' + hitCount + '회 (' + (hitCount/recent20.length*100).toFixed(0) + '%)</strong> · 면 처리된 박스만 진짜 적중';
+    }
     var recent = flow.sequence.slice(-20);  // 아래 코드 호환용
 
     // 🔁 다음 흐름 예측 — 직전 1등 시퀀스 다음에 1등이 어디로 갔는지 (마르코프)

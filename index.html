@@ -414,6 +414,16 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 }
 .flow-step.in-hot-range .flow-step-group { color: #d1fae5; }
 
+/* 등수별 흐름 라벨 */
+.flow-rank-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin: 16px 0 8px;
+  letter-spacing: 0.02em;
+}
+.flow-rank-label:first-of-type { margin-top: 6px; }
+
 /* 흐름 카드 범례 */
 .flow-legend {
   display: flex;
@@ -1095,15 +1105,20 @@ tr.topfreq-rank-top3 .col-num {
     <button class="btn-primary" id="btn-add">등록</button>
   </div>
 
-  <!-- 🌊 1등 흐름 분석 (먼저 표시) -->
+  <!-- 🌊 1·2·3등 흐름 분석 (먼저 표시) -->
   <div class="card" id="flow-card" style="display:none;">
-    <div class="card-title">🌊 1등 당첨 흐름</div>
+    <div class="card-title">🌊 1·2·3등 당첨 흐름</div>
     <div class="flow-legend">
       <div class="flow-legend-item"><span class="flow-legend-swatch latest"></span>최신 회차</div>
-      <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>추천 적중 (그 시점 베팅 시퀀스에 1등 들어옴)</div>
+      <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>추천 적중 (그 시점 베팅 시퀀스에 들어옴)</div>
       <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 시퀀스 반복 (2회+)</div>
     </div>
+    <div class="flow-rank-label">🥇 1등 흐름</div>
     <div class="flow-recent" id="flow-recent"></div>
+    <div class="flow-rank-label">🥈 2등 흐름</div>
+    <div class="flow-recent" id="flow-recent-second"></div>
+    <div class="flow-rank-label">🥉 3등 흐름</div>
+    <div class="flow-recent" id="flow-recent-third"></div>
     <!-- 1등 기반 최고 시퀀스 추천 -->
     <div id="flow-first-sequence"></div>
     <!-- 자주 나온 1등 번호 TOP3 -->
@@ -1604,6 +1619,51 @@ function _groupMarkovDecades(sortedRows, topK) {
   return { topDecades: probs.slice(0, topK || 5), simSequence: sim };
 }
 
+// 2·3등 흐름 시퀀스 계산 (1등 흐름과 동일 로직, rank만 다름)
+function _flowSequenceForRank(sorted, rankKey) {
+  var flowCfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
+  var flowWinSize = flowCfg.window || 20;
+  var weights = flowCfg.weights || [1, 1, 1];
+  var seq = [];
+  for (var i = 0; i < sorted.length; i++) {
+    var num = sorted[i][rankKey];
+    if (!num) continue;
+    // 그 회차 등수 번호를 포함하는 핫 시퀀스
+    var seqLabel = '', seqStart = null, seqEnd = null;
+    if (i >= 1) {
+      var pastHr = _slidingHotRangeContaining(sorted.slice(0, i + 1), num, flowWinSize, weights);
+      if (pastHr) {
+        seqStart = pastHr.start;
+        seqEnd = pastHr.end;
+        seqLabel = seqStart + '~' + seqEnd;
+      }
+    }
+    if (!seqLabel) {
+      seqStart = Math.max(1, num - 4);
+      seqEnd = Math.min(100, seqStart + 9);
+      if (seqEnd === 100) seqStart = 91;
+      seqLabel = seqStart + '~' + seqEnd;
+    }
+    // 적중 여부: R-1까지의 sliding TOP1에 그 등수 번호 들어가는지
+    var hit = false;
+    if (i >= 20) {
+      var prevHr = _slidingHotRange(sorted.slice(0, i), flowWinSize, weights);
+      if (prevHr && prevHr.top && prevHr.top[0]) {
+        hit = (num >= prevHr.top[0].start && num <= prevHr.top[0].end);
+      }
+    }
+    seq.push({
+      round: sorted[i].round,
+      num: num,
+      seqLabel: seqLabel,
+      seqStart: seqStart,
+      seqEnd: seqEnd,
+      hit: hit
+    });
+  }
+  return seq;
+}
+
 function analyzeFlow(rows) {
   if (rows.length < 2) return null;
   var sorted = rows.slice();
@@ -1705,9 +1765,14 @@ function analyzeFlow(rows) {
   var cfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
   // 흐름 카드의 핫 구간 = 베팅 시퀀스와 동일 (cfg.window, cfg.weights) — 일관성 유지
   var hotRange = _slidingHotRange(sorted, cfg.window || 20, cfg.weights || [1,1,1]);
+  // 2·3등 흐름 추가
+  var sequenceSecond = _flowSequenceForRank(sorted, 'second');
+  var sequenceThird  = _flowSequenceForRank(sorted, 'third');
 
   return {
     sequence: sequence,
+    sequenceSecond: sequenceSecond,
+    sequenceThird: sequenceThird,
     transitions: transitions,
     predictions: predictions,
     hotRange: hotRange,
@@ -2132,33 +2197,34 @@ function render() {
     flowCard.style.display = 'block';
 
     // 최근 흐름 (최대 7회) + 반복 구간 색상 강조
-    var recent = flow.sequence.slice(-20);
-    // 동일 시퀀스 라벨 반복 카운트 (recent 안에서만)
-    var seqLabelCount = {};
-    for (var fc = 0; fc < recent.length; fc++) {
-      var lbl = recent[fc].seqLabel;
-      seqLabelCount[lbl] = (seqLabelCount[lbl] || 0) + 1;
+    // 흐름 시퀀스 박스 렌더 (1·2·3등 공통)
+    function renderFlowRow(sequence) {
+      if (!sequence || sequence.length === 0) return '';
+      var rec = sequence.slice(-20);
+      var labelCount = {};
+      for (var fc = 0; fc < rec.length; fc++) {
+        labelCount[rec[fc].seqLabel] = (labelCount[rec[fc].seqLabel] || 0) + 1;
+      }
+      var html = '';
+      for (var fi = 0; fi < rec.length; fi++) {
+        if (fi > 0) html += '<span class="flow-arrow">→</span>';
+        var isLatest = (fi === rec.length - 1);
+        var sCount = labelCount[rec[fi].seqLabel];
+        var cls = 'flow-step seq-box';
+        if (rec[fi].hit) cls += ' in-hot-range';
+        if (isLatest) cls += ' latest';
+        if (!isLatest && sCount >= 2) cls += ' repeat-2';
+        html += '<span class="' + cls + '">' +
+          '<span class="flow-step-group">' + rec[fi].seqLabel + '</span>' +
+          '<span class="flow-step-num">' + rec[fi].num + '</span>' +
+          '</span>';
+      }
+      return html;
     }
-
-    var recentHtml = '';
-    for (var fi = 0; fi < recent.length; fi++) {
-      if (fi > 0) recentHtml += '<span class="flow-arrow">→</span>';
-      var isLatest = (fi === recent.length - 1);
-      var sCount = seqLabelCount[recent[fi].seqLabel];
-      var cls = 'flow-step seq-box';
-      // 면(채움): 그 회차 시점 베팅 추천에 1등 적중한 경우만
-      if (recent[fi].hit) cls += ' in-hot-range';
-      // 최신 회차: 면 채움 (탭 accent)
-      if (isLatest) cls += ' latest';
-      // 라인(보더): 같은 시퀀스 라벨 2회+ 반복
-      if (!isLatest && sCount >= 2) cls += ' repeat-2';
-      // 박스 안: 그 회차 시퀀스 (메인) + 1등 번호 배지
-      recentHtml += '<span class="' + cls + '">' +
-        '<span class="flow-step-group">' + recent[fi].seqLabel + '</span>' +
-        '<span class="flow-step-num">' + recent[fi].num + '</span>' +
-        '</span>';
-    }
-    document.getElementById('flow-recent').innerHTML = recentHtml;
+    document.getElementById('flow-recent').innerHTML        = renderFlowRow(flow.sequence);
+    document.getElementById('flow-recent-second').innerHTML = renderFlowRow(flow.sequenceSecond);
+    document.getElementById('flow-recent-third').innerHTML  = renderFlowRow(flow.sequenceThird);
+    var recent = flow.sequence.slice(-20);  // 아래 코드 호환용 (가장 자주 나온 1등 번호 등)
 
     // 🥇 1등 기반 최고 시퀀스 (sliding window, weights=[1,0,0])
     var sortedRows = rows.slice().sort(function(a, b){ return a.round - b.round; });

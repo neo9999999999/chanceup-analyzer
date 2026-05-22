@@ -1022,11 +1022,6 @@ body.food .flow-step.repeat-3 {
     </div>
     <!-- 백테스트 적중률 (이 시퀀스의 1·2·3등 적중률) -->
     <div class="betting-stats" id="betting-stats"></div>
-    <!-- 번호별 1·2·3등 출현 -->
-    <div class="betting-section" id="rank-prob-section" style="display:none;">
-      <div class="betting-section-title">📊 번호별 1·2·3등 출현 (최근 30회)</div>
-      <div id="rank-prob-table"></div>
-    </div>
   </div>
 
   <!-- 🌊 1등 흐름 분석 -->
@@ -1037,9 +1032,9 @@ body.food .flow-step.repeat-3 {
     <div id="flow-stats-only"></div>
   </div>
 
-  <!-- 🏆 최근 빈도 TOP 10 -->
+  <!-- 🏆 최근 1등 빈도 TOP 10 -->
   <div class="card" id="topfreq-card" style="display:none;">
-    <div class="card-title">🏆 최근 빈도 TOP 10 (1·2·3등 가중합)</div>
+    <div class="card-title">🏆 최근 1등 빈도 TOP 10</div>
     <div id="topfreq-table"></div>
   </div>
 
@@ -1381,27 +1376,20 @@ function decadeLabel(d) {
   return ((d - 1) * 10 + 1) + '~' + (d * 10);
 }
 
-// 🏆 빈도 TOP 10 — 최근 N회 1·2·3등 가중합 (1등×3 + 2등×2 + 3등×1) 상위 10
+// 🏆 빈도 TOP 10 — 최근 N회 1등 출현 횟수만 기준 (사용자 요청)
 function _topFrequencyNumbers(rounds, window, count) {
   count = count || 10;
   var win = rounds.length >= window ? rounds.slice(-window) : rounds.slice();
-  var stats = {}; // num -> {c1, c2, c3, score}
-  for (var n = 1; n <= 100; n++) stats[n] = { num: n, c1: 0, c2: 0, c3: 0, score: 0 };
+  var stats = {}; // num -> {c1}
+  for (var n = 1; n <= 100; n++) stats[n] = { num: n, c1: 0 };
   for (var i = 0; i < win.length; i++) {
-    var r = win[i];
-    stats[r.first].c1++;
-    stats[r.second].c2++;
-    stats[r.third].c3++;
+    stats[win[i].first].c1++;
   }
   var arr = [];
   for (var k in stats) {
-    var s = stats[k];
-    s.score = s.c1 * 3 + s.c2 * 2 + s.c3;
-    s.total = s.c1 + s.c2 + s.c3;
-    if (s.total > 0) arr.push(s);
+    if (stats[k].c1 > 0) arr.push(stats[k]);
   }
   arr.sort(function(a, b) {
-    if (b.score !== a.score) return b.score - a.score;
     if (b.c1 !== a.c1) return b.c1 - a.c1;
     return a.num - b.num;
   });
@@ -1973,43 +1961,6 @@ function render() {
         '<div class="betting-stat-value" style="font-size:22px;color:rgba(134,239,172,1);">' + stats.pany + '%</div>' +
       '</div>';
 
-    // 📊 번호별 1·2·3등 출현 표 (최근 30회)
-    var rankSection = document.getElementById('rank-prob-section');
-    var rankSorted = dup2.slice().sort(function(a, b) {
-      var ca = _numberRankCounts(rows, a.number, 30);
-      var cb = _numberRankCounts(rows, b.number, 30);
-      var sa = ca.c1 * 3 + ca.c2 * 2 + ca.c3;
-      var sb = cb.c1 * 3 + cb.c2 * 2 + cb.c3;
-      if (sa !== sb) return sb - sa;
-      return a.number - b.number;
-    });
-    var tableHtml = '<table class="rank-prob-table"><thead><tr>' +
-      '<th>번호</th><th>1등</th><th>2등</th><th>3등</th><th>합계</th><th>신호</th>' +
-      '</tr></thead><tbody>';
-    for (var ri = 0; ri < rankSorted.length; ri++) {
-      var rnum = rankSorted[ri].number;
-      var cnts = _numberRankCounts(rows, rnum, 30);
-      var total = cnts.c1 + cnts.c2 + cnts.c3;
-      var rowCls = '';
-      if (rankSorted[ri].kind === 'hot') rowCls = 'row-hot';
-      else if (rankSorted[ri].kind === 'cold') rowCls = 'row-cold';
-      var signalBadge = '';
-      if (rankSorted[ri].kind === 'hot') signalBadge = '<span style="color:#fbbf24;">핫</span>';
-      else if (rankSorted[ri].kind === 'cold') signalBadge = '<span style="color:#60a5fa;">콜드</span>';
-      else signalBadge = '<span style="color:#a78bfa;">믹스</span>';
-      tableHtml += '<tr class="' + rowCls + '">' +
-        '<td class="col-num">' + rnum + '</td>' +
-        '<td class="col-1 ' + (cnts.c1 === 0 ? 'rank-zero' : '') + '">' + cnts.c1 + '회</td>' +
-        '<td class="col-2 ' + (cnts.c2 === 0 ? 'rank-zero' : '') + '">' + cnts.c2 + '회</td>' +
-        '<td class="col-3 ' + (cnts.c3 === 0 ? 'rank-zero' : '') + '">' + cnts.c3 + '회</td>' +
-        '<td class="col-sum ' + (total === 0 ? 'rank-zero' : '') + '">' + total + '</td>' +
-        '<td>' + signalBadge + '</td>' +
-        '</tr>';
-    }
-    tableHtml += '</tbody></table>';
-    document.getElementById('rank-prob-table').innerHTML = tableHtml;
-    rankSection.style.display = 'block';
-
   } else {
     bettingCard.style.display = 'none';
   }
@@ -2022,7 +1973,7 @@ function render() {
 
     // 최근 흐름 (최대 7회) + 반복 구간 색상 강조
     var recent = flow.sequence.slice(-20);
-    // 핫 구간 안 번호 set (TOP1·TOP2 핫 구간에 속하는지 표시용)
+    // 핫 구간 set (sliding TOP1·TOP2)
     var hotSet = {};
     if (flow.hotRange && flow.hotRange.top) {
       for (var ti = 0; ti < flow.hotRange.top.length; ti++) {
@@ -2030,25 +1981,28 @@ function render() {
         for (var hn = hrT.start; hn <= hrT.end; hn++) hotSet[hn] = true;
       }
     }
-    // 번호별 출현 횟수 카운트 (recent 안에서)
-    var numCount = {};
+    // 십의자리 그룹별 등장 횟수 카운트 (반복 강조용)
+    var decadeCount = {};
     for (var fc = 0; fc < recent.length; fc++) {
-      var fn = recent[fc].num;
-      numCount[fn] = (numCount[fn] || 0) + 1;
+      var fd = recent[fc].decade;
+      decadeCount[fd] = (decadeCount[fd] || 0) + 1;
     }
 
     var recentHtml = '';
     for (var fi = 0; fi < recent.length; fi++) {
       if (fi > 0) recentHtml += '<span class="flow-arrow">→</span>';
       var isLatest = (fi === recent.length - 1);
-      var nCount = numCount[recent[fi].num];
+      var dCount = decadeCount[recent[fi].decade];
       var inHot = hotSet[recent[fi].num];
-      var cls = 'flow-step';
+      var cls = 'flow-step seq-box';
       if (isLatest) cls += ' latest';
       else if (inHot) cls += ' in-hot-range';
-      else if (nCount >= 2) cls += ' repeat-2';
+      else if (dCount >= 3) cls += ' repeat-3';
+      else if (dCount === 2) cls += ' repeat-2';
+      // 박스 안: 시퀀스 라벨(81~90) + 작게 실제 번호
       recentHtml += '<span class="' + cls + '">' +
-        recent[fi].num +
+        decadeLabel(recent[fi].decade) +
+        '<span class="flow-step-num">' + recent[fi].num + '</span>' +
         '</span>';
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;
@@ -2116,27 +2070,26 @@ function render() {
     flowCard.style.display = 'none';
   }
 
-  // 🏆 최근 빈도 TOP 10 (1·2·3등 가중합, 회차 등록할 때마다 순위 변동)
+  // 🏆 최근 1등 빈도 TOP 10 (회차 등록할 때마다 순위 변동)
   var topFreqCard = document.getElementById('topfreq-card');
   var freqWindow = (ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic).window || 20;
-  var freqResult = _topFrequencyNumbers(rows, freqWindow * 2, 10); // 좀 더 넓은 윈도우로 안정성
+  var freqResult = _topFrequencyNumbers(rows, freqWindow * 2, 10);
   if (freqResult.top.length > 0) {
     topFreqCard.style.display = 'block';
-    var fHtml = '<div class="topfreq-info">최근 ' + freqResult.windowSize + '회 기준 · 1등×3 + 2등×2 + 3등×1 가중합 순위</div>';
+    var fHtml = '<div class="topfreq-info">최근 ' + freqResult.windowSize + '회 1등 출현 횟수 순위 · 회차 등록할 때마다 갱신</div>';
     fHtml += '<table class="rank-prob-table topfreq-table"><thead><tr>' +
-      '<th>순위</th><th>번호</th><th>1등</th><th>2등</th><th>3등</th><th>점수</th>' +
+      '<th>순위</th><th>번호</th><th>1등 출현</th><th>비율</th>' +
       '</tr></thead><tbody>';
     for (var fi = 0; fi < freqResult.top.length; fi++) {
       var ft = freqResult.top[fi];
       var rankCls = fi < 3 ? 'topfreq-rank-top3' : '';
       var rankEmoji = fi === 0 ? '🥇' : fi === 1 ? '🥈' : fi === 2 ? '🥉' : (fi+1);
+      var pct = freqResult.windowSize > 0 ? Math.round(ft.c1 / freqResult.windowSize * 100) : 0;
       fHtml += '<tr class="' + rankCls + '">' +
         '<td class="col-rank">' + rankEmoji + '</td>' +
         '<td class="col-num">' + ft.num + '</td>' +
-        '<td class="col-1 ' + (ft.c1 === 0 ? 'rank-zero' : '') + '">' + ft.c1 + '</td>' +
-        '<td class="col-2 ' + (ft.c2 === 0 ? 'rank-zero' : '') + '">' + ft.c2 + '</td>' +
-        '<td class="col-3 ' + (ft.c3 === 0 ? 'rank-zero' : '') + '">' + ft.c3 + '</td>' +
-        '<td class="col-sum">' + ft.score + '</td>' +
+        '<td class="col-1">' + ft.c1 + '회</td>' +
+        '<td class="col-sum">' + pct + '%</td>' +
         '</tr>';
     }
     fHtml += '</tbody></table>';

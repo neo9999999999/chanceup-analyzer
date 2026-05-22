@@ -1143,8 +1143,8 @@ tr.topfreq-rank-top3 .col-num {
       <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>추천 적중 (OOS 진짜)</div>
       <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 시퀀스 반복</div>
     </div>
-    <!-- 🎯 1등 추천 흐름 (위) -->
-    <div class="flow-rank-label">🎯 1등 추천 흐름 (각 회차 직전 데이터로 추천 → 실제 1등 적중 여부)</div>
+    <!-- 🎯 1등 추천 흐름 (위) — 마르코프 기반 -->
+    <div class="flow-rank-label">🎯 1등 추천 흐름 (마르코프 OOS · 각 회차 직전 데이터로 다음 흐름 예측 → 실제 1등 적중 여부)</div>
     <div class="flow-recent" id="flow-recommend"></div>
     <div style="font-size:11px;color:var(--text-dim);margin:6px 0 0;" id="flow-recommend-stat"></div>
     <!-- 🌊 1등 당첨 흐름 (아래) -->
@@ -1713,25 +1713,23 @@ function _flowSequenceCombined(sorted) {
   return seq;
 }
 
-// 🎯 1등 추천 흐름 — 각 회차 R-1까지의 데이터로 만든 sliding TOP1 추천 (1등만 기준)
-// 시퀀스 라벨 = 그 시점 추천. 실제 1등이 그 추천 안 들어가면 miss.
-// → 진짜 OOS. 면처리는 hit=true일 때만.
+// 🎯 1등 추천 흐름 v10.9 — 마르코프(다음 흐름 예측) 기반 OOS
+// 각 회차 R: R-1까지의 데이터로 _nextFlowPrediction → 예측 TOP1 시퀀스
+// 실제 R의 1등이 그 안 들어가면 면처리. 다음 흐름 예측 카드와 일관.
 function _recommendationFlow(sorted) {
   var seq = [];
-  var win = 20;
   for (var i = 1; i < sorted.length; i++) {
     var prevData = sorted.slice(0, i);
-    if (prevData.length < 5) {
-      seq.push({ round: sorted[i].round, num: sorted[i].first, seqLabel: '데이터부족', hit: false, recStart: null, recEnd: null });
+    if (prevData.length < 15) {
+      seq.push({ round: sorted[i].round, num: sorted[i].first, seqLabel: '데이터부족', hit: false });
       continue;
     }
-    // 1등만 기준 sliding TOP1 (1등 노린 추천)
-    var hr = _slidingHotRange(prevData, win, [1, 0, 0]);
-    if (!hr || !hr.top || !hr.top[0]) {
-      seq.push({ round: sorted[i].round, num: sorted[i].first, seqLabel: '?', hit: false, recStart: null, recEnd: null });
+    var pred = _nextFlowPrediction(prevData);
+    if (!pred || !pred.top || !pred.top[0]) {
+      seq.push({ round: sorted[i].round, num: sorted[i].first, seqLabel: '?', hit: false });
       continue;
     }
-    var t = hr.top[0];
+    var t = pred.top[0];
     var actualFirst = sorted[i].first;
     var hit = (actualFirst >= t.start && actualFirst <= t.end);
     seq.push({
@@ -1740,7 +1738,8 @@ function _recommendationFlow(sorted) {
       seqLabel: t.start + '~' + t.end,
       seqStart: t.start,
       seqEnd: t.end,
-      hit: hit
+      hit: hit,
+      predPct: pred.top[0].pct
     });
   }
   return seq;

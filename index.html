@@ -1101,7 +1101,7 @@ tr.topfreq-rank-top3 .col-num {
     <div class="card-title">🌊 1등 당첨 흐름</div>
     <div class="flow-legend">
       <div class="flow-legend-item"><span class="flow-legend-swatch latest"></span>최신 회차</div>
-      <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 십의자리 반복 (2회+)</div>
+      <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 시퀀스 반복 (2회+)</div>
       <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>이번 베팅 시퀀스 영역</div>
     </div>
     <div class="flow-recent" id="flow-recent"></div>
@@ -1588,11 +1588,33 @@ function analyzeFlow(rows) {
   sorted.sort(function (a, b) { return a.round - b.round; });
 
   var transitions = {};  // {fromDecade: {toDecade: count}}
-  var sequence = [];     // [{round, decade, num}]
+  var sequence = [];     // [{round, decade, num, seqLabel, seqStart, seqEnd}]
+  var flowCfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
+  var flowWinSize = flowCfg.window || 20;
 
   for (var i = 0; i < sorted.length; i++) {
     var d = getDecade(sorted[i].first);
-    sequence.push({ round: sorted[i].round, decade: d, num: sorted[i].first });
+    var num = sorted[i].first;
+    // 그 시점까지의 데이터로 sliding TOP1 시퀀스 계산 (최적 흐름도)
+    var seqLabel = '', seqStart = null, seqEnd = null;
+    if (i >= 1) {
+      var pastHr = _slidingHotRange(sorted.slice(0, i + 1), flowWinSize, flowCfg.weights || [1,1,1]);
+      if (pastHr && pastHr.top && pastHr.top[0]) {
+        seqStart = pastHr.top[0].start;
+        seqEnd = pastHr.top[0].end;
+        seqLabel = seqStart + '~' + seqEnd;
+      }
+    }
+    // fallback: 데이터 없으면 십의자리
+    if (!seqLabel) seqLabel = decadeLabel(d);
+    sequence.push({
+      round: sorted[i].round,
+      decade: d,
+      num: num,
+      seqLabel: seqLabel,
+      seqStart: seqStart,
+      seqEnd: seqEnd
+    });
     if (i > 0) {
       var prev = getDecade(sorted[i - 1].first);
       if (!transitions[prev]) transitions[prev] = {};
@@ -2075,7 +2097,7 @@ function render() {
 
     // 최근 흐름 (최대 7회) + 반복 구간 색상 강조
     var recent = flow.sequence.slice(-20);
-    // 핫 구간 set (sliding TOP1·TOP2)
+    // 핫 구간 set (다음 회차 sliding TOP1·TOP2)
     var hotSet = {};
     if (flow.hotRange && flow.hotRange.top) {
       for (var ti = 0; ti < flow.hotRange.top.length; ti++) {
@@ -2083,27 +2105,27 @@ function render() {
         for (var hn = hrT.start; hn <= hrT.end; hn++) hotSet[hn] = true;
       }
     }
-    // 십의자리 그룹별 등장 횟수 카운트 (반복 강조용)
-    var decadeCount = {};
+    // 동일 시퀀스 라벨 반복 카운트 (예: '73~82'가 연속 3회 등장 시 강조)
+    var seqLabelCount = {};
     for (var fc = 0; fc < recent.length; fc++) {
-      var fd = recent[fc].decade;
-      decadeCount[fd] = (decadeCount[fd] || 0) + 1;
+      var lbl = recent[fc].seqLabel;
+      seqLabelCount[lbl] = (seqLabelCount[lbl] || 0) + 1;
     }
 
     var recentHtml = '';
     for (var fi = 0; fi < recent.length; fi++) {
       if (fi > 0) recentHtml += '<span class="flow-arrow">→</span>';
       var isLatest = (fi === recent.length - 1);
-      var dCount = decadeCount[recent[fi].decade];
+      var sCount = seqLabelCount[recent[fi].seqLabel];
       var inHot = hotSet[recent[fi].num];
       var cls = 'flow-step seq-box';
       if (isLatest) cls += ' latest';
       else if (inHot) cls += ' in-hot-range';
-      else if (dCount >= 3) cls += ' repeat-3';
-      else if (dCount === 2) cls += ' repeat-2';
-      // 박스 안: 시퀀스 그룹 (메인) + 1등 번호 강조 배지
+      else if (sCount >= 3) cls += ' repeat-3';
+      else if (sCount === 2) cls += ' repeat-2';
+      // 박스 안: 그 시점 sliding TOP1 시퀀스 (메인) + 1등 번호 강조 배지
       recentHtml += '<span class="' + cls + '">' +
-        '<span class="flow-step-group">' + decadeLabel(recent[fi].decade) + '</span>' +
+        '<span class="flow-step-group">' + recent[fi].seqLabel + '</span>' +
         '<span class="flow-step-num">' + recent[fi].num + '</span>' +
         '</span>';
     }

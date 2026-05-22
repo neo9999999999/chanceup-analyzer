@@ -1135,27 +1135,14 @@ tr.topfreq-rank-top3 .col-num {
     <button class="btn-primary" id="btn-add">등록</button>
   </div>
 
-  <!-- 🌊 1등 흐름 카드 (추천 흐름 + 당첨 흐름 분기) -->
+  <!-- 🌊 1등 당첨 흐름 (간소) -->
   <div class="card" id="flow-card" style="display:none;">
-    <div class="card-title">🌊 1등 흐름 분석</div>
+    <div class="card-title">🌊 1등 당첨 흐름</div>
     <div class="flow-legend">
       <div class="flow-legend-item"><span class="flow-legend-swatch latest"></span>최신 회차</div>
-      <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>추천 적중 (OOS 진짜)</div>
-      <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 시퀀스 반복</div>
+      <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 시퀀스 반복 (2회+)</div>
     </div>
-    <!-- 🎯 1등 추천 흐름 (위) — 마르코프 기반 -->
-    <div class="flow-rank-label">🎯 1등 추천 흐름 (마르코프 OOS · 각 회차 직전 데이터로 다음 흐름 예측 → 실제 1등 적중 여부)</div>
-    <div class="flow-recent" id="flow-recommend"></div>
-    <div style="font-size:11px;color:var(--text-dim);margin:6px 0 0;" id="flow-recommend-stat"></div>
-    <!-- 🌊 1등 당첨 흐름 (아래) -->
-    <div class="flow-rank-label" style="margin-top:20px;">🌊 1등 당첨 흐름 (실제 1등 시퀀스)</div>
     <div class="flow-recent" id="flow-recent"></div>
-    <!-- 🔁 흐름 트랜지션 마르코프 (시퀀스 이동 패턴) -->
-    <div id="flow-transition"></div>
-    <!-- 1등 기반 최고 시퀀스 추천 -->
-    <div id="flow-first-sequence"></div>
-    <!-- 자주 나온 1등 번호 TOP3 -->
-    <div id="flow-next-pred"></div>
     <div id="flow-stats-only"></div>
   </div>
 
@@ -2666,144 +2653,7 @@ function render() {
       }
       return html;
     }
-    document.getElementById('flow-recommend').innerHTML = renderRecommendRow(flow.recommendationFlow);
     document.getElementById('flow-recent').innerHTML = renderActualRow(flow.sequence);
-    // 추천 흐름 적중률 표시
-    if (flow.recommendationFlow && flow.recommendationFlow.length > 0) {
-      var recent20 = flow.recommendationFlow.slice(-20);
-      var hitCount = recent20.filter(function(x){ return x.hit; }).length;
-      document.getElementById('flow-recommend-stat').innerHTML =
-        '<strong>추천 적중 (최근 ' + recent20.length + '회): ' + hitCount + '회 (' + (hitCount/recent20.length*100).toFixed(0) + '%)</strong> · 면 처리된 박스만 진짜 적중';
-    }
-    var recent = flow.sequence.slice(-20);  // 아래 코드 호환용
-
-    // 🔁 다음 흐름 예측 — 직전 1등 시퀀스 다음에 1등이 어디로 갔는지 (마르코프)
-    var sortedFlow = rows.slice().sort(function(a, b){ return a.round - b.round; });
-    var nextFlow = _nextFlowPrediction(sortedFlow);
-    var transHtml = '';
-    if (nextFlow && nextFlow.top.length > 0) {
-      transHtml += '<div class="flow-next-card" style="margin-top:8px;">';
-      transHtml += '<div class="flow-next-title">🔁 다음 흐름 예측 (직전 1등 ' + nextFlow.lastFirst + ' · 시퀀스 ' + nextFlow.fromSeq + ')</div>';
-      transHtml += '<div class="flow-sim-title">과거 1등이 ' + nextFlow.fromSeq + '에 들어간 ' + nextFlow.totalSamples + '회의 다음 회차 1등 분포</div>';
-      for (var ni = 0; ni < nextFlow.top.length; ni++) {
-        var nx = nextFlow.top[ni];
-        var pct = Math.round(nx.pct * 100);
-        var topCls = ni === 0 ? ' top-pick' : '';
-        transHtml += '<div class="flow-next-row' + topCls + '">' +
-          '<span class="decade-label">' + (ni===0?'⭐ ':'') + nx.start + '~' + nx.end + '</span>' +
-          '<span class="decade-pct">' + nx.count + '/' + nextFlow.totalSamples + ' (' + pct + '%)</span>' +
-          '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + Math.min(pct*2.5, 100) + '%' + (ni>0?';opacity:0.7':'') + '"></div></div>' +
-          '</div>';
-      }
-      // 다음 1등들 실제 분포 보여줌 (참고)
-      transHtml += '<div class="flow-sim-title" style="margin-top:6px;">📍 실제 다음 1등들: ' + nextFlow.nextFirsts.join(', ') + '</div>';
-      transHtml += '</div>';
-    }
-    document.getElementById('flow-transition').innerHTML = transHtml;
-
-    // 🥇 1등 시퀀스 = 다음 흐름 예측 TOP1 (마르코프, v10.7부터 통합)
-    var sortedRows = rows.slice().sort(function(a, b){ return a.round - b.round; });
-    var flowWin = (ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic).window || 20;
-    var firstStats = FLOW_FIRST_STATS[currentTab] || FLOW_FIRST_STATS.basic;
-    var firstSeqHtml = '';
-    // 마르코프 예측 우선, 없으면 단순 sliding fallback
-    var predStart, predEnd, predSub;
-    if (nextFlow && nextFlow.top && nextFlow.top[0]) {
-      predStart = nextFlow.top[0].start;
-      predEnd = nextFlow.top[0].end;
-      var predPct = Math.round(nextFlow.top[0].pct * 100);
-      predSub = '직전 1등 ' + nextFlow.lastFirst + ' 다음 — 과거 ' + nextFlow.totalSamples + '회 중 ' + nextFlow.top[0].count + '회 (' + predPct + '%) 이 구간으로 이동';
-    } else {
-      var firstHr = _slidingHotRange(sortedRows, flowWin, [1, 0, 0]);
-      if (firstHr && firstHr.top && firstHr.top[0]) {
-        var ft1 = firstHr.top[0];
-        predStart = ft1.start;
-        predEnd = ft1.end;
-        predSub = '최근 ' + firstHr.windowSize + '회 1등 ' + firstHr.totalHits + '개 중 ' + ft1.hits + '개 (' + Math.round(ft1.pct*100) + '%) 집중';
-      }
-    }
-    if (predStart != null) {
-      firstSeqHtml += '<div class="seq-main-card seq-first">' +
-        '<div class="seq-main-label">🥇 1등 다음 흐름 예측 (마르코프)</div>' +
-        '<div class="seq-main-range">' + predStart + ' ~ ' + predEnd + '</div>' +
-        '<div class="seq-main-sub">' + predSub + '</div>' +
-        '<div class="seq-first-stats">' +
-          '<span>1등 적중 <strong>' + firstStats.p1 + '%</strong></span>' +
-          '<span>2등 <strong>' + firstStats.p2 + '%</strong></span>' +
-          '<span>3등 <strong>' + firstStats.p3 + '%</strong></span>' +
-          '<span>통합 <strong>' + firstStats.pany + '%</strong></span>' +
-        '</div>' +
-        '</div>';
-
-      // 시퀀스 안 10개 번호 그리드 (마르코프 예측 구간 기준)
-      firstSeqHtml += '<div class="betting-section">' +
-        '<div class="betting-section-title">🥇 다음 흐름 예측 안 10개 번호</div>' +
-        '<div class="betting-numbers betting-numbers-gold">';
-      for (var fn = predStart; fn <= predEnd; fn++) {
-        var fc = _numberRankCounts(sortedRows, fn, flowWin);
-        var fbadge = '', fbadgeClass = '';
-        if (fc.c1 >= 1) {
-          fbadge = '1등 ' + fc.c1;
-          fbadgeClass = 'bn-count bn-first';
-        } else if (fc.c2 + fc.c3 >= 1) {
-          fbadge = '2·3등 ' + (fc.c2 + fc.c3);
-          fbadgeClass = 'bn-count bn-mix';
-        }
-        var fbadgeHtml = fbadge ? '<span class="' + fbadgeClass + '">' + fbadge + '</span>' : '';
-        firstSeqHtml += '<div class="betting-number bn-flow">' +
-          fbadgeHtml +
-          fn +
-          '</div>';
-      }
-      firstSeqHtml += '</div></div>';
-    }
-    document.getElementById('flow-first-sequence').innerHTML = firstSeqHtml;
-
-    // 1등 흐름 통계 — 시퀀스 안 가장 자주 나온 1등 번호 TOP 3 (확률 표시)
-    var nextHtml = '';
-    var freqMap = {};
-    for (var fr = 0; fr < recent.length; fr++) {
-      freqMap[recent[fr].num] = (freqMap[recent[fr].num] || 0) + 1;
-    }
-    var freqArr = [];
-    for (var fk in freqMap) freqArr.push({ n: parseInt(fk, 10), c: freqMap[fk] });
-    freqArr.sort(function(a, b){
-      if (b.c !== a.c) return b.c - a.c;
-      return a.n - b.n;
-    });
-    var totalRecent = recent.length;
-    if (freqArr.length > 0) {
-      nextHtml += '<div class="flow-next-card">';
-      nextHtml += '<div class="flow-next-title">🥇 최근 ' + totalRecent + '회 가장 많이 나온 1등 번호</div>';
-      // 베팅 시퀀스 영역 (✨ 표시용)
-      var hotSetLocal = {};
-      if (flow.hotRange && flow.hotRange.top) {
-        for (var hsi = 0; hsi < flow.hotRange.top.length; hsi++) {
-          var hsT = flow.hotRange.top[hsi];
-          for (var hsn = hsT.start; hsn <= hsT.end; hsn++) hotSetLocal[hsn] = true;
-        }
-      }
-      var topShow = Math.min(freqArr.length, 3);
-      for (var fa = 0; fa < topShow; fa++) {
-        var fi2 = freqArr[fa];
-        var pp = Math.round(fi2.c / totalRecent * 100);
-        var emoji = fa === 0 ? '🥇' : fa === 1 ? '🥈' : '🥉';
-        // 베팅 시퀀스 안 번호면 ✨
-        var inHotR = hotSetLocal[fi2.n] ? ' ✨' : '';
-        nextHtml += '<div class="flow-next-row' + (fa === 0 ? ' top-pick' : '') + '">' +
-          '<span class="decade-label">' + emoji + ' ' + fi2.n + inHotR + '</span>' +
-          '<span class="decade-pct">' + fi2.c + '회 (' + pp + '%)</span>' +
-          '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + Math.min(pp * 4, 100) + '%' + (fa > 0 ? ';opacity:0.7' : '') + '"></div></div>' +
-          '</div>';
-      }
-      // 같은 번호 2회+ 또는 핫 구간 안 번호가 단독 = 시그널 강함 안내
-      var has2plus = freqArr[0] && freqArr[0].c >= 2;
-      if (has2plus) {
-        nextHtml += '<div class="flow-sim-title">💡 ' + freqArr[0].n + '번이 ' + freqArr[0].c + '회 등장 — 반복 시그널</div>';
-      }
-      nextHtml += '</div>';
-    }
-    document.getElementById('flow-next-pred').innerHTML = nextHtml;
 
     // 베팅 추천 백테스트 통계 (1등/2등/3등 적중)
     var bt = analyzeBettingBacktest(rows);

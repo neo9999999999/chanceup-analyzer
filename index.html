@@ -414,6 +414,36 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 }
 .flow-step.in-hot-range .flow-step-group { color: #d1fae5; }
 
+/* 1·2·3 혼합 흐름 박스 — 적중 개수별 채움 강도 */
+.flow-step.bf-step { padding: 5px 8px; min-width: 60px; }
+.flow-step.bf-step .bf-num {
+  font-size: 9px;
+  padding: 1px 5px;
+  letter-spacing: 0;
+  background: #0a0a0b;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.flow-step.bf-step .bf-hits-label {
+  font-size: 8px;
+  color: var(--text-dim);
+  margin-top: 2px;
+  font-weight: 700;
+}
+.flow-step.bf-step.bf-hits-1 {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.flow-step.bf-step.bf-hits-2 {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.flow-step.bf-step.bf-hits-3 {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+  border-color: var(--accent);
+}
+.flow-step.bf-step.bf-hits-3 .bf-hits-label { color: var(--accent); }
+
 /* 등수별 흐름 라벨 */
 .flow-rank-label {
   font-size: 12px;
@@ -1105,20 +1135,15 @@ tr.topfreq-rank-top3 .col-num {
     <button class="btn-primary" id="btn-add">등록</button>
   </div>
 
-  <!-- 🌊 1·2·3등 흐름 분석 (먼저 표시) -->
+  <!-- 🌊 1등 당첨 흐름 (1등만 표시) -->
   <div class="card" id="flow-card" style="display:none;">
-    <div class="card-title">🌊 1·2·3등 당첨 흐름</div>
+    <div class="card-title">🌊 1등 당첨 흐름</div>
     <div class="flow-legend">
       <div class="flow-legend-item"><span class="flow-legend-swatch latest"></span>최신 회차</div>
-      <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>추천 적중 (그 시점 베팅 시퀀스에 들어옴)</div>
-      <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 시퀀스 반복 (2회+)</div>
+      <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>추천 적중</div>
+      <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 시퀀스 반복</div>
     </div>
-    <div class="flow-rank-label">🥇 1등 흐름</div>
     <div class="flow-recent" id="flow-recent"></div>
-    <div class="flow-rank-label">🥈 2등 흐름</div>
-    <div class="flow-recent" id="flow-recent-second"></div>
-    <div class="flow-rank-label">🥉 3등 흐름</div>
-    <div class="flow-recent" id="flow-recent-third"></div>
     <!-- 1등 기반 최고 시퀀스 추천 -->
     <div id="flow-first-sequence"></div>
     <!-- 자주 나온 1등 번호 TOP3 -->
@@ -1139,6 +1164,11 @@ tr.topfreq-rank-top3 .col-num {
     </div>
     <!-- 백테스트 적중률 (이 시퀀스의 1·2·3등 적중률) -->
     <div class="betting-stats" id="betting-stats"></div>
+    <!-- 1·2·3등 혼합 흐름 (회차별 적중 개수) -->
+    <div class="betting-section" id="betting-flow-section" style="display:none;">
+      <div class="betting-section-title">📈 1·2·3등 혼합 흐름 (각 회차 시점 추천에 들어온 등수 개수)</div>
+      <div class="flow-recent betting-flow-row" id="betting-flow-recent"></div>
+    </div>
   </div>
 
   <!-- 🏆 최근 1등 빈도 TOP 10 -->
@@ -1619,6 +1649,56 @@ function _groupMarkovDecades(sortedRows, topK) {
   return { topDecades: probs.slice(0, topK || 5), simSequence: sim };
 }
 
+// 1·2·3등 혼합 흐름: 각 회차의 그 시점 sliding TOP1 시퀀스 + 1·2·3등 적중 개수
+function _flowSequenceCombined(sorted) {
+  var flowCfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
+  var flowWinSize = flowCfg.window || 20;
+  var weights = flowCfg.weights || [1, 1, 1];
+  var seq = [];
+  for (var i = 0; i < sorted.length; i++) {
+    var r = sorted[i];
+    // 그 회차 시점 sliding TOP1 (적중 판정용 — 그 시점 데이터로)
+    var seqLabel = '', seqStart = null, seqEnd = null;
+    var hits = 0, hit1 = false, hit2 = false, hit3 = false;
+    if (i >= 20) {
+      var prevHr = _slidingHotRange(sorted.slice(0, i), flowWinSize, weights);
+      if (prevHr && prevHr.top && prevHr.top[0]) {
+        seqStart = prevHr.top[0].start;
+        seqEnd = prevHr.top[0].end;
+        seqLabel = seqStart + '~' + seqEnd;
+        hit1 = (r.first  >= seqStart && r.first  <= seqEnd);
+        hit2 = (r.second >= seqStart && r.second <= seqEnd);
+        hit3 = (r.third  >= seqStart && r.third  <= seqEnd);
+        hits = (hit1 ? 1 : 0) + (hit2 ? 1 : 0) + (hit3 ? 1 : 0);
+      }
+    }
+    // 박스 안 표시할 번호: 적중한 1·2·3등 번호들 (없으면 그 회차 1등)
+    var displayNums = [];
+    if (hit1) displayNums.push(r.first);
+    if (hit2) displayNums.push(r.second);
+    if (hit3) displayNums.push(r.third);
+    if (displayNums.length === 0) displayNums = [r.first];  // fallback
+    if (!seqLabel) {
+      // 데이터 부족 fallback: 1등 중심
+      seqStart = Math.max(1, r.first - 4);
+      seqEnd = Math.min(100, seqStart + 9);
+      if (seqEnd === 100) seqStart = 91;
+      seqLabel = seqStart + '~' + seqEnd;
+    }
+    seq.push({
+      round: r.round,
+      seqLabel: seqLabel,
+      seqStart: seqStart,
+      seqEnd: seqEnd,
+      hits: hits,
+      hit1: hit1, hit2: hit2, hit3: hit3,
+      first: r.first, second: r.second, third: r.third,
+      displayNums: displayNums
+    });
+  }
+  return seq;
+}
+
 // 2·3등 흐름 시퀀스 계산 (1등 흐름과 동일 로직, rank만 다름)
 function _flowSequenceForRank(sorted, rankKey) {
   var flowCfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
@@ -1985,12 +2065,15 @@ function analyzeBetting(rows) {
       kind: kind
     });
   }
+  // 1·2·3등 혼합 흐름 (베팅 카드 안에 표시)
+  var combinedFlow = _flowSequenceCombined(sorted);
   return {
     picked: dup2,
     dup2: dup2,
     sequence: { start: top1.start, end: top1.end, pct: top1.pct, hits: top1.hits, totalHits: hr.totalHits, windowSize: hr.windowSize },
     windowSize: hr.windowSize,
     stats: stats,
+    combinedFlow: combinedFlow,
     algoLabel: '핫 시퀀스 W' + cfg.window + ' (1·2·3등 가중합 ' + cfg.weights.join(':') + ')'
   };
 }
@@ -2166,6 +2249,40 @@ function render() {
         '<div class="betting-empty">데이터 부족</div>';
     }
 
+    // 📈 1·2·3등 혼합 흐름 (베팅 카드 안)
+    if (betting.combinedFlow && betting.combinedFlow.length > 0) {
+      var bfSection = document.getElementById('betting-flow-section');
+      var bfRecent = betting.combinedFlow.slice(-20);
+      var bfHtml = '';
+      // 같은 시퀀스 라벨 반복 카운트
+      var bfLabelCount = {};
+      for (var bfc = 0; bfc < bfRecent.length; bfc++) {
+        var bflbl = bfRecent[bfc].seqLabel;
+        bfLabelCount[bflbl] = (bfLabelCount[bflbl] || 0) + 1;
+      }
+      for (var bfi = 0; bfi < bfRecent.length; bfi++) {
+        if (bfi > 0) bfHtml += '<span class="flow-arrow">→</span>';
+        var bfit = bfRecent[bfi];
+        var isLatest = (bfi === bfRecent.length - 1);
+        var bfsCount = bfLabelCount[bfit.seqLabel];
+        var cls = 'flow-step seq-box bf-step';
+        if (bfit.hits > 0) cls += ' bf-hits-' + bfit.hits;  // 1/2/3 적중 강도
+        if (isLatest) cls += ' latest';
+        if (!isLatest && bfsCount >= 2) cls += ' repeat-2';
+        // 박스: 시퀀스 + 적중 개수 (예: 73~82 / 2·3)
+        var numLabel = bfit.hits > 0
+          ? bfit.displayNums.join('·')
+          : (bfit.first + '·' + bfit.second + '·' + bfit.third);
+        bfHtml += '<span class="' + cls + '">' +
+          '<span class="flow-step-group">' + bfit.seqLabel + '</span>' +
+          '<span class="flow-step-num bf-num">' + numLabel + '</span>' +
+          '<span class="bf-hits-label">' + bfit.hits + '/3</span>' +
+          '</span>';
+      }
+      document.getElementById('betting-flow-recent').innerHTML = bfHtml;
+      bfSection.style.display = 'block';
+    }
+
     // 백테스트 적중률 (1·2·3등 분리)
     var stats = betting.stats;
     document.getElementById('betting-stats').innerHTML =
@@ -2221,10 +2338,8 @@ function render() {
       }
       return html;
     }
-    document.getElementById('flow-recent').innerHTML        = renderFlowRow(flow.sequence);
-    document.getElementById('flow-recent-second').innerHTML = renderFlowRow(flow.sequenceSecond);
-    document.getElementById('flow-recent-third').innerHTML  = renderFlowRow(flow.sequenceThird);
-    var recent = flow.sequence.slice(-20);  // 아래 코드 호환용 (가장 자주 나온 1등 번호 등)
+    document.getElementById('flow-recent').innerHTML = renderFlowRow(flow.sequence);
+    var recent = flow.sequence.slice(-20);  // 아래 코드 호환용
 
     // 🥇 1등 기반 최고 시퀀스 (sliding window, weights=[1,0,0])
     var sortedRows = rows.slice().sort(function(a, b){ return a.round - b.round; });

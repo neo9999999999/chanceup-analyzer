@@ -1100,8 +1100,8 @@ tr.topfreq-rank-top3 .col-num {
     <div class="card-title">🌊 1등 당첨 흐름</div>
     <div class="flow-legend">
       <div class="flow-legend-item"><span class="flow-legend-swatch latest"></span>최신 회차</div>
+      <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>추천 적중 (그 시점 베팅 시퀀스에 1등 들어옴)</div>
       <div class="flow-legend-item"><span class="flow-legend-swatch repeat"></span>같은 시퀀스 반복 (2회+)</div>
-      <div class="flow-legend-item"><span class="flow-legend-swatch hot"></span>이번 베팅 시퀀스 영역</div>
     </div>
     <div class="flow-recent" id="flow-recent"></div>
     <!-- 1등 기반 최고 시퀀스 추천 -->
@@ -1618,7 +1618,6 @@ function analyzeFlow(rows) {
     var d = getDecade(sorted[i].first);
     var num = sorted[i].first;
     // 그 회차 1등 번호를 반드시 포함하는 sliding 핫 시퀀스 (그 시점까지의 데이터)
-    // → 박스 라벨이 항상 1등 번호를 감싸는 자연 시퀀스
     var seqLabel = '', seqStart = null, seqEnd = null;
     if (i >= 1) {
       var pastHr = _slidingHotRangeContaining(sorted.slice(0, i + 1), num, flowWinSize, flowCfg.weights || [1,1,1]);
@@ -1628,12 +1627,20 @@ function analyzeFlow(rows) {
         seqLabel = seqStart + '~' + seqEnd;
       }
     }
-    // fallback (첫 회차): 1등 번호 중심 ±4
     if (!seqLabel) {
       seqStart = Math.max(1, num - 4);
       seqEnd = Math.min(100, seqStart + 9);
       if (seqEnd === 100) seqStart = 91;
       seqLabel = seqStart + '~' + seqEnd;
+    }
+    // ★ 백테스트 적중 여부: R-1까지의 데이터로 베팅 추천 시퀀스 계산 → 그 안에 R의 1등이 있는지
+    // → 면(채움)은 이 hit=true일 때만 처리
+    var hit = false;
+    if (i >= 20) {  // 최소 20회 데이터로 추천 계산
+      var prevHr = _slidingHotRange(sorted.slice(0, i), flowWinSize, flowCfg.weights || [1,1,1]);
+      if (prevHr && prevHr.top && prevHr.top[0]) {
+        hit = (num >= prevHr.top[0].start && num <= prevHr.top[0].end);
+      }
     }
     sequence.push({
       round: sorted[i].round,
@@ -1641,7 +1648,8 @@ function analyzeFlow(rows) {
       num: num,
       seqLabel: seqLabel,
       seqStart: seqStart,
-      seqEnd: seqEnd
+      seqEnd: seqEnd,
+      hit: hit
     });
     if (i > 0) {
       var prev = getDecade(sorted[i - 1].first);
@@ -2125,15 +2133,7 @@ function render() {
 
     // 최근 흐름 (최대 7회) + 반복 구간 색상 강조
     var recent = flow.sequence.slice(-20);
-    // 핫 구간 set (다음 회차 sliding TOP1·TOP2)
-    var hotSet = {};
-    if (flow.hotRange && flow.hotRange.top) {
-      for (var ti = 0; ti < flow.hotRange.top.length; ti++) {
-        var hrT = flow.hotRange.top[ti];
-        for (var hn = hrT.start; hn <= hrT.end; hn++) hotSet[hn] = true;
-      }
-    }
-    // 동일 시퀀스 라벨 반복 카운트 (예: '73~82'가 연속 3회 등장 시 강조)
+    // 동일 시퀀스 라벨 반복 카운트 (recent 안에서만)
     var seqLabelCount = {};
     for (var fc = 0; fc < recent.length; fc++) {
       var lbl = recent[fc].seqLabel;
@@ -2145,13 +2145,14 @@ function render() {
       if (fi > 0) recentHtml += '<span class="flow-arrow">→</span>';
       var isLatest = (fi === recent.length - 1);
       var sCount = seqLabelCount[recent[fi].seqLabel];
-      var inHot = hotSet[recent[fi].num];
       var cls = 'flow-step seq-box';
+      // 면(채움): 그 회차 시점 베팅 추천에 1등 적중한 경우만
+      if (recent[fi].hit) cls += ' in-hot-range';
+      // 최신 회차: 면 채움 (탭 accent)
       if (isLatest) cls += ' latest';
-      else if (inHot) cls += ' in-hot-range';
-      else if (sCount >= 3) cls += ' repeat-3';
-      else if (sCount === 2) cls += ' repeat-2';
-      // 박스 안: 그 시점 sliding TOP1 시퀀스 (메인) + 1등 번호 강조 배지
+      // 라인(보더): 같은 시퀀스 라벨 2회+ 반복
+      if (!isLatest && sCount >= 2) cls += ' repeat-2';
+      // 박스 안: 그 회차 시퀀스 (메인) + 1등 번호 배지
       recentHtml += '<span class="' + cls + '">' +
         '<span class="flow-step-group">' + recent[fi].seqLabel + '</span>' +
         '<span class="flow-step-num">' + recent[fi].num + '</span>' +

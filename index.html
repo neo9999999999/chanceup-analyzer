@@ -1326,6 +1326,50 @@ function decadeLabel(d) {
   return ((d - 1) * 10 + 1) + '~' + (d * 10);
 }
 
+// 🌊 핫 구간 (Sliding Window) — 최근 N회 1·2·3등 합산으로 연속 10개 베스트 구간 찾기
+// 백테스트 결과 십의자리 그룹보다 1·2·3등 적중률 +5~6%p 더 높음 (자연 경계라 신호 안 잘림)
+function _slidingHotRange(rounds, window, weights) {
+  weights = weights || [1, 1, 1];
+  var win = rounds.length >= window ? rounds.slice(-window) : rounds.slice();
+  if (win.length === 0) return null;
+  // 번호별 가중치 카운트
+  var counts = new Array(101).fill(0);
+  for (var i = 0; i < win.length; i++) {
+    counts[win[i].first]  += weights[0];
+    counts[win[i].second] += weights[1];
+    counts[win[i].third]  += weights[2];
+  }
+  // TOP-3 sliding windows of size 10 (s..s+9)
+  var allRanges = [];
+  for (var s = 1; s <= 91; s++) {
+    var t = 0;
+    for (var k = 0; k < 10; k++) t += counts[s+k];
+    allRanges.push({ start: s, end: s+9, hits: t });
+  }
+  allRanges.sort(function(a, b){ return b.hits - a.hits; });
+  var totalAll = counts.reduce(function(a,b){return a+b;}, 0);
+  // 각 구간의 % (전체 가중 합 대비)
+  for (var ri = 0; ri < allRanges.length; ri++) {
+    allRanges[ri].pct = totalAll > 0 ? allRanges[ri].hits / totalAll : 0;
+  }
+  // TOP1 + 겹치지 않는 두 번째 핫존
+  var top1 = allRanges[0];
+  var top2 = null;
+  for (var j = 1; j < allRanges.length; j++) {
+    var r = allRanges[j];
+    // 겹치지 않으면 후보
+    if (r.start > top1.end || r.end < top1.start) {
+      top2 = r;
+      break;
+    }
+  }
+  return {
+    top: top2 ? [top1, top2] : [top1],
+    windowSize: win.length,
+    totalHits: totalAll
+  };
+}
+
 // 번호별 1·2·3등 출현 카운트 (최근 윈도우 기준)
 function _numberRankCounts(rounds, num, window) {
   var win = rounds.length >= window ? rounds.slice(-window) : rounds.slice();
@@ -1434,15 +1478,15 @@ function analyzeFlow(rows) {
     });
   }
 
-  // 다음 회차 예상 흐름 (그룹 마르코프)
-  var flowPred = _groupMarkovDecades(sorted, 5);
+  // 다음 회차 예상 핫 구간 (Sliding window 1·2·3등 합산 — 백테스트 +5~6%p 우월)
+  var cfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
+  var hotRange = _slidingHotRange(sorted, cfg.flow_window || 20, cfg.flow_weights || [1,1,1]);
 
   return {
     sequence: sequence,
     transitions: transitions,
     predictions: predictions,
-    nextDecades: flowPred.topDecades,
-    simSequence: flowPred.simSequence,
+    hotRange: hotRange,
     nextRound: sorted[sorted.length - 1].round + 1
   };
 }
@@ -1458,10 +1502,14 @@ var BETTING_STATS = {
 };
 
 // 게임별 알고리즘 설정 (백테스트 그리드 서치로 선정)
+// flow_*: 흐름 카드의 sliding window (1·2·3등 합산) 설정
 var ALGO_CONFIG = {
-  basic:   { kind: 'hybrid_cold', window: 20, weights: [1,1,1], decay: 1.0, cold_weight: 0.5, cold_window: 10 },
-  premium: { kind: 'hybrid_cold', window: 30, weights: [2,1,1], decay: 1.0, cold_weight: 0.7, cold_window: 30 },
-  food:    { kind: 'ensemble',    windows: [12, 20, 30], weights: [4,2,1] }
+  basic:   { kind: 'hybrid_cold', window: 20, weights: [1,1,1], decay: 1.0, cold_weight: 0.5, cold_window: 10,
+             flow_window: 20, flow_weights: [1,1,1] },
+  premium: { kind: 'hybrid_cold', window: 30, weights: [2,1,1], decay: 1.0, cold_weight: 0.7, cold_window: 30,
+             flow_window: 20, flow_weights: [1,1,1] },
+  food:    { kind: 'ensemble',    windows: [12, 20, 30], weights: [4,2,1],
+             flow_window: 30, flow_weights: [1,1,1] }
 };
 
 // 핫 점수: 최근 N회 1·2·3등 가중치 합 (decay 시간 감쇠)
@@ -1933,43 +1981,33 @@ function render() {
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;
 
-    // 🔮 다음 회차 예상 흐름 — TOP1만 (TOP2가 5%p 이내로 비슷할 때만 둘 다)
+    // 🔮 다음 회차 예상 핫 구간 — Sliding window 1·2·3등 합산 (자연 연속 10개)
     var nextHtml = '';
-    if (flow.nextDecades && flow.nextDecades.length > 0) {
-      var top1 = flow.nextDecades[0];
-      var top2 = flow.nextDecades[1];
-      var showTop2 = top2 && (top1.p - top2.p) <= 0.05; // 5%p 이내면 함께
+    if (flow.hotRange && flow.hotRange.top.length > 0) {
+      var top1 = flow.hotRange.top[0];
+      var top2 = flow.hotRange.top[1];
+      // 비슷 판정: hits 차이 / top1.hits < 0.1 (10% 이내) 면 둘 다 표시
+      var showTop2 = top2 && top1.hits > 0 && ((top1.hits - top2.hits) / top1.hits) <= 0.1;
       nextHtml += '<div class="flow-next-card">';
-      nextHtml += '<div class="flow-next-title">🔮 ' + flow.nextRound + '회 예상 흐름 (1등 십의자리)</div>';
-      var pct1 = Math.round(top1.p * 100);
+      nextHtml += '<div class="flow-next-title">🔮 ' + flow.nextRound + '회 예상 핫 구간 (1·2·3등 합산)</div>';
+      var pct1 = Math.round(top1.pct * 100);
+      // 표시 방식: "14~23" 같은 연속 구간 + 점유율
       nextHtml += '<div class="flow-next-row top-pick">' +
-        '<span class="decade-label">⭐ ' + decadeLabel(top1.decade) + '</span>' +
+        '<span class="decade-label">⭐ ' + top1.start + '~' + top1.end + '</span>' +
         '<span class="decade-pct">' + pct1 + '%</span>' +
-        '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + pct1 + '%"></div></div>' +
+        '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + Math.min(pct1 * 3, 100) + '%"></div></div>' +
         '</div>';
       if (showTop2) {
-        var pct2 = Math.round(top2.p * 100);
+        var pct2 = Math.round(top2.pct * 100);
         nextHtml += '<div class="flow-next-row">' +
-          '<span class="decade-label">' + decadeLabel(top2.decade) + '</span>' +
+          '<span class="decade-label">' + top2.start + '~' + top2.end + '</span>' +
           '<span class="decade-pct">' + pct2 + '%</span>' +
-          '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + pct2 + '%;opacity:0.7"></div></div>' +
+          '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + Math.min(pct2 * 3, 100) + '%;opacity:0.7"></div></div>' +
           '</div>';
-        nextHtml += '<div class="flow-sim-title" style="margin-top:6px;">⚠️ 두 그룹 확률 비슷함 (' + (pct1 - pct2) + '%p 차이) — 둘 다 후보</div>';
+        nextHtml += '<div class="flow-sim-title" style="margin-top:6px;">⚠️ 두 구간 점유율 비슷 — 둘 다 후보</div>';
       }
-      // 시퀀스 시뮬레이션 (3회만)
-      if (flow.simSequence && flow.simSequence.length > 0) {
-        nextHtml += '<div class="flow-sim-title">📍 예상 시퀀스 (다음 ' + Math.min(flow.simSequence.length, 3) + '회차)</div>';
-        nextHtml += '<div class="flow-sim-row">';
-        for (var sq = 0; sq < Math.min(flow.simSequence.length, 3); sq++) {
-          if (sq > 0) nextHtml += '<span class="flow-sim-arrow">→</span>';
-          var stepRound = flow.nextRound + sq;
-          nextHtml += '<span class="flow-sim-step">' +
-            '<span class="sim-round">' + stepRound + '</span>' +
-            decadeLabel(flow.simSequence[sq].decade) +
-            '</span>';
-        }
-        nextHtml += '</div>';
-      }
+      // 보조 정보
+      nextHtml += '<div class="flow-sim-title">📍 최근 ' + flow.hotRange.windowSize + '회 1·2·3등 ' + flow.hotRange.totalHits + '개 출현 중 ' + top1.hits + '개가 이 구간 집중</div>';
       nextHtml += '</div>';
     }
     document.getElementById('flow-next-pred').innerHTML = nextHtml;

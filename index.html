@@ -2549,13 +2549,21 @@ function render() {
     if (freqArr.length > 0) {
       nextHtml += '<div class="flow-next-card">';
       nextHtml += '<div class="flow-next-title">🥇 최근 ' + totalRecent + '회 가장 많이 나온 1등 번호</div>';
+      // 베팅 시퀀스 영역 (✨ 표시용)
+      var hotSetLocal = {};
+      if (flow.hotRange && flow.hotRange.top) {
+        for (var hsi = 0; hsi < flow.hotRange.top.length; hsi++) {
+          var hsT = flow.hotRange.top[hsi];
+          for (var hsn = hsT.start; hsn <= hsT.end; hsn++) hotSetLocal[hsn] = true;
+        }
+      }
       var topShow = Math.min(freqArr.length, 3);
       for (var fa = 0; fa < topShow; fa++) {
         var fi2 = freqArr[fa];
         var pp = Math.round(fi2.c / totalRecent * 100);
         var emoji = fa === 0 ? '🥇' : fa === 1 ? '🥈' : '🥉';
-        // 핫 구간 안 번호인지
-        var inHotR = hotSet[fi2.n] ? ' ✨' : '';
+        // 베팅 시퀀스 안 번호면 ✨
+        var inHotR = hotSetLocal[fi2.n] ? ' ✨' : '';
         nextHtml += '<div class="flow-next-row' + (fa === 0 ? ' top-pick' : '') + '">' +
           '<span class="decade-label">' + emoji + ' ' + fi2.n + inHotR + '</span>' +
           '<span class="decade-pct">' + fi2.c + '회 (' + pp + '%)</span>' +

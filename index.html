@@ -413,6 +413,41 @@ input::-webkit-inner-spin-button {
   transition: width 0.3s;
 }
 
+/* 번호별 1·2·3등 출현 표 */
+.rank-prob-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.rank-prob-table thead th {
+  text-align: center;
+  padding: 8px 4px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+.rank-prob-table tbody td {
+  padding: 8px 4px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.rank-prob-table .col-num {
+  font-weight: 800;
+  color: var(--text);
+  font-size: 15px;
+}
+.rank-prob-table .col-1 { color: #fbbf24; font-weight: 700; }
+.rank-prob-table .col-2 { color: #94a3b8; font-weight: 600; }
+.rank-prob-table .col-3 { color: #c084fc; font-weight: 600; }
+.rank-prob-table .col-sum { color: rgba(134, 239, 172, 1); font-weight: 700; }
+.rank-prob-table .rank-zero { opacity: 0.3; }
+.rank-prob-table tbody tr.row-hot { background: rgba(251, 191, 36, 0.06); }
+.rank-prob-table tbody tr.row-cold { background: rgba(59, 130, 246, 0.06); }
+
 /* 다음 회차 예상 흐름 (그룹 마르코프) */
 .flow-next-card {
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(59, 130, 246, 0.08));
@@ -444,6 +479,20 @@ input::-webkit-inner-spin-button {
   color: rgba(134, 239, 172, 1);
   font-weight: 700;
   text-align: right;
+}
+.flow-next-row.top-pick {
+  background: rgba(34, 197, 94, 0.12);
+  border-radius: 8px;
+  padding: 8px 6px;
+  margin: 4px 0;
+}
+.flow-next-row.top-pick .decade-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+.flow-next-row.top-pick .decade-pct {
+  font-size: 16px;
+  color: rgba(34, 197, 94, 1);
 }
 .flow-next-row .decade-bar {
   height: 6px;
@@ -915,6 +964,10 @@ body.food .flow-step.repeat-3 {
       <div class="betting-numbers" id="betting-numbers-2"></div>
     </div>
     <div class="betting-stats" id="betting-stats"></div>
+    <div class="betting-section" id="rank-prob-section" style="display:none;">
+      <div class="betting-section-title">📊 번호별 1·2·3등 출현 (최근 30회)</div>
+      <div id="rank-prob-table"></div>
+    </div>
     <div class="betting-section" id="betting-warn-section" style="display:none;">
       <div class="betting-section-title warn">🔥 핫존 (Tier 1, 핵심 추천)</div>
       <div class="betting-numbers warn" id="betting-numbers-warn"></div>
@@ -1271,6 +1324,18 @@ function decadeLabel(d) {
   if (d === 1) return '1~10';
   if (d === 10) return '91~100';
   return ((d - 1) * 10 + 1) + '~' + (d * 10);
+}
+
+// 번호별 1·2·3등 출현 카운트 (최근 윈도우 기준)
+function _numberRankCounts(rounds, num, window) {
+  var win = rounds.length >= window ? rounds.slice(-window) : rounds.slice();
+  var c1 = 0, c2 = 0, c3 = 0;
+  for (var i = 0; i < win.length; i++) {
+    if (win[i].first === num) c1++;
+    if (win[i].second === num) c2++;
+    if (win[i].third === num) c3++;
+  }
+  return { c1: c1, c2: c2, c3: c3, total: win.length };
 }
 
 // 십의자리 그룹 마르코프 체인 — 다음 회차 예상 그룹 TOP-K + 시퀀스 시뮬레이션
@@ -1781,6 +1846,43 @@ function render() {
         '<div class="betting-stat-value">' + stats.pany + '%</div>' +
       '</div>';
 
+    // 📊 번호별 1·2·3등 출현 표 (최근 30회)
+    var rankSection = document.getElementById('rank-prob-section');
+    var rankSorted = dup2.slice().sort(function(a, b) {
+      var ca = _numberRankCounts(rows, a.number, 30);
+      var cb = _numberRankCounts(rows, b.number, 30);
+      var sa = ca.c1 * 3 + ca.c2 * 2 + ca.c3;
+      var sb = cb.c1 * 3 + cb.c2 * 2 + cb.c3;
+      if (sa !== sb) return sb - sa;
+      return a.number - b.number;
+    });
+    var tableHtml = '<table class="rank-prob-table"><thead><tr>' +
+      '<th>번호</th><th>1등</th><th>2등</th><th>3등</th><th>합계</th><th>신호</th>' +
+      '</tr></thead><tbody>';
+    for (var ri = 0; ri < rankSorted.length; ri++) {
+      var rnum = rankSorted[ri].number;
+      var cnts = _numberRankCounts(rows, rnum, 30);
+      var total = cnts.c1 + cnts.c2 + cnts.c3;
+      var rowCls = '';
+      if (rankSorted[ri].kind === 'hot') rowCls = 'row-hot';
+      else if (rankSorted[ri].kind === 'cold') rowCls = 'row-cold';
+      var signalBadge = '';
+      if (rankSorted[ri].kind === 'hot') signalBadge = '<span style="color:#fbbf24;">핫</span>';
+      else if (rankSorted[ri].kind === 'cold') signalBadge = '<span style="color:#60a5fa;">콜드</span>';
+      else signalBadge = '<span style="color:#a78bfa;">믹스</span>';
+      tableHtml += '<tr class="' + rowCls + '">' +
+        '<td class="col-num">' + rnum + '</td>' +
+        '<td class="col-1 ' + (cnts.c1 === 0 ? 'rank-zero' : '') + '">' + cnts.c1 + '회</td>' +
+        '<td class="col-2 ' + (cnts.c2 === 0 ? 'rank-zero' : '') + '">' + cnts.c2 + '회</td>' +
+        '<td class="col-3 ' + (cnts.c3 === 0 ? 'rank-zero' : '') + '">' + cnts.c3 + '회</td>' +
+        '<td class="col-sum ' + (total === 0 ? 'rank-zero' : '') + '">' + total + '</td>' +
+        '<td>' + signalBadge + '</td>' +
+        '</tr>';
+    }
+    tableHtml += '</tbody></table>';
+    document.getElementById('rank-prob-table').innerHTML = tableHtml;
+    rankSection.style.display = 'block';
+
     // 식어가는 3회+ 번호 (제외 표시)
     var dup3 = betting.dup3;
     if (dup3.length > 0) {
@@ -1831,25 +1933,34 @@ function render() {
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;
 
-    // 🔮 다음 회차 예상 흐름 (그룹 마르코프 체인)
+    // 🔮 다음 회차 예상 흐름 — TOP1만 (TOP2가 5%p 이내로 비슷할 때만 둘 다)
     var nextHtml = '';
     if (flow.nextDecades && flow.nextDecades.length > 0) {
+      var top1 = flow.nextDecades[0];
+      var top2 = flow.nextDecades[1];
+      var showTop2 = top2 && (top1.p - top2.p) <= 0.05; // 5%p 이내면 함께
       nextHtml += '<div class="flow-next-card">';
       nextHtml += '<div class="flow-next-title">🔮 ' + flow.nextRound + '회 예상 흐름 (1등 십의자리)</div>';
-      for (var nd = 0; nd < Math.min(flow.nextDecades.length, 5); nd++) {
-        var ndItem = flow.nextDecades[nd];
-        var pct = Math.round(ndItem.p * 100);
+      var pct1 = Math.round(top1.p * 100);
+      nextHtml += '<div class="flow-next-row top-pick">' +
+        '<span class="decade-label">⭐ ' + decadeLabel(top1.decade) + '</span>' +
+        '<span class="decade-pct">' + pct1 + '%</span>' +
+        '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + pct1 + '%"></div></div>' +
+        '</div>';
+      if (showTop2) {
+        var pct2 = Math.round(top2.p * 100);
         nextHtml += '<div class="flow-next-row">' +
-          '<span class="decade-label">' + decadeLabel(ndItem.decade) + '</span>' +
-          '<span class="decade-pct">' + pct + '%</span>' +
-          '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + pct + '%"></div></div>' +
+          '<span class="decade-label">' + decadeLabel(top2.decade) + '</span>' +
+          '<span class="decade-pct">' + pct2 + '%</span>' +
+          '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + pct2 + '%;opacity:0.7"></div></div>' +
           '</div>';
+        nextHtml += '<div class="flow-sim-title" style="margin-top:6px;">⚠️ 두 그룹 확률 비슷함 (' + (pct1 - pct2) + '%p 차이) — 둘 다 후보</div>';
       }
-      // 시퀀스 시뮬레이션
+      // 시퀀스 시뮬레이션 (3회만)
       if (flow.simSequence && flow.simSequence.length > 0) {
-        nextHtml += '<div class="flow-sim-title">📍 예상 시퀀스 (다음 ' + flow.simSequence.length + '회차, 최빈 체인)</div>';
+        nextHtml += '<div class="flow-sim-title">📍 예상 시퀀스 (다음 ' + Math.min(flow.simSequence.length, 3) + '회차)</div>';
         nextHtml += '<div class="flow-sim-row">';
-        for (var sq = 0; sq < flow.simSequence.length; sq++) {
+        for (var sq = 0; sq < Math.min(flow.simSequence.length, 3); sq++) {
           if (sq > 0) nextHtml += '<span class="flow-sim-arrow">→</span>';
           var stepRound = flow.nextRound + sq;
           nextHtml += '<span class="flow-sim-step">' +

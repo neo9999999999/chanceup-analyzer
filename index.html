@@ -2671,27 +2671,28 @@ function render() {
       }
       return html;
     }
-    // 당첨 흐름: 면처리 X (그냥 시계열). 라인은 시퀀스 반복. 번호대별 컬러.
+    // 당첨 흐름: 십의자리 그룹 라벨 (sliding 자연 시퀀스 X)
     function renderActualRow(sequence) {
       if (!sequence || sequence.length === 0) return '';
       var rec = sequence.slice(-20);
-      var labelCount = {};
+      // 십의자리 그룹 카운트 (반복 강조용)
+      var groupCount = {};
       for (var fc = 0; fc < rec.length; fc++) {
-        labelCount[rec[fc].seqLabel] = (labelCount[rec[fc].seqLabel] || 0) + 1;
+        var d0 = Math.floor((rec[fc].num - 1) / 10);
+        groupCount[d0] = (groupCount[d0] || 0) + 1;
       }
       var html = '';
       for (var fi = 0; fi < rec.length; fi++) {
         if (fi > 0) html += '<span class="flow-arrow">→</span>';
-        var isLatest = (fi === rec.length - 1);
-        var sCount = labelCount[rec[fi].seqLabel];
+        var num = rec[fi].num;
+        var dec = Math.floor((num - 1) / 10); // 0~9
+        var groupLabel = (dec*10+1) + '~' + (dec*10+10);
+        var gCount = groupCount[dec];
         var cls = 'flow-step seq-box';
-        if (isLatest) cls += ' latest';
-        if (!isLatest && sCount >= 2) cls += ' repeat-2';
-        // 1등 번호의 십의자리 그룹 (0=1~10, 9=91~100)
-        var dec = Math.floor((rec[fi].num - 1) / 10);
+        if (gCount >= 2) cls += ' repeat-2';
         html += '<span class="' + cls + '" data-decade="' + dec + '">' +
-          '<span class="flow-step-group">' + rec[fi].seqLabel + '</span>' +
-          '<span class="flow-step-num">' + rec[fi].num + '</span>' +
+          '<span class="flow-step-group">' + groupLabel + '</span>' +
+          '<span class="flow-step-num">' + num + '</span>' +
           '</span>';
       }
       return html;

@@ -1171,6 +1171,12 @@ tr.topfreq-rank-top3 .col-num {
     </div>
   </div>
 
+  <!-- 📚 추천 히스토리 (회차 등록 시 자동 저장) -->
+  <div class="card" id="rechistory-card" style="display:none;">
+    <div class="card-title">📚 추천 히스토리 (회차 등록 시 자동 저장)</div>
+    <div id="rechistory-table"></div>
+  </div>
+
   <!-- 🏆 최근 1등 빈도 TOP 10 -->
   <div class="card" id="topfreq-card" style="display:none;">
     <div class="card-title">🏆 최근 1등 빈도 TOP 10</div>
@@ -1880,6 +1886,26 @@ var ALGO_CONFIG = {
   premium: { window: 20, weights: [1,1,1], auto: false },
   food:    { window: 30, weights: [1,1,1], auto: false }
 };
+
+// 📚 추천 히스토리 저장/로드 (localStorage)
+function _saveRecHistory(game, entry) {
+  try {
+    var key = 'chanceup_rec_history_' + game;
+    var arr = JSON.parse(localStorage.getItem(key) || '[]');
+    // 같은 회차 있으면 덮어씀
+    arr = arr.filter(function(x){ return x.round !== entry.round; });
+    arr.push(entry);
+    arr.sort(function(a,b){ return a.round - b.round; });
+    // 최대 50개만 유지
+    if (arr.length > 50) arr = arr.slice(-50);
+    localStorage.setItem(key, JSON.stringify(arr));
+  } catch(e) { console.warn('saveRecHistory failed', e); }
+}
+function _loadRecHistory(game) {
+  try {
+    return JSON.parse(localStorage.getItem('chanceup_rec_history_' + game) || '[]');
+  } catch(e) { return []; }
+}
 
 // ★ 자동 학습 v10.1 — 과적합 방지: 평가창 확대 + baseline 비교
 // 평가창을 50회로 확대 (노이즈 ↓)
@@ -2604,6 +2630,52 @@ function render() {
     flowCard.style.display = 'none';
   }
 
+  // 📚 추천 히스토리 (자동 저장된 과거 추천 + 실제 결과 + 적중 여부)
+  var recHistCard = document.getElementById('rechistory-card');
+  var recHist = _loadRecHistory(currentTab);
+  if (recHist.length > 0) {
+    recHistCard.style.display = 'block';
+    var shown = recHist.slice(-15).reverse();
+    var rhHtml = '<div class="topfreq-info">회차 등록 시점의 추천 시퀀스 자동 저장 · 실제 1·2·3등과 매칭</div>';
+    rhHtml += '<table class="rank-prob-table"><thead><tr>' +
+      '<th>회차</th><th>추천 시퀀스</th><th>1등</th><th>2등</th><th>3등</th><th>적중</th>' +
+      '</tr></thead><tbody>';
+    for (var rh = 0; rh < shown.length; rh++) {
+      var h = shown[rh];
+      var hitBadge = h.hitCount === 0 ? '<span style="color:var(--text-dim);">0/3</span>' :
+                     h.hitCount === 3 ? '<span style="color:#34d399;font-weight:800;">🎯 3/3</span>' :
+                     '<span style="color:var(--accent);font-weight:700;">' + h.hitCount + '/3</span>';
+      function _cell(num, isHit) {
+        var color = isHit ? 'color:var(--accent);font-weight:800;' : 'color:var(--text-dim);';
+        return '<td style="' + color + '">' + num + (isHit ? ' ✓' : '') + '</td>';
+      }
+      rhHtml += '<tr>' +
+        '<td class="col-num">' + h.round + '</td>' +
+        '<td style="font-weight:700;">' + h.recStart + '~' + h.recEnd + '</td>' +
+        _cell(h.actualFirst, h.hit1) +
+        _cell(h.actualSecond, h.hit2) +
+        _cell(h.actualThird, h.hit3) +
+        '<td>' + hitBadge + '</td>' +
+        '</tr>';
+    }
+    rhHtml += '</tbody></table>';
+    var totalH = recHist.length;
+    var totH1 = recHist.filter(function(h){ return h.hit1; }).length;
+    var totH2 = recHist.filter(function(h){ return h.hit2; }).length;
+    var totH3 = recHist.filter(function(h){ return h.hit3; }).length;
+    var totAny = recHist.filter(function(h){ return h.hitCount > 0; }).length;
+    rhHtml += '<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--border);font-size:12px;">' +
+      '<strong style="color:var(--accent);">📊 누적 적중률 (' + totalH + '회 기록)</strong><br>' +
+      '1등 ' + totH1 + ' (' + (totH1/totalH*100).toFixed(0) + '%) · ' +
+      '2등 ' + totH2 + ' (' + (totH2/totalH*100).toFixed(0) + '%) · ' +
+      '3등 ' + totH3 + ' (' + (totH3/totalH*100).toFixed(0) + '%) · ' +
+      '<strong>통합 ' + totAny + ' (' + (totAny/totalH*100).toFixed(0) + '%)</strong>' +
+      '</div>';
+    document.getElementById('rechistory-table').innerHTML = rhHtml;
+  } else {
+    recHistCard.style.display = 'none';
+  }
+
   // 🏆 최근 1등 빈도 TOP 10 (회차 등록할 때마다 순위 변동)
   var topFreqCard = document.getElementById('topfreq-card');
   var freqWindow = (ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic).window || 20;
@@ -2698,6 +2770,31 @@ function handleAdd() {
     if (current[i].round === r) {
       existing = current[i];
       break;
+    }
+  }
+
+  // ★ 추천 히스토리 자동 저장 — 그 시점 추천을 캡처해서 결과랑 매칭
+  // (회차 추가 전 시점의 추천 시퀀스를 저장, 실제 결과로 적중 여부 자동 계산)
+  if (!existing) {
+    var snapshotData = current.slice().sort(function(a,b){return a.round-b.round;});
+    var cfgSnap = ALGO_CONFIG[currentTab] || { window: 20, weights: [1,1,1] };
+    var hr = _slidingHotRange(snapshotData, cfgSnap.window, cfgSnap.weights);
+    if (hr && hr.top && hr.top[0]) {
+      var hits1 = (f >= hr.top[0].start && f <= hr.top[0].end);
+      var hits2 = (s >= hr.top[0].start && s <= hr.top[0].end);
+      var hits3 = (t >= hr.top[0].start && t <= hr.top[0].end);
+      var hitCount = (hits1 ? 1 : 0) + (hits2 ? 1 : 0) + (hits3 ? 1 : 0);
+      _saveRecHistory(currentTab, {
+        round: r,
+        recStart: hr.top[0].start,
+        recEnd: hr.top[0].end,
+        algoWindow: cfgSnap.window,
+        algoWeights: cfgSnap.weights,
+        actualFirst: f, actualSecond: s, actualThird: t,
+        hit1: hits1, hit2: hits2, hit3: hits3,
+        hitCount: hitCount,
+        ts: new Date().toISOString()
+      });
     }
   }
 

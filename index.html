@@ -360,17 +360,20 @@ input::-webkit-inner-spin-button {
   line-height: 1.05;
   position: relative;
 }
-/* 번호대별 고유 컬러 — 좌측 보더 + 배경 살짝 (1등 번호 십의자리 기준) */
-.flow-step[data-decade="0"]  { border-left-color: #ef4444; background: linear-gradient(90deg, rgba(239,68,68,0.10), var(--card) 30%); }
-.flow-step[data-decade="1"]  { border-left-color: #f97316; background: linear-gradient(90deg, rgba(249,115,22,0.10), var(--card) 30%); }
-.flow-step[data-decade="2"]  { border-left-color: #eab308; background: linear-gradient(90deg, rgba(234,179,8,0.10),  var(--card) 30%); }
-.flow-step[data-decade="3"]  { border-left-color: #84cc16; background: linear-gradient(90deg, rgba(132,204,22,0.10), var(--card) 30%); }
-.flow-step[data-decade="4"]  { border-left-color: #22c55e; background: linear-gradient(90deg, rgba(34,197,94,0.10),  var(--card) 30%); }
-.flow-step[data-decade="5"]  { border-left-color: #14b8a6; background: linear-gradient(90deg, rgba(20,184,166,0.10), var(--card) 30%); }
-.flow-step[data-decade="6"]  { border-left-color: #3b82f6; background: linear-gradient(90deg, rgba(59,130,246,0.10), var(--card) 30%); }
-.flow-step[data-decade="7"]  { border-left-color: #6366f1; background: linear-gradient(90deg, rgba(99,102,241,0.10), var(--card) 30%); }
-.flow-step[data-decade="8"]  { border-left-color: #a855f7; background: linear-gradient(90deg, rgba(168,85,247,0.10), var(--card) 30%); }
-.flow-step[data-decade="9"]  { border-left-color: #ec4899; background: linear-gradient(90deg, rgba(236,72,153,0.10), var(--card) 30%); }
+/* 번호대 컬러 — 30이하 어둡, 31~60 미들, 61~100 밝은 톤 (각 그룹 다른 hue) */
+/* 어두운 톤 (1~30) */
+.flow-step[data-decade="0"]  { border-left-color: #7f1d1d; background: linear-gradient(90deg, rgba(127,29,29,0.20),  var(--card) 32%); }
+.flow-step[data-decade="1"]  { border-left-color: #9a3412; background: linear-gradient(90deg, rgba(154,52,18,0.20),  var(--card) 32%); }
+.flow-step[data-decade="2"]  { border-left-color: #713f12; background: linear-gradient(90deg, rgba(113,63,18,0.22),  var(--card) 32%); }
+/* 미들 톤 (31~60) */
+.flow-step[data-decade="3"]  { border-left-color: #4d7c0f; background: linear-gradient(90deg, rgba(77,124,15,0.20),  var(--card) 32%); }
+.flow-step[data-decade="4"]  { border-left-color: #15803d; background: linear-gradient(90deg, rgba(21,128,61,0.20),  var(--card) 32%); }
+.flow-step[data-decade="5"]  { border-left-color: #0f766e; background: linear-gradient(90deg, rgba(15,118,110,0.20), var(--card) 32%); }
+/* 밝은 톤 (61~100) */
+.flow-step[data-decade="6"]  { border-left-color: #60a5fa; background: linear-gradient(90deg, rgba(96,165,250,0.22), var(--card) 32%); }
+.flow-step[data-decade="7"]  { border-left-color: #a78bfa; background: linear-gradient(90deg, rgba(167,139,250,0.22), var(--card) 32%); }
+.flow-step[data-decade="8"]  { border-left-color: #f0abfc; background: linear-gradient(90deg, rgba(240,171,252,0.22), var(--card) 32%); }
+.flow-step[data-decade="9"]  { border-left-color: #fcd34d; background: linear-gradient(90deg, rgba(252,211,77,0.22),  var(--card) 32%); }
 /* 최신 회차 — 탭 accent 컬러 */
 .flow-step.latest {
   background: var(--accent);
@@ -473,16 +476,19 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
   border-radius: 4px;
   letter-spacing: -0.02em;
 }
-.decade-color-bar > div:nth-child(1)  { background: #ef4444; }
-.decade-color-bar > div:nth-child(2)  { background: #f97316; }
-.decade-color-bar > div:nth-child(3)  { background: #eab308; }
-.decade-color-bar > div:nth-child(4)  { background: #84cc16; }
-.decade-color-bar > div:nth-child(5)  { background: #22c55e; }
-.decade-color-bar > div:nth-child(6)  { background: #14b8a6; }
-.decade-color-bar > div:nth-child(7)  { background: #3b82f6; }
-.decade-color-bar > div:nth-child(8)  { background: #6366f1; color: #fff; }
-.decade-color-bar > div:nth-child(9)  { background: #a855f7; color: #fff; }
-.decade-color-bar > div:nth-child(10) { background: #ec4899; color: #fff; }
+/* 30이하 어두운 톤 — 흰색 텍스트 */
+.decade-color-bar > div:nth-child(1)  { background: #7f1d1d; color: #fff; }
+.decade-color-bar > div:nth-child(2)  { background: #9a3412; color: #fff; }
+.decade-color-bar > div:nth-child(3)  { background: #713f12; color: #fff; }
+/* 31~60 미들 톤 — 흰색 텍스트 */
+.decade-color-bar > div:nth-child(4)  { background: #4d7c0f; color: #fff; }
+.decade-color-bar > div:nth-child(5)  { background: #15803d; color: #fff; }
+.decade-color-bar > div:nth-child(6)  { background: #0f766e; color: #fff; }
+/* 61~100 밝은 톤 — 검정 텍스트 */
+.decade-color-bar > div:nth-child(7)  { background: #60a5fa; color: #1a1a1a; }
+.decade-color-bar > div:nth-child(8)  { background: #a78bfa; color: #1a1a1a; }
+.decade-color-bar > div:nth-child(9)  { background: #f0abfc; color: #1a1a1a; }
+.decade-color-bar > div:nth-child(10) { background: #fcd34d; color: #1a1a1a; }
 
 /* 등수별 흐름 라벨 */
 .flow-rank-label {

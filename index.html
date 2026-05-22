@@ -1874,12 +1874,75 @@ var FLOW_FIRST_STATS = {
   food:    { p1:  6.7, p2:  2.2, p3:  8.9, pany: 17.8 }
 };
 
-// 게임별 알고리즘 설정 — 추천 = sliding TOP1 시퀀스. 흐름·베팅 둘 다 동일 방식.
+// 게임별 알고리즘 설정 — 자동 학습으로 갱신됨 (페이지 로드 / 회차 추가 시)
 var ALGO_CONFIG = {
-  basic:   { window: 20, weights: [1,1,1] },
-  premium: { window: 20, weights: [1,1,1] },
-  food:    { window: 30, weights: [1,1,1] }
+  basic:   { window: 20, weights: [1,1,1], auto: false },
+  premium: { window: 20, weights: [1,1,1], auto: false },
+  food:    { window: 30, weights: [1,1,1], auto: false }
 };
+
+// ★ 자동 학습: 최근 N회 hit rate 기준으로 최적 (window, weights) 자동 선택
+// 매 페이지 로드 / 회차 등록 시 호출 → ALGO_CONFIG 갱신
+function autoLearnAlgo(rows, evalLastN, startSafety) {
+  evalLastN = evalLastN || 20;     // 최근 20회로 평가
+  startSafety = startSafety || 20; // 백테스트 시작 최소 데이터
+  if (!rows || rows.length < startSafety + 3) return null;
+  var sorted = rows.slice().sort(function(a, b){ return a.round - b.round; });
+
+  // 후보 그리드
+  var windows = [8, 10, 12, 15, 20, 25, 30, 40];
+  var weightSets = [[1,1,1], [2,1,1], [3,2,1], [4,2,1], [3,1,1], [1,2,1], [2,2,1], [5,3,1]];
+  var startIdx = Math.max(startSafety, sorted.length - evalLastN);
+
+  var best = null, bestScore = -1;
+  for (var wi = 0; wi < windows.length; wi++) {
+    for (var ti = 0; ti < weightSets.length; ti++) {
+      var win = windows[wi], wt = weightSets[ti];
+      var h1 = 0, any = 0, hitsTotal = 0, tot = 0;
+      for (var i = startIdx; i < sorted.length; i++) {
+        var hr = _slidingHotRange(sorted.slice(0, i), win, wt);
+        if (!hr || !hr.top || !hr.top[0]) continue;
+        var t = hr.top[0], r = sorted[i];
+        var ha = (r.first  >= t.start && r.first  <= t.end);
+        var hb = (r.second >= t.start && r.second <= t.end);
+        var hc = (r.third  >= t.start && r.third  <= t.end);
+        if (ha) h1++;
+        if (ha || hb || hc) any++;
+        hitsTotal += (ha?1:0) + (hb?1:0) + (hc?1:0);
+        tot++;
+      }
+      if (tot === 0) continue;
+      // 점수: 1등 적중률 × 2 + 통합 + 누적 hits (1·2·3 다 잡은 경우 가산)
+      var score = (h1 * 2 + any) / tot + hitsTotal / (tot * 3) * 0.5;
+      if (score > bestScore) {
+        bestScore = score;
+        best = {
+          window: win, weights: wt,
+          hit1: h1, hitAny: any, hitsTotal: hitsTotal, total: tot,
+          score: score
+        };
+      }
+    }
+  }
+  return best;
+}
+
+// 자동 학습 실행 — currentTab에 적용
+function runAutoLearn() {
+  var rows = (typeof data !== 'undefined') ? data[currentTab] : [];
+  if (!rows || rows.length < 25) return;
+  var picked = autoLearnAlgo(rows, 20);
+  if (picked) {
+    ALGO_CONFIG[currentTab] = {
+      window: picked.window,
+      weights: picked.weights,
+      auto: true,
+      learnedAt: new Date().toISOString(),
+      lastEval: picked
+    };
+    console.log('[autoLearn]', currentTab, ALGO_CONFIG[currentTab]);
+  }
+}
 
 // 핫 점수: 최근 N회 1·2·3등 가중치 합 (decay 시간 감쇠)
 function _scoreWindow(rounds, window, w1, w2, w3, decay) {
@@ -2167,6 +2230,10 @@ function escapeHtml(s) {
 function render() {
   var rows = getCurrent();
 
+  // ★ 자동 학습: 매 렌더 시 (탭 변경/회차 등록/페이지 로드 시 모두 트리거됨)
+  // 최근 데이터로 가장 잘 맞는 (window, weights) 자동 선택
+  runAutoLearn();
+
   // 탭 활성화
   var tabs = document.querySelectorAll('.tab');
   for (var i = 0; i < tabs.length; i++) {
@@ -2205,8 +2272,18 @@ function render() {
 
     document.getElementById('betting-title').innerHTML =
       '🎯 ' + nextRound + '회 베팅 추천';
+    var cfgNow = ALGO_CONFIG[currentTab];
+    var autoBadge = (cfgNow && cfgNow.auto)
+      ? ' <span style="color:#34d399;font-weight:700;">🤖 자동학습</span>'
+      : '';
+    var learnInfo = '';
+    if (cfgNow && cfgNow.lastEval) {
+      var le = cfgNow.lastEval;
+      learnInfo = '<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">' +
+        '최근 ' + le.total + '회 평가: 1등 ' + le.hit1 + '회 / 통합 ' + le.hitAny + '회 (적중 평점 ' + (le.score).toFixed(2) + ')</div>';
+    }
     document.getElementById('betting-info').innerHTML =
-      '최근 ' + betting.windowSize + '회 분석 · <strong>' + betting.algoLabel + '</strong>';
+      '최근 ' + betting.windowSize + '회 분석 · <strong>' + betting.algoLabel + '</strong>' + autoBadge + learnInfo;
 
     // ⭐ 메인 추천 시퀀스 박스 (sliding TOP1)
     var seqMain = document.getElementById('betting-sequence-main');

@@ -1889,6 +1889,53 @@ var ALGO_CONFIG = {
   food:    { window: 30, weights: [1,1,1], auto: false }
 };
 
+// 🔁 다음 흐름 예측 — 직전 1등이 속한 시퀀스의 과거 사례에서 다음 회차 1등이 어디로 갔는지
+// 진짜 'flow shift' 마르코프: A → B 패턴 (자기복귀가 아닌 이동)
+function _nextFlowPrediction(sorted) {
+  if (!sorted || sorted.length < 15) return null;
+  var last = sorted[sorted.length - 1].first;
+  // 직전 1등 포함 sliding TOP1 시퀀스
+  var hr = _slidingHotRangeContaining(sorted, last, 20, [1, 0, 0]);
+  if (!hr) return null;
+  var lstart = hr.start, lend = hr.end;
+  // 과거 1등이 [lstart, lend]에 들어간 회차들의 다음 회차 1등 모음
+  var nextFirsts = [];
+  for (var i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i].first >= lstart && sorted[i].first <= lend) {
+      nextFirsts.push(sorted[i + 1].first);
+    }
+  }
+  if (nextFirsts.length === 0) return null;
+  // 다음 1등들의 sliding 분포
+  var counts = new Array(101).fill(0);
+  for (var i = 0; i < nextFirsts.length; i++) counts[nextFirsts[i]]++;
+  var ranges = [];
+  for (var s = 1; s <= 91; s++) {
+    var c = 0;
+    for (var k = 0; k < 10; k++) c += counts[s + k];
+    if (c > 0) ranges.push({ start: s, end: s + 9, count: c, pct: c / nextFirsts.length });
+  }
+  ranges.sort(function(a, b){ return b.count - a.count; });
+  // 겹치지 않는 TOP-3 (중복 sliding 제거)
+  var top = [];
+  for (var r = 0; r < ranges.length && top.length < 3; r++) {
+    var overlaps = false;
+    for (var u = 0; u < top.length; u++) {
+      if (ranges[r].start <= top[u].end && ranges[r].end >= top[u].start) {
+        overlaps = true; break;
+      }
+    }
+    if (!overlaps) top.push(ranges[r]);
+  }
+  return {
+    fromSeq: lstart + '~' + lend,
+    lastFirst: last,
+    totalSamples: nextFirsts.length,
+    nextFirsts: nextFirsts,
+    top: top
+  };
+}
+
 // 🔁 흐름 트랜지션 마르코프 — 시퀀스 위치 이동 패턴 학습 (단순 빈도 X)
 // 직전 sliding TOP1 시작점 → 다음 sliding TOP1 시작점 전이확률
 function _flowTransitionMarkov(sorted, window, weights) {
@@ -2560,25 +2607,26 @@ function render() {
     document.getElementById('flow-recent').innerHTML = renderFlowRow(flow.sequence);
     var recent = flow.sequence.slice(-20);  // 아래 코드 호환용
 
-    // 🔁 흐름 트랜지션 마르코프 — 시퀀스 이동 패턴 (단순 빈도가 아닌 흐름)
+    // 🔁 다음 흐름 예측 — 직전 1등 시퀀스 다음에 1등이 어디로 갔는지 (마르코프)
     var sortedFlow = rows.slice().sort(function(a, b){ return a.round - b.round; });
-    var trans = _flowTransitionMarkov(sortedFlow, 20, [1, 0, 0]);
+    var nextFlow = _nextFlowPrediction(sortedFlow);
     var transHtml = '';
-    if (trans && trans.topNext.length > 0) {
+    if (nextFlow && nextFlow.top.length > 0) {
       transHtml += '<div class="flow-next-card" style="margin-top:8px;">';
-      transHtml += '<div class="flow-next-title">🔁 흐름 트랜지션 (직전 ' + trans.lastSeqLabel + ' 다음 패턴)</div>';
-      transHtml += '<div class="flow-sim-title">과거 ' + trans.totalTransitions + '번 ' + trans.lastSeqLabel + ' 이후 어디로 이동했는지</div>';
-      for (var ni = 0; ni < trans.topNext.length; ni++) {
-        var nx = trans.topNext[ni];
+      transHtml += '<div class="flow-next-title">🔁 다음 흐름 예측 (직전 1등 ' + nextFlow.lastFirst + ' · 시퀀스 ' + nextFlow.fromSeq + ')</div>';
+      transHtml += '<div class="flow-sim-title">과거 1등이 ' + nextFlow.fromSeq + '에 들어간 ' + nextFlow.totalSamples + '회의 다음 회차 1등 분포</div>';
+      for (var ni = 0; ni < nextFlow.top.length; ni++) {
+        var nx = nextFlow.top[ni];
         var pct = Math.round(nx.pct * 100);
         var topCls = ni === 0 ? ' top-pick' : '';
         transHtml += '<div class="flow-next-row' + topCls + '">' +
           '<span class="decade-label">' + (ni===0?'⭐ ':'') + nx.start + '~' + nx.end + '</span>' +
-          '<span class="decade-pct">' + nx.count + '번 (' + pct + '%)</span>' +
-          '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + pct + '%' + (ni>0?';opacity:0.7':'') + '"></div></div>' +
+          '<span class="decade-pct">' + nx.count + '/' + nextFlow.totalSamples + ' (' + pct + '%)</span>' +
+          '<div class="decade-bar"><div class="decade-bar-fill" style="width:' + Math.min(pct*2.5, 100) + '%' + (ni>0?';opacity:0.7':'') + '"></div></div>' +
           '</div>';
       }
-      transHtml += '<div class="flow-sim-title" style="margin-top:6px;">📊 OOS 검증: 1등 13.0% / 통합 <strong style="color:#34d399;">31.9%</strong> (단순 빈도 25% 대비 +7%p)</div>';
+      // 다음 1등들 실제 분포 보여줌 (참고)
+      transHtml += '<div class="flow-sim-title" style="margin-top:6px;">📍 실제 다음 1등들: ' + nextFlow.nextFirsts.join(', ') + '</div>';
       transHtml += '</div>';
     }
     document.getElementById('flow-transition').innerHTML = transHtml;

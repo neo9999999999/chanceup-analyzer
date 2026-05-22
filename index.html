@@ -345,16 +345,19 @@ input::-webkit-inner-spin-button {
   border-radius: 12px;
 }
 .flow-step {
-  font-size: 13px;
-  font-weight: 700;
-  padding: 7px 11px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px 4px;
   background: var(--card);
   border-radius: 8px;
   border: 1px solid var(--border);
   white-space: nowrap;
-  min-width: 36px;
+  min-width: 50px;
   text-align: center;
-  color: var(--text-dim);
+  color: var(--text);
+  line-height: 1.05;
 }
 /* 최신 회차 — 탭 accent 컬러 */
 .flow-step.latest {
@@ -384,12 +387,28 @@ input::-webkit-inner-spin-button {
 body.premium .flow-step.repeat-3 { background: rgba(167, 139, 250, 0.1); }
 body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 
+/* 1등 번호 — 메인 강조 (큰 글씨, 진한 색) */
 .flow-step-num {
-  opacity: 0.7;
-  font-size: 10px;
-  margin-left: 3px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0;
+  line-height: 1;
 }
-.flow-step.latest .flow-step-num { opacity: 0.9; }
+/* 그룹 라벨 — 보조 (작게, 흐리게) */
+.flow-step-group {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-top: 2px;
+  letter-spacing: 0.02em;
+  opacity: 0.75;
+}
+.flow-step.latest .flow-step-num { color: #1a1a1a; }
+.flow-step.latest .flow-step-group { color: #1a1a1a; opacity: 0.65; }
+.flow-step.in-hot-range .flow-step-num { color: #d1fae5; }
+.flow-step.in-hot-range .flow-step-group { color: #6ee7b7; opacity: 0.8; }
 
 /* 흐름 카드 범례 */
 .flow-legend {
@@ -2074,10 +2093,10 @@ function render() {
       else if (inHot) cls += ' in-hot-range';
       else if (dCount >= 3) cls += ' repeat-3';
       else if (dCount === 2) cls += ' repeat-2';
-      // 박스 안: 시퀀스 라벨(81~90) + 작게 실제 번호
+      // 박스 안: 1등 번호 크게 (메인) + 시퀀스 라벨 작게 (보조)
       recentHtml += '<span class="' + cls + '">' +
-        decadeLabel(recent[fi].decade) +
         '<span class="flow-step-num">' + recent[fi].num + '</span>' +
+        '<span class="flow-step-group">' + decadeLabel(recent[fi].decade) + '</span>' +
         '</span>';
     }
     document.getElementById('flow-recent').innerHTML = recentHtml;

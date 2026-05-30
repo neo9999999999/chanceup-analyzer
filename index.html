@@ -2736,7 +2736,7 @@ function render() {
   var recHist = _loadRecHistory(currentTab);
   if (recHist.length > 0) {
     recHistCard.style.display = 'block';
-    var shown = recHist.slice(-15).reverse();
+    var shown = recHist.slice(-30).reverse();
     var rhHtml = '<div class="topfreq-info">회차 등록 시점의 추천 시퀀스 자동 저장 · 실제 1·2·3등과 매칭</div>';
     rhHtml += '<table class="rank-prob-table"><thead><tr>' +
       '<th>회차</th><th>추천 시퀀스</th><th>1등</th><th>2등</th><th>3등</th><th>적중</th>' +

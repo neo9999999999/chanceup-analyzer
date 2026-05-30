@@ -2151,9 +2151,7 @@ function _evaluateAlgoOOS(sorted, window, weights, evalLastN) {
 function runAutoLearn() {
   var rows = (typeof data !== 'undefined') ? data[currentTab] : [];
   if (!rows || rows.length < 50) {
-    // 데이터 부족 시 baseline 사용
-    var baseCfg = (currentTab === 'food') ? { window: 30, weights: [1,1,1] } : { window: 20, weights: [1,1,1] };
-    ALGO_CONFIG[currentTab] = { window: baseCfg.window, weights: baseCfg.weights, auto: false };
+    ALGO_CONFIG[currentTab] = { window: 20, weights: [1,1,1], auto: false };
     return;
   }
   var sorted = rows.slice().sort(function(a,b){return a.round-b.round;});
@@ -2161,9 +2159,9 @@ function runAutoLearn() {
   // baseline OOS 평가 (W=20, [1,1,1])
   var baselineEval = _evaluateAlgoOOS(sorted, 20, [1,1,1], 40);
 
-  // 후보들 OOS 평가
-  var windows = [10, 15, 20, 25, 30];
-  var weightSets = [[1,1,1], [2,1,1], [3,2,1], [4,2,1]];
+  // 후보들 OOS 평가 — window=20 고정 (사용자 요청), weights만 자동학습
+  var windows = [20];
+  var weightSets = [[1,1,1], [2,1,1], [3,2,1], [4,2,1], [3,1,1], [5,3,1]];
   var bestCand = null;
   for (var wi = 0; wi < windows.length; wi++) {
     for (var ti = 0; ti < weightSets.length; ti++) {

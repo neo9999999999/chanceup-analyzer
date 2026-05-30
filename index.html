@@ -2671,10 +2671,10 @@ function render() {
       }
       return html;
     }
-    // 당첨 흐름: 십의자리 그룹 라벨 (sliding 자연 시퀀스 X)
+    // 당첨 흐름: 십의자리 그룹 라벨, 최근 30회 누적
     function renderActualRow(sequence) {
       if (!sequence || sequence.length === 0) return '';
-      var rec = sequence.slice(-20);
+      var rec = sequence.slice(-30);
       // 십의자리 그룹 카운트 (반복 강조용)
       var groupCount = {};
       for (var fc = 0; fc < rec.length; fc++) {

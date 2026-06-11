@@ -1600,7 +1600,86 @@ function _slidingHotRangeContaining(rounds, num, window, weights) {
   return { start: bestS, end: bestS + 9, hits: bestTotal };
 }
 
-// 🌊 핫 구간 (Sliding Window + EWMA decay)
+// 가중 카운트 배열 (1~100), EWMA decay
+function _weightedCounts(rounds, window, weights, decay) {
+  weights = weights || [1, 1, 1];
+  if (decay == null) decay = 1.0;
+  var win = rounds.length >= window ? rounds.slice(-window) : rounds.slice();
+  var counts = new Array(101).fill(0);
+  var n = win.length;
+  for (var i = 0; i < n; i++) {
+    var wt = Math.pow(decay, n - 1 - i);
+    counts[win[i].first]  += weights[0] * wt;
+    counts[win[i].second] += weights[1] * wt;
+    counts[win[i].third]  += weights[2] * wt;
+  }
+  return { counts: counts, windowSize: n };
+}
+
+// 🎯 v13 전략별 추천 10개 번호 — strategy: 'consecutive' | 'free' | 'two_seg'
+// 반환: { picks: [10개 번호 정렬], label: 표시용, segments: [[s,e],...] }
+function _recommend(rounds, cfg) {
+  var window = cfg.window || 20;
+  var weights = cfg.weights || [1,1,1];
+  var decay = cfg.decay || 1.0;
+  var strategy = cfg.strategy || 'consecutive';
+  var wc = _weightedCounts(rounds, window, weights, decay);
+  var counts = wc.counts;
+  if (wc.windowSize === 0) return { picks: [], label: '', segments: [] };
+
+  if (strategy === 'free') {
+    // 자유 TOP10 (연속 제약 X)
+    var idx = [];
+    for (var n = 1; n <= 100; n++) idx.push(n);
+    idx.sort(function(a, b){ return counts[b] !== counts[a] ? counts[b]-counts[a] : a-b; });
+    var picks = idx.slice(0, 10).sort(function(a,b){return a-b;});
+    return { picks: picks, label: '자유 추천 10개', segments: [], strategy: 'free' };
+  }
+  if (strategy === 'two_seg') {
+    // 두 개 비겹침 연속 5칸
+    var segs = [];
+    for (var s = 1; s <= 96; s++) {
+      var t = 0;
+      for (var k = 0; k < 5; k++) t += counts[s+k];
+      segs.push({ s: s, t: t });
+    }
+    segs.sort(function(a, b){ return b.t - a.t; });
+    var chosen = [], used = {};
+    for (var si = 0; si < segs.length && chosen.length < 2; si++) {
+      var cs = segs[si].s, overlap = false;
+      for (var k2 = 0; k2 < 5; k2++) if (used[cs+k2]) overlap = true;
+      if (overlap) continue;
+      chosen.push(cs);
+      for (var k3 = 0; k3 < 5; k3++) used[cs+k3] = true;
+    }
+    var out = [];
+    for (var ci = 0; ci < chosen.length; ci++)
+      for (var k4 = 0; k4 < 5; k4++) out.push(chosen[ci]+k4);
+    // 모자라면 자유 채움
+    if (out.length < 10) {
+      var idx2 = [];
+      for (var n2 = 1; n2 <= 100; n2++) if (out.indexOf(n2) < 0) idx2.push(n2);
+      idx2.sort(function(a, b){ return counts[b]-counts[a]; });
+      for (var f = 0; out.length < 10 && f < idx2.length; f++) out.push(idx2[f]);
+    }
+    chosen.sort(function(a,b){return a-b;});
+    var segLabels = chosen.map(function(s){ return s + '~' + (s+4); });
+    return { picks: out.sort(function(a,b){return a-b;}), label: segLabels.join(' + '),
+             segments: chosen.map(function(s){ return [s, s+4]; }), strategy: 'two_seg' };
+  }
+  // consecutive (기본): 연속 10칸 베스트
+  var bs = 1, bt = -1;
+  for (var s2 = 1; s2 <= 91; s2++) {
+    var t2 = 0;
+    for (var k5 = 0; k5 < 10; k5++) t2 += counts[s2+k5];
+    if (t2 > bt) { bt = t2; bs = s2; }
+  }
+  var cpicks = [];
+  for (var p = bs; p < bs+10; p++) cpicks.push(p);
+  return { picks: cpicks, label: bs + ' ~ ' + (bs+9), segments: [[bs, bs+9]], strategy: 'consecutive' };
+}
+
+// 🌊 핫 구간 (Sliding Window + EWMA decay) — 흐름 카드용 (consecutive 유지)
 function _slidingHotRange(rounds, window, weights, decay) {
   weights = weights || [1, 1, 1];
   if (decay == null) decay = 1.0;
@@ -1938,11 +2017,11 @@ function analyzeFlow(rows) {
 // 게임별 백테스트 적중률 (v8.1 = Sliding TOP1, 2026-05-22 측정)
 //   BETTING_STATS      = 1·2·3등 가중합 sliding TOP1 (베팅 카드)
 //   FLOW_FIRST_STATS  = 1등만 sliding TOP1 (흐름 카드)
-// v12 OOS walk-forward (최근 50회 평가, 2026-05-23, data n_basic=196)
+// v13 OOS 강건성 검증 (40/60/80/100 구간 평균 1등 적중률, 2026, n_basic=196)
 var BETTING_STATS = {
-  basic:   { p1: 14.0, p2: 12.0, p3: 14.0, p12: 26.0, pany: 40.0 },  // W25 (3:1:1)
-  premium: { p1: 10.0, p2: 10.0, p3: 30.0, p12: 20.0, pany: 50.0 },  // W8 (1:1:1)
-  food:    { p1: 14.0, p2:  8.0, p3: 18.0, p12: 22.0, pany: 36.0 }   // W35 (3:1:1) d=0.97
+  basic:   { p1: 16.9, p2: 12.0, p3: 14.0, p12: 26.0, pany: 33.0 },  // 분할5+5 W40
+  premium: { p1: 30.0, p2: 10.0, p3: 20.0, p12: 35.0, pany: 50.0 },  // 자유TOP10 W8
+  food:    { p1: 20.0, p2:  8.0, p3: 12.0, p12: 24.0, pany: 30.0 }   // 자유TOP10 W15 d0.97
 };
 // FLOW_FIRST_STATS v10.7 — 다음 흐름 마르코프 예측 OOS walk-forward 적중률 (2026-05-23)
 var FLOW_FIRST_STATS = {
@@ -1951,11 +2030,12 @@ var FLOW_FIRST_STATS = {
   food:    { p1:  8.8, p2:  8.8, p3: 11.8, pany: 26.5 }   // OOS n=34
 };
 
-// 게임별 알고리즘 설정 — v12 OOS 그리드 서치 baseline (자동학습으로 갱신됨)
+// 게임별 알고리즘 설정 — v13 OOS 강건성 검증 (여러 구간 평균 1등 적중률 최대)
+// strategy: 'consecutive'(연속10) | 'free'(자유TOP10) | 'two_seg'(분할5+5)
 var ALGO_CONFIG = {
-  basic:   { window: 25, weights: [3,1,1], decay: 1.0,  auto: false },
-  premium: { window:  8, weights: [1,1,1], decay: 1.0,  auto: false },
-  food:    { window: 35, weights: [3,1,1], decay: 0.97, auto: false }
+  basic:   { window: 40, weights: [3,1,1], decay: 1.0,  strategy: 'two_seg', auto: false },
+  premium: { window:  8, weights: [2,1,1], decay: 1.0,  strategy: 'free',    auto: false },
+  food:    { window: 15, weights: [3,1,1], decay: 0.97, strategy: 'free',    auto: false }
 };
 
 // 🔁 다음 흐름 예측 — 직전 1등이 속한 시퀀스의 과거 사례에서 다음 회차 1등이 어디로 갔는지
@@ -2127,17 +2207,21 @@ function autoLearnAlgo(rows, evalLastN, startSafety) {
 // 자동 학습 v10.2 — OOS walk-forward 검증으로 baseline 못 넘으면 baseline 유지
 // 솔직한 평가: 매 회차 i 시점에 i까지로 학습한 알고리즘이 i회차 적중하는지
 // 평가창 = 최근 40회 OOS, baseline = W=20 (1,1,1) 정적
-function _evaluateAlgoOOS(sorted, window, weights, evalLastN, decay) {
+function _evaluateAlgoOOS(sorted, window, weights, evalLastN, decay, strategy) {
   if (decay == null) decay = 1.0;
+  strategy = strategy || 'consecutive';
   var startIdx = Math.max(30, sorted.length - evalLastN);
   var h1 = 0, any = 0, hitsTotal = 0, tot = 0;
+  var cfg = { window: window, weights: weights, decay: decay, strategy: strategy };
   for (var i = startIdx; i < sorted.length; i++) {
-    var hr = _slidingHotRange(sorted.slice(0, i), window, weights, decay);
-    if (!hr || !hr.top || !hr.top[0]) continue;
-    var t = hr.top[0], r = sorted[i];
-    var ha = (r.first  >= t.start && r.first  <= t.end);
-    var hb = (r.second >= t.start && r.second <= t.end);
-    var hc = (r.third  >= t.start && r.third  <= t.end);
+    var rec = _recommend(sorted.slice(0, i), cfg);
+    if (!rec || !rec.picks || rec.picks.length === 0) continue;
+    var pset = {};
+    for (var p = 0; p < rec.picks.length; p++) pset[rec.picks[p]] = true;
+    var r = sorted[i];
+    var ha = !!pset[r.first];
+    var hb = !!pset[r.second];
+    var hc = !!pset[r.third];
     if (ha) h1++;
     if (ha || hb || hc) any++;
     hitsTotal += (ha?1:0) + (hb?1:0) + (hc?1:0);
@@ -2145,64 +2229,74 @@ function _evaluateAlgoOOS(sorted, window, weights, evalLastN, decay) {
   }
   if (tot === 0) return null;
   return {
-    window: window, weights: weights, decay: decay,
+    window: window, weights: weights, decay: decay, strategy: strategy,
     hit1: h1, hitAny: any, hitsTotal: hitsTotal, total: tot,
-    score: (h1 * 2 + any) / tot + hitsTotal / (tot * 3) * 0.5
+    // 1등 적중률 최우선 (×3), 통합 보조
+    score: (h1 * 3 + any) / tot + hitsTotal / (tot * 3) * 0.3
   };
 }
 
 function runAutoLearn() {
   var rows = (typeof data !== 'undefined') ? data[currentTab] : [];
-  // 게임별 v12 baseline (OOS 그리드 서치로 선정)
-  var V12_BASE = {
-    basic:   { window: 25, weights: [3,1,1], decay: 1.0 },
-    premium: { window:  8, weights: [1,1,1], decay: 1.0 },
-    food:    { window: 35, weights: [3,1,1], decay: 0.97 }
+  // 게임별 v13 baseline (OOS 강건성 검증 — 여러 구간 평균)
+  var V13_BASE = {
+    basic:   { window: 40, weights: [3,1,1], decay: 1.0,  strategy: 'two_seg' },
+    premium: { window:  8, weights: [2,1,1], decay: 1.0,  strategy: 'free' },
+    food:    { window: 15, weights: [3,1,1], decay: 0.97, strategy: 'free' }
   };
-  var bg = V12_BASE[currentTab] || V12_BASE.basic;
+  var bg = V13_BASE[currentTab] || V13_BASE.basic;
   if (!rows || rows.length < 60) {
-    ALGO_CONFIG[currentTab] = { window: bg.window, weights: bg.weights, decay: bg.decay, auto: false };
+    ALGO_CONFIG[currentTab] = { window: bg.window, weights: bg.weights, decay: bg.decay, strategy: bg.strategy, auto: false };
     return;
   }
   var sorted = rows.slice().sort(function(a,b){return a.round-b.round;});
 
-  // v12 baseline 자체를 OOS 평가
-  var baselineEval = _evaluateAlgoOOS(sorted, bg.window, bg.weights, 50, bg.decay);
+  // 여러 구간 평균 OOS 평가 (강건성) — 40/60/80
+  function avgEval(window, weights, decay, strategy) {
+    var evs = [40, 60, 80].map(function(en){
+      return _evaluateAlgoOOS(sorted, window, weights, en, decay, strategy);
+    }).filter(Boolean);
+    if (evs.length === 0) return null;
+    var s = 0, h1 = 0, any = 0, tot = 0;
+    for (var k = 0; k < evs.length; k++) { s += evs[k].score; h1 += evs[k].hit1; any += evs[k].hitAny; tot += evs[k].total; }
+    return { window: window, weights: weights, decay: decay, strategy: strategy,
+             score: s/evs.length, hit1: h1, hitAny: any, total: tot,
+             pct1: h1/tot, pctAny: any/tot };
+  }
 
-  // 확장 그리드 OOS 검증 (window × weights × decay)
+  var baselineEval = avgEval(bg.window, bg.weights, bg.decay, bg.strategy);
+
+  // 확장 그리드: strategy × window × weights × decay
+  var strategies = ['consecutive', 'free', 'two_seg'];
   var windows = [10, 15, 20, 25, 30, 35, 40];
-  var weightSets = [[1,1,1], [2,1,1], [3,1,1], [3,2,1], [4,2,1], [5,3,1], [2,2,1]];
-  var decays = [1.0, 0.97, 0.95, 0.92, 0.90];
+  var weightSets = [[1,1,1], [2,1,1], [3,1,1], [3,2,1], [4,2,1], [5,3,1]];
+  var decays = [1.0, 0.97, 0.95, 0.92];
   var bestCand = null;
-  for (var wi = 0; wi < windows.length; wi++) {
-    for (var ti = 0; ti < weightSets.length; ti++) {
-      for (var di = 0; di < decays.length; di++) {
-        var ev = _evaluateAlgoOOS(sorted, windows[wi], weightSets[ti], 50, decays[di]);
-        if (!ev) continue;
-        if (!bestCand || ev.score > bestCand.score) bestCand = ev;
+  for (var si = 0; si < strategies.length; si++) {
+    for (var wi = 0; wi < windows.length; wi++) {
+      for (var ti = 0; ti < weightSets.length; ti++) {
+        for (var di = 0; di < decays.length; di++) {
+          var ev = avgEval(windows[wi], weightSets[ti], decays[di], strategies[si]);
+          if (!ev) continue;
+          if (!bestCand || ev.score > bestCand.score) bestCand = ev;
+        }
       }
     }
   }
 
-  // baseline 대비 점수 +0.05 이상 좋아야 채택 (작은 차이는 baseline 유지)
+  // baseline 대비 +0.05 이상이어야 채택
   var THRESHOLD = 0.05;
   if (bestCand && baselineEval && (bestCand.score - baselineEval.score) >= THRESHOLD) {
     ALGO_CONFIG[currentTab] = {
-      window: bestCand.window,
-      weights: bestCand.weights,
-      decay: bestCand.decay,
-      auto: true,
+      window: bestCand.window, weights: bestCand.weights, decay: bestCand.decay,
+      strategy: bestCand.strategy, auto: true,
       learnedAt: new Date().toISOString(),
-      lastEval: bestCand,
-      baselineEval: baselineEval
+      lastEval: bestCand, baselineEval: baselineEval
     };
   } else {
-    // baseline 유지
     ALGO_CONFIG[currentTab] = {
-      window: bg.window, weights: bg.weights, decay: bg.decay,
-      auto: false,
-      lastEval: baselineEval,
-      note: 'v12 baseline 유지'
+      window: bg.window, weights: bg.weights, decay: bg.decay, strategy: bg.strategy,
+      auto: false, lastEval: baselineEval, note: 'v13 baseline 유지'
     };
   }
 }
@@ -2364,7 +2458,7 @@ function _predictEnsemble(rounds, cfg) {
   return top;
 }
 
-// 🎯 베팅 추천 분석 (v7: Sliding TOP1 시퀀스 = 자연 연속 10개 + 1·2·3등 합산)
+// 🎯 베팅 추천 분석 (v13: 게임별 최적 전략 — consecutive/free/two_seg)
 function analyzeBetting(rows) {
   var stats = BETTING_STATS[currentTab] || BETTING_STATS.basic;
   if (!rows || rows.length < 1) {
@@ -2372,35 +2466,37 @@ function analyzeBetting(rows) {
   }
   var sorted = rows.slice().sort(function(a, b){ return a.round - b.round; });
   var cfg = ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic;
-  var hr = _slidingHotRange(sorted, cfg.window, cfg.weights, cfg.decay || 1.0);
-  if (!hr || !hr.top || !hr.top[0]) {
+  var rec = _recommend(sorted, cfg);
+  if (!rec || !rec.picks || rec.picks.length === 0) {
     return { picked: [], dup2: [], windowSize: 0, stats: stats, algoLabel: '', sequence: null };
   }
-  var top1 = hr.top[0];
   var dup2 = [];
-  for (var n = top1.start; n <= top1.end; n++) {
-    // 각 번호의 1·2·3등 출현 카운트 (window 안)
+  for (var pi = 0; pi < rec.picks.length; pi++) {
+    var n = rec.picks[pi];
     var cnts = _numberRankCounts(sorted, n, cfg.window);
     var raw = cnts.c1 + cnts.c2 + cnts.c3;
-    var kind = 'mix';
-    if (raw >= 2) kind = 'hot';
     dup2.push({
       number: n,
       count: raw,
       c1: cnts.c1, c2: cnts.c2, c3: cnts.c3,
-      kind: kind
+      kind: raw >= 2 ? 'hot' : 'mix'
     });
   }
-  // 1·2·3등 혼합 흐름 (베팅 카드 안에 표시)
+  var winSize = (rows.length >= cfg.window ? cfg.window : rows.length);
+  var stratLabel = {
+    'consecutive': '연속 10칸',
+    'free': '자유 TOP10',
+    'two_seg': '분할 5+5'
+  }[cfg.strategy || 'consecutive'];
   var combinedFlow = _flowSequenceCombined(sorted);
   return {
     picked: dup2,
     dup2: dup2,
-    sequence: { start: top1.start, end: top1.end, pct: top1.pct, hits: top1.hits, totalHits: hr.totalHits, windowSize: hr.windowSize },
-    windowSize: hr.windowSize,
+    sequence: { label: rec.label, segments: rec.segments, strategy: rec.strategy, windowSize: winSize },
+    windowSize: winSize,
     stats: stats,
     combinedFlow: combinedFlow,
-    algoLabel: '핫 시퀀스 W' + cfg.window + ' (1·2·3등 가중합 ' + cfg.weights.join(':') + ')'
+    algoLabel: stratLabel + ' · W' + cfg.window + ' (' + cfg.weights.join(':') + (cfg.decay && cfg.decay < 1 ? ' d=' + cfg.decay : '') + ')'
   };
 }
 function analyzeBettingBacktest(rows) {
@@ -2553,15 +2649,20 @@ function render() {
     document.getElementById('betting-info').innerHTML =
       '최근 ' + betting.windowSize + '회 분석 · <strong>' + betting.algoLabel + '</strong>' + autoBadge + learnInfo;
 
-    // ⭐ 메인 추천 시퀀스 박스 (sliding TOP1)
+    // ⭐ 메인 추천 박스 (전략별: 연속/자유/분할)
     var seqMain = document.getElementById('betting-sequence-main');
     if (betting.sequence) {
       var sq = betting.sequence;
-      var pct = Math.round(sq.pct * 100);
+      var labelTxt = {
+        'consecutive': '⭐ 최고 시퀀스 (10개 연속)',
+        'free': '⭐ 자유 추천 (1등 적중률 최적)',
+        'two_seg': '⭐ 분할 추천 (2구간 × 5개)'
+      }[sq.strategy] || '⭐ 추천';
+      var rangeTxt = sq.strategy === 'free' ? '아래 10개 번호' : sq.label;
       seqMain.innerHTML = '<div class="seq-main-card">' +
-        '<div class="seq-main-label">⭐ 최고 시퀀스 (10개 연속)</div>' +
-        '<div class="seq-main-range">' + sq.start + ' ~ ' + sq.end + '</div>' +
-        '<div class="seq-main-sub">최근 ' + sq.windowSize + '회 1·2·3등 ' + sq.totalHits + '개 중 ' + sq.hits + '개 (' + pct + '%) 집중</div>' +
+        '<div class="seq-main-label">' + labelTxt + '</div>' +
+        '<div class="seq-main-range">' + rangeTxt + '</div>' +
+        '<div class="seq-main-sub">최근 ' + sq.windowSize + '회 분석 · OOS 1등 적중률 최적화</div>' +
         '</div>';
     } else {
       seqMain.innerHTML = '';

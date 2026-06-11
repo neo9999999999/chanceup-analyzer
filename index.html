@@ -2281,8 +2281,9 @@ function runAutoLearn() {
     return;
   }
   var sorted = rows.slice().sort(function(a,b){return a.round-b.round;});
+  var N = sorted.length;
 
-  // 여러 구간 평균 OOS 평가 (강건성) — 40/60/80
+  // 여러 구간 평균 OOS 평가 (강건성) — 40/60/80 (표시·참고용)
   function avgEval(window, weights, decay, strategy) {
     var evs = [40, 60, 80].map(function(en){
       return _evaluateAlgoOOS(sorted, window, weights, en, decay, strategy);
@@ -2295,41 +2296,97 @@ function runAutoLearn() {
              pct1: h1/tot, pctAny: any/tot };
   }
 
-  var baselineEval = avgEval(bg.window, bg.weights, bg.decay, bg.strategy);
-
-  // 확장 그리드: strategy × window × weights × decay
-  var strategies = ['consecutive', 'free', 'two_seg', 'two_seg_echo'];
-  var windows = [10, 15, 20, 25, 30, 35, 40];
-  var weightSets = [[1,1,1], [2,1,1], [3,1,1], [3,2,1], [4,2,1], [5,3,1]];
-  var decays = [1.0, 0.97, 0.95, 0.92];
-  var bestCand = null;
-  for (var si = 0; si < strategies.length; si++) {
-    for (var wi = 0; wi < windows.length; wi++) {
-      for (var ti = 0; ti < weightSets.length; ti++) {
-        for (var di = 0; di < decays.length; di++) {
-          var ev = avgEval(windows[wi], weightSets[ti], decays[di], strategies[si]);
-          if (!ev) continue;
-          if (!bestCand || ev.score > bestCand.score) bestCand = ev;
-        }
-      }
+  // ── v16: 중첩 OOS (nested walk-forward) ──
+  // 특정 cfg를 [from,to) 회차 구간에서 평가. 각 i회차는 직전 데이터만 사용 (진짜 OOS).
+  function oosRange(cfg, from, to) {
+    var h1 = 0, any = 0, tot = 0;
+    for (var i = from; i < to; i++) {
+      if (i < cfg.window) continue;
+      var rec = _recommend(sorted.slice(0, i), cfg);
+      if (!rec || !rec.picks || !rec.picks.length) continue;
+      var pset = {}; for (var p = 0; p < rec.picks.length; p++) pset[rec.picks[p]] = true;
+      var r = sorted[i], ha = !!pset[r.first], hb = !!pset[r.second], hc = !!pset[r.third];
+      if (ha) h1++; if (ha || hb || hc) any++; tot++;
     }
+    return tot ? { h1: h1, any: any, tot: tot, p1: h1/tot, pany: any/tot } : null;
   }
 
-  // baseline 대비 +0.05 이상이어야 채택
-  var THRESHOLD = 0.05;
-  if (bestCand && baselineEval && (bestCand.score - baselineEval.score) >= THRESHOLD) {
+  // 타임라인 분리: 최근 HOLD회는 '검증 tail'로 격리(선택에 사용 X) → 일반화 검증
+  var HOLD = Math.min(30, Math.floor(N / 3));
+  var selEnd = N - HOLD;                          // 선택 구간 끝
+  var selFrom = Math.max(40, selEnd - 60);        // 선택 구간 = 직전 60회 OOS
+
+  var baseSel  = oosRange(bg, selFrom, selEnd);
+  var baseHold = oosRange(bg, selEnd, N);
+  var baselineEval = avgEval(bg.window, bg.weights, bg.decay, bg.strategy);
+
+  // 확장 그리드 (basic은 echo 포함, 전 게임 공통)
+  var strategies = ['free', 'two_seg', 'two_seg_echo'];
+  var windows = [20, 25, 30, 35, 40, 60];
+  var weightSets = [[1,1,1], [2,1,1], [3,1,1], [3,2,1], [4,2,1]];
+  var decays = [1.0, 0.97, 0.95];
+  var champ = null;  // 선택 구간 최고 (검증 tail은 안 봄)
+  for (var si = 0; si < strategies.length; si++)
+   for (var wi = 0; wi < windows.length; wi++)
+    for (var ti = 0; ti < weightSets.length; ti++)
+     for (var di = 0; di < decays.length; di++) {
+       var cfg = { window: windows[wi], weights: weightSets[ti], decay: decays[di], strategy: strategies[si] };
+       var sel = oosRange(cfg, selFrom, selEnd);
+       if (!sel) continue;
+       var score = sel.p1 * 3 + sel.pany;   // 1등 적중률 최우선
+       if (!champ || score > champ.score) champ = { cfg: cfg, sel: sel, score: score };
+     }
+
+  // 채택 조건: 챔피언이 (a)선택구간에서 baseline 이상  AND  (b)미검증 tail에서 baseline 능가
+  //  → 둘 다 만족해야 일반화로 인정. 과적합(선택만 좋고 tail 폭락) 자동 배제.
+  var EPS = 0.0001, adopted = false, champHold = null;
+  if (champ) {
+    champHold = oosRange(champ.cfg, selEnd, N);
+    var baseSelScore = baseSel ? (baseSel.p1 * 3 + baseSel.pany) : 0;
+    var beatsSel  = champ.score >= baseSelScore - EPS;
+    var beatsHold = champHold && baseHold && (
+        champHold.p1 > baseHold.p1 + EPS ||
+        (Math.abs(champHold.p1 - baseHold.p1) <= EPS && champHold.pany > baseHold.pany + EPS));
+    adopted = beatsSel && beatsHold;
+  }
+
+  if (adopted) {
     ALGO_CONFIG[currentTab] = {
-      window: bestCand.window, weights: bestCand.weights, decay: bestCand.decay,
-      strategy: bestCand.strategy, auto: true,
-      learnedAt: new Date().toISOString(),
-      lastEval: bestCand, baselineEval: baselineEval
+      window: champ.cfg.window, weights: champ.cfg.weights, decay: champ.cfg.decay,
+      strategy: champ.cfg.strategy, auto: true, learnedAt: new Date().toISOString(),
+      lastEval: avgEval(champ.cfg.window, champ.cfg.weights, champ.cfg.decay, champ.cfg.strategy),
+      baselineEval: baselineEval,
+      nested: { hold: HOLD, champHold: champHold, baseHold: baseHold, champSel: champ.sel, baseSel: baseSel },
+      note: '검증 tail ' + HOLD + '회에서 baseline 능가 → 자동 채택'
     };
   } else {
     ALGO_CONFIG[currentTab] = {
       window: bg.window, weights: bg.weights, decay: bg.decay, strategy: bg.strategy,
-      auto: false, lastEval: baselineEval, note: 'v15 baseline 유지'
+      auto: false, lastEval: baselineEval, baselineEval: baselineEval,
+      nested: { hold: HOLD, champHold: champHold, baseHold: baseHold,
+                champCfg: champ ? champ.cfg : null, champSel: champ ? champ.sel : null, baseSel: baseSel },
+      note: 'v15 baseline 유지 (검증 tail에서 우위 미달 = 과적합 방지)'
     };
   }
+
+  // ── 학습 진화 로그: 새 회차가 쌓일 때마다 1건 기록 (localStorage 누적) ──
+  try {
+    var maxR = sorted[N - 1].round;
+    var logKey = 'chanceup_learnlog_' + currentTab;
+    var log = JSON.parse(localStorage.getItem(logKey) || '[]');
+    if (!log.length || log[log.length - 1].round !== maxR) {
+      var c = ALGO_CONFIG[currentTab];
+      log.push({
+        round: maxR, at: new Date().toISOString(), adopted: !!c.auto,
+        cfg: { window: c.window, weights: c.weights, decay: c.decay, strategy: c.strategy },
+        champHold: champHold ? { p1: +(champHold.p1*100).toFixed(1), pany: +(champHold.pany*100).toFixed(1) } : null,
+        baseHold:  baseHold  ? { p1: +(baseHold.p1*100).toFixed(1),  pany: +(baseHold.pany*100).toFixed(1) }  : null
+      });
+      if (log.length > 60) log = log.slice(-60);
+      localStorage.setItem(logKey, JSON.stringify(log));
+    }
+    window.__learnLog = log;
+  } catch (e) { /* localStorage 불가 시 무시 */ }
 }
 
 // 핫 점수: 최근 N회 1·2·3등 가중치 합 (decay 시간 감쇠)
@@ -2665,8 +2722,8 @@ function render() {
       '🎯 ' + nextRound + '회 베팅 추천';
     var cfgNow = ALGO_CONFIG[currentTab];
     var autoBadge = (cfgNow && cfgNow.auto)
-      ? ' <span style="color:#34d399;font-weight:700;">🤖 자동학습 채택</span>'
-      : ' <span style="color:var(--text-dim);">📌 baseline 유지</span>';
+      ? ' <span style="color:#34d399;font-weight:700;">🤖 자가보정 채택</span>'
+      : ' <span style="color:var(--text-dim);">📌 v15 유지</span>';
     var learnInfo = '';
     if (cfgNow && cfgNow.lastEval) {
       var le = cfgNow.lastEval;
@@ -2675,7 +2732,20 @@ function render() {
       learnInfo = '<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">' +
         '<strong>OOS walk-forward 최근 ' + le.total + '회 검증</strong>: ' +
         '1등 ' + le.hit1 + '/' + le.total + ' (' + pct1 + '%) · 통합 ' + le.hitAny + '/' + le.total + ' (' + pctAny + '%)';
+      // 중첩 OOS(검증 tail) 비교 — 과적합 방지 근거 표시
+      if (cfgNow.nested && cfgNow.nested.champHold && cfgNow.nested.baseHold) {
+        var nh = cfgNow.nested, ch = nh.champHold, bh = nh.baseHold;
+        learnInfo += '<br><span style="color:#fbbf24;">🔁 중첩검증(미검증 ' + nh.hold + '회 tail)</span>: ' +
+          'baseline 1등 ' + (bh.p1*100).toFixed(0) + '%' +
+          (ch ? ' vs 후보 1등 ' + (ch.p1*100).toFixed(0) + '%' : '');
+      }
       if (cfgNow.note) learnInfo += '<br>ℹ️ ' + cfgNow.note;
+      // 학습 진화 이력 (최근 변화)
+      if (window.__learnLog && window.__learnLog.length >= 2) {
+        var lg = window.__learnLog, switches = 0;
+        for (var li = 1; li < lg.length; li++) if (lg[li].adopted !== lg[li-1].adopted) switches++;
+        learnInfo += '<br>📚 자가보정 이력 ' + lg.length + '회차 누적 · 전략 전환 ' + switches + '회';
+      }
       learnInfo += '</div>';
     }
     document.getElementById('betting-info').innerHTML =

@@ -1489,6 +1489,20 @@ var currentTab = 'basic';
 var data = { basic: [], premium: [], food: [] };
 
 // ============ 저장/로드 ============
+// 두 데이터 배열 합집합 (회차 기준 dedupe). preferA=true면 같은 회차에서 A 우선.
+// 데이터 손실 방지 핵심: 어느 한쪽도 버리지 않고 회차 union → 회차 많은 쪽 자동 보존.
+function unionRounds(a, b, preferA) {
+  var byRound = {};
+  var src1 = preferA ? (b || []) : (a || []);
+  var src2 = preferA ? (a || []) : (b || []);
+  for (var i = 0; i < src1.length; i++) if (src1[i] && src1[i].round != null) byRound[src1[i].round] = src1[i];
+  for (var j = 0; j < src2.length; j++) if (src2[j] && src2[j].round != null) byRound[src2[j].round] = src2[j];
+  var merged = [];
+  for (var k in byRound) merged.push(byRound[k]);
+  merged.sort(function (x, y) { return x.round - y.round; });
+  return merged;
+}
+
 // INITIAL 데이터와 localStorage 데이터를 병합 (회차 기준 dedupe)
 // localStorage에 같은 회차가 있으면 그걸 우선 사용 (사용자 수정값 보존)
 function mergeWithInitial(localArr, initialArr) {
@@ -3264,16 +3278,23 @@ async function init() {
   if (initSupabase()) {
     var remote = await loadFromSupabase();
     if (remote) {
-      // 원격 데이터가 있으면 로컬보다 우선 (마지막 저장이 ground truth)
-      if (Array.isArray(remote.basic)) data.basic = remote.basic;
-      if (Array.isArray(remote.premium)) data.premium = remote.premium;
-      if (Array.isArray(remote.food)) data.food = remote.food;
-      // 로컬에도 백업
+      // ★ 데이터 손실 방지: 원격 무조건 덮어쓰기 → 로컬·원격 합집합(union)으로 변경.
+      // 어느 한쪽도 버리지 않음 → 회차 많은 쪽 자동 보존. 동기화 충돌로 인한 롤백 방지.
+      var beforeLen = data.basic.length + data.premium.length + data.food.length;
+      data.basic   = unionRounds(data.basic,   Array.isArray(remote.basic)   ? remote.basic   : [], true);
+      data.premium = unionRounds(data.premium, Array.isArray(remote.premium) ? remote.premium : [], true);
+      data.food    = unionRounds(data.food,    Array.isArray(remote.food)    ? remote.food    : [], true);
+      var afterLen = data.basic.length + data.premium.length + data.food.length;
       try {
         localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));
         localStorage.setItem(STORAGE_KEY_PREMIUM, JSON.stringify(data.premium));
         localStorage.setItem(STORAGE_KEY_FOOD, JSON.stringify(data.food));
       } catch (e) {}
+      // 합집합 결과가 원격보다 회차가 많으면(=로컬에 더 최신 데이터) 원격도 복구 저장
+      var remoteLen = (remote.basic||[]).length + (remote.premium||[]).length + (remote.food||[]).length;
+      if (afterLen > remoteLen) {
+        await saveToSupabase();
+      }
       render();
     } else {
       // 원격에 데이터 없으면 로컬 데이터로 첫 동기화

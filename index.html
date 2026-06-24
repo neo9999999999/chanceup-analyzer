@@ -1435,6 +1435,21 @@ async function saveToSupabase() {
   if (!supabaseReady) return false;
   try {
     setSyncStatus('syncing', '저장 중...');
+    // ★ 데이터 손실 방지 (read-merge-write): 저장 직전 클라우드 최신본을 다시 읽어
+    //   union 합친 뒤 저장 → 다른 기기/계정이 올린 데이터를 절대 덮어쓰지 않음.
+    try {
+      var latest = await loadFromSupabase();
+      if (latest) {
+        data.basic   = unionRounds(data.basic,   Array.isArray(latest.basic)   ? latest.basic   : [], true);
+        data.premium = unionRounds(data.premium, Array.isArray(latest.premium) ? latest.premium : [], true);
+        data.food    = unionRounds(data.food,    Array.isArray(latest.food)    ? latest.food    : [], true);
+        try {
+          localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));
+          localStorage.setItem(STORAGE_KEY_PREMIUM, JSON.stringify(data.premium));
+          localStorage.setItem(STORAGE_KEY_FOOD, JSON.stringify(data.food));
+        } catch (e) {}
+      }
+    } catch (e) { /* 클라우드 못 읽으면 로컬 그대로 저장 (오프라인 대비) */ }
     var payload = {
       basic: data.basic,
       premium: data.premium,

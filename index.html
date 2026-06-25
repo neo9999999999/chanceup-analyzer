@@ -1230,6 +1230,7 @@ tr.topfreq-rank-top3 .col-num {
 
   <div class="footer">
     <div class="footer-actions">
+      <button class="footer-btn" id="btn-refresh">🔄 새로고침(클라우드 동기화)</button>
       <button class="footer-btn" id="btn-export">📤 백업</button>
       <button class="footer-btn" id="btn-import">📥 복원</button>
       <input type="file" id="file-input" accept="application/json" style="display:none;">
@@ -3189,6 +3190,8 @@ function handleAdd() {
   }
 
   saveData();
+  // ★ 추가할 때마다 즉시 클라우드 저장 (debounce 안 기다리고 바로, read-merge-write로 안전)
+  if (supabaseReady) { saveToSupabase(); }
   render();
 
   // 입력 비우기 + 다음 회차 자동 채움
@@ -3279,6 +3282,38 @@ function handleImport(e) {
 }
 
 // ============ 초기화 ============
+// 🔄 수동 새로고침: 로컬 히스토리 복구 + 클라우드 양방향 동기화 후 화면 갱신
+async function manualRefresh() {
+  try {
+    setSyncStatus('syncing', '동기화 중...');
+    loadData();
+    recoverFromRecHistory();   // 로컬 추천 히스토리 → 회차 복구
+    if (supabaseReady || initSupabase()) {
+      var remote = await loadFromSupabase();
+      if (remote) {
+        data.basic   = unionRounds(data.basic,   Array.isArray(remote.basic)   ? remote.basic   : [], true);
+        data.premium = unionRounds(data.premium, Array.isArray(remote.premium) ? remote.premium : [], true);
+        data.food    = unionRounds(data.food,    Array.isArray(remote.food)    ? remote.food    : [], true);
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));
+        localStorage.setItem(STORAGE_KEY_PREMIUM, JSON.stringify(data.premium));
+        localStorage.setItem(STORAGE_KEY_FOOD, JSON.stringify(data.food));
+      } catch (e) {}
+      await saveToSupabase();  // 합친 결과를 클라우드에 (read-merge-write로 안전)
+    }
+    render();
+    fillNextRound();
+    var maxR = 0;
+    for (var i = 0; i < data[currentTab].length; i++) if (data[currentTab][i].round > maxR) maxR = data[currentTab][i].round;
+    setSyncStatus('synced', '최신 ' + maxR + '회 · 동기화 완료');
+    alert('동기화 완료!\n기본 ' + data.basic.length + '회 / 프리미엄 ' + data.premium.length + '회 / 푸드 ' + data.food.length + '회');
+  } catch (e) {
+    setSyncStatus('error', '동기화 실패');
+    alert('동기화 실패: ' + (e.message || e));
+  }
+}
+
 async function init() {
   // 일단 localStorage에서 로드 (즉시 렌더)
   loadData();
@@ -3301,6 +3336,9 @@ async function init() {
 
   document.getElementById('btn-add').addEventListener('click', handleAdd);
 
+  // 새로고침(클라우드 동기화)
+  var btnRefresh = document.getElementById('btn-refresh');
+  if (btnRefresh) btnRefresh.addEventListener('click', manualRefresh);
   // 백업/복원
   document.getElementById('btn-export').addEventListener('click', handleExport);
   document.getElementById('btn-import').addEventListener('click', function () {

@@ -3261,18 +3261,20 @@ function handleImport(e) {
         alert('잘못된 백업 파일입니다');
         return;
       }
-      var msg = '복원하면 현재 데이터가 덮어써집니다.\n계속할까요?\n\n';
+      var msg = '복원 파일을 현재 데이터와 합칩니다 (덮어쓰기 X, 회차 합집합).\n계속할까요?\n\n';
       if (parsed.basic) msg += '기본: ' + parsed.basic.length + '회차\n';
       if (parsed.premium) msg += '프리미엄: ' + parsed.premium.length + '회차\n';
       if (parsed.food) msg += '푸드박스: ' + parsed.food.length + '회차';
       if (!confirm(msg)) return;
 
-      if (parsed.basic) data.basic = parsed.basic;
-      if (parsed.premium) data.premium = parsed.premium;
-      if (parsed.food) data.food = parsed.food;
+      // ★ 덮어쓰기 X → union 합치기 (기존 회차 보존)
+      if (parsed.basic)   data.basic   = unionRounds(data.basic,   parsed.basic,   true);
+      if (parsed.premium) data.premium = unionRounds(data.premium, parsed.premium, true);
+      if (parsed.food)    data.food    = unionRounds(data.food,    parsed.food,    true);
       saveData();
+      if (supabaseReady) { saveToSupabase(); }
       render();
-      alert('복원 완료!');
+      alert('복원 완료! 기본 ' + data.basic.length + '회 / 프리미엄 ' + data.premium.length + '회 / 푸드 ' + data.food.length + '회');
     } catch (err) {
       alert('파일을 읽을 수 없습니다: ' + err.message);
     }

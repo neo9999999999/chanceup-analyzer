@@ -52,6 +52,23 @@ body {
   letter-spacing: -0.02em;
 }
 
+.header-refresh-btn {
+  display: block;
+  margin: 12px auto 0;
+  padding: 10px 20px;
+  background: var(--accent);
+  color: #1a1a1a;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: -0.01em;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  transition: opacity 0.15s, transform 0.1s;
+}
+.header-refresh-btn:active { transform: scale(0.97); opacity: 0.85; }
 .sync-status {
   display: inline-flex;
   align-items: center;
@@ -1155,6 +1172,7 @@ tr.topfreq-rank-top3 .col-num {
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
     </div>
+    <button class="header-refresh-btn" id="btn-refresh-top">🔄 새로고침 (클라우드 동기화)</button>
   </div>
 
   <div class="tabs">
@@ -3338,9 +3356,11 @@ async function init() {
 
   document.getElementById('btn-add').addEventListener('click', handleAdd);
 
-  // 새로고침(클라우드 동기화)
+  // 새로고침(클라우드 동기화) — 헤더 + 푸터 둘 다
   var btnRefresh = document.getElementById('btn-refresh');
   if (btnRefresh) btnRefresh.addEventListener('click', manualRefresh);
+  var btnRefreshTop = document.getElementById('btn-refresh-top');
+  if (btnRefreshTop) btnRefreshTop.addEventListener('click', manualRefresh);
   // 백업/복원
   document.getElementById('btn-export').addEventListener('click', handleExport);
   document.getElementById('btn-import').addEventListener('click', function () {

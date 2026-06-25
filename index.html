@@ -1518,6 +1518,34 @@ function unionRounds(a, b, preferA) {
   return merged;
 }
 
+// 🔧 추천 히스토리(실제 당첨번호 별도 저장)에서 회차 데이터 복구
+// 회차 데이터(chanceup_*_data_v1)가 동기화 사고로 유실돼도, 추천 히스토리엔
+// 등록 시점의 실제 1·2·3등이 남아있음 → 거기서 회차 데이터 복원.
+function recoverFromRecHistory() {
+  var games = [
+    { key: 'chanceup_rec_history_basic',   tab: 'basic' },
+    { key: 'chanceup_rec_history_premium', tab: 'premium' },
+    { key: 'chanceup_rec_history_food',    tab: 'food' }
+  ];
+  for (var g = 0; g < games.length; g++) {
+    try {
+      var hist = JSON.parse(localStorage.getItem(games[g].key) || '[]');
+      if (!hist.length) continue;
+      var recovered = [];
+      for (var i = 0; i < hist.length; i++) {
+        var h = hist[i];
+        if (h.round != null && h.actualFirst != null) {
+          recovered.push({ round: h.round, first: h.actualFirst, second: h.actualSecond, third: h.actualThird });
+        }
+      }
+      if (recovered.length) {
+        // 기존 회차 데이터에 union (회차 데이터 우선, 없는 회차만 히스토리에서 채움)
+        data[games[g].tab] = unionRounds(recovered, data[games[g].tab], true);
+      }
+    } catch (e) {}
+  }
+}
+
 // INITIAL 데이터와 localStorage 데이터를 병합 (회차 기준 dedupe)
 // localStorage에 같은 회차가 있으면 그걸 우선 사용 (사용자 수정값 보존)
 function mergeWithInitial(localArr, initialArr) {
@@ -3254,6 +3282,8 @@ function handleImport(e) {
 async function init() {
   // 일단 localStorage에서 로드 (즉시 렌더)
   loadData();
+  // 🔧 추천 히스토리에서 유실 회차 복구 (동기화 사고 대비)
+  recoverFromRecHistory();
 
   var tabs = document.querySelectorAll('.tab');
   for (var i = 0; i < tabs.length; i++) {

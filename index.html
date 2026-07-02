@@ -1525,12 +1525,18 @@ var data = { basic: [], premium: [], food: [] };
 // ============ 저장/로드 ============
 // 두 데이터 배열 합집합 (회차 기준 dedupe). preferA=true면 같은 회차에서 A 우선.
 // 데이터 손실 방지 핵심: 어느 한쪽도 버리지 않고 회차 union → 회차 많은 쪽 자동 보존.
+// 유효 회차 판정 — 오타로 잘못 등록된 비정상 회차(예: 10161025) 자동 제거
+function _validRound(x) {
+  if (!x || x.round == null) return false;
+  var r = x.round;
+  return r >= 1 && r <= 5000;  // 정상 회차 범위. 그 밖은 오타로 간주
+}
 function unionRounds(a, b, preferA) {
   var byRound = {};
   var src1 = preferA ? (b || []) : (a || []);
   var src2 = preferA ? (a || []) : (b || []);
-  for (var i = 0; i < src1.length; i++) if (src1[i] && src1[i].round != null) byRound[src1[i].round] = src1[i];
-  for (var j = 0; j < src2.length; j++) if (src2[j] && src2[j].round != null) byRound[src2[j].round] = src2[j];
+  for (var i = 0; i < src1.length; i++) if (_validRound(src1[i])) byRound[src1[i].round] = src1[i];
+  for (var j = 0; j < src2.length; j++) if (_validRound(src2[j])) byRound[src2[j].round] = src2[j];
   var merged = [];
   for (var k in byRound) merged.push(byRound[k]);
   merged.sort(function (x, y) { return x.round - y.round; });
@@ -1570,10 +1576,10 @@ function recoverFromRecHistory() {
 function mergeWithInitial(localArr, initialArr) {
   var byRound = {};
   for (var i = 0; i < initialArr.length; i++) {
-    byRound[initialArr[i].round] = initialArr[i];
+    if (_validRound(initialArr[i])) byRound[initialArr[i].round] = initialArr[i];
   }
   for (var j = 0; j < localArr.length; j++) {
-    byRound[localArr[j].round] = localArr[j];  // local이 우선
+    if (_validRound(localArr[j])) byRound[localArr[j].round] = localArr[j];  // local이 우선, 오타 회차 제외
   }
   var merged = [];
   for (var k in byRound) merged.push(byRound[k]);

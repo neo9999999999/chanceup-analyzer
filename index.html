@@ -2986,24 +2986,12 @@ function render() {
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 +
             '회 (최근 ' + pr.windowSize + '회)</span></span>';
     html += '</div>';
-    // 구간 주요수: 번호별 등수 출현 상세 (많이 나온 순)
-    var det = (pr.numbers || []).filter(function(d) { return d.n1 + d.n2 + d.n3 > 0; });
-    det.sort(function(a, b) {
+    // 추천 TOP 20 (우선순위 단일 리스트) — 분석은 백단, 앞단은 순위+번호만 (상세는 툴팁)
+    // 1~10위 = 예측 구간(구간 내 강도순) · 11~20위 = 실패 커버(빗나간 회차 당첨수, 전체 횟수순)
+    var bandOrder = (pr.numbers || []).slice().sort(function(a, b) {
       return (b.n1*2 + b.n2 + b.n3) - (a.n1*2 + a.n2 + a.n3) ||
              (b.n1 + b.n2 + b.n3) - (a.n1 + a.n2 + a.n3) || a.num - b.num;
     });
-    if (det.length > 0) {
-      var dHtml = '<span class="predict-numdetail-label">구간 주요수 · 최근 ' + pr.windowSize + '회 등수별 출현 (많이 나온 순)</span>';
-      for (var di = 0; di < det.length; di++) {
-        var d = det[di], parts = [];
-        if (d.n1) parts.push('<span class="rk-txt rk1-txt">1등 ' + d.n1 + '</span>');
-        if (d.n2) parts.push('<span class="rk-txt rk2-txt">2등 ' + d.n2 + '</span>');
-        if (d.n3) parts.push('<span class="rk-txt rk3-txt">3등 ' + d.n3 + '</span>');
-        dHtml += '<span class="predict-num-chip"><b class="predict-num">' + d.num + '</b>' + parts.join('<span class="predict-num-sep">·</span>') + '</span>';
-      }
-      html += '<div class="predict-numdetail">' + dHtml + '</div>';
-    }
-    // 추가 추천 12: 예측이 빗나간 회차(최근 100회)에 실제 나온 당첨수 — 등수별 집계 (밴드+인접 ±2 제외)
     var missDet = {};
     for (var mi = 0; mi < acc.recent.length; mi++) {
       var mr = acc.recent[mi];
@@ -3020,28 +3008,35 @@ function render() {
         missDet[mn].last = mr.round;
       }
     }
-    var bonus = Object.keys(missDet).map(Number);
-    // 전체 횟수 우선 → 최신 출현 → 번호순 (OOS: 1등우선 정렬은 전 지표 열세 — 1등 0/100)
-    bonus.sort(function(a, b) {
+    var cover = Object.keys(missDet).map(Number);
+    cover.sort(function(a, b) {
       var ta = missDet[a].c1 + missDet[a].c2 + missDet[a].c3;
       var tb = missDet[b].c1 + missDet[b].c2 + missDet[b].c3;
       return tb - ta || missDet[b].last - missDet[a].last || a - b;
     });
-    bonus = bonus.slice(0, 12);
-    if (bonus.length > 0) {
-      var bHtml = '<span class="predict-numdetail-label">추가 추천 12 — 예측이 빗나간 회차(최근 ' + acc.tot +
-                  '회 중)에 실제 나온 당첨수 · 전체 횟수순 (검증: 1등횟수 정렬보다 우수) · 구간 ' + pr.start + '~' + pr.end + ' 제외</span>';
-      for (var bj = 0; bj < bonus.length; bj++) {
-        var bd = missDet[bonus[bj]], bparts = [];
-        if (bd.c1) bparts.push('<span class="rk-txt rk1-txt">1등 ' + bd.c1 + '</span>');
-        if (bd.c2) bparts.push('<span class="rk-txt rk2-txt">2등 ' + bd.c2 + '</span>');
-        if (bd.c3) bparts.push('<span class="rk-txt rk3-txt">3등 ' + bd.c3 + '</span>');
-        bHtml += '<span class="predict-num-chip bonus-chip" title="마지막 출현 ' + bd.last + '회">' +
-                 '<span class="prio-rank">' + (bj + 1) + '</span>' +
-                 '<b class="predict-num">' + bonus[bj] + '</b>' + bparts.join('<span class="predict-num-sep">·</span>') + '</span>';
-      }
-      html += '<div class="predict-numdetail predict-bonus">' + bHtml + '</div>';
+    cover = cover.slice(0, 10);
+    var rank = 0;
+    var tHtml = '<span class="predict-numdetail-label">추천 TOP 20 — 위에서부터 예산만큼 구매 (금 1~10위 = 예측 구간 · 파랑 11~20위 = 실패 커버)</span>';
+    for (var bo = 0; bo < bandOrder.length; bo++) {
+      var bd0 = bandOrder[bo]; rank++;
+      var tp = [];
+      if (bd0.n1) tp.push('1등 ' + bd0.n1 + '회');
+      if (bd0.n2) tp.push('2등 ' + bd0.n2 + '회');
+      if (bd0.n3) tp.push('3등 ' + bd0.n3 + '회');
+      tHtml += '<span class="predict-num-chip" title="최근 ' + pr.windowSize + '회: ' + (tp.length ? tp.join(' · ') : '출현 없음') + '">' +
+               '<span class="prio-rank">' + rank + '</span><b class="predict-num">' + bd0.num + '</b></span>';
     }
+    for (var co = 0; co < cover.length; co++) {
+      var cd = missDet[cover[co]]; rank++;
+      var tp2 = [];
+      if (cd.c1) tp2.push('1등 ' + cd.c1 + '회');
+      if (cd.c2) tp2.push('2등 ' + cd.c2 + '회');
+      if (cd.c3) tp2.push('3등 ' + cd.c3 + '회');
+      tHtml += '<span class="predict-num-chip bonus-chip" title="예측 빗나간 회차: ' + tp2.join(' · ') + ' (마지막 ' + cd.last + '회)">' +
+               '<span class="prio-rank">' + rank + '</span><b class="predict-num">' + cover[co] + '</b></span>';
+    }
+    html += '<div class="predict-numdetail predict-top20">' + tHtml + '</div>';
+    // (추천 TOP 20으로 통합됨)
     // 판세: 현재 구간 유지 길이 + 2위 구간과 격차 (역전 시 예측 자동 교체)
     var starts = acc.recent.map(function(r){ return r.predStart; });
     starts.push(pr.start);

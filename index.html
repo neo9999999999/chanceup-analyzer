@@ -3021,16 +3021,16 @@ function render() {
       }
     }
     var bonus = Object.keys(missDet).map(Number);
-    // 1등 횟수 최우선 → 전체 횟수 → 최신 출현 → 번호순
+    // 전체 횟수 우선 → 최신 출현 → 번호순 (OOS: 1등우선 정렬은 전 지표 열세 — 1등 0/100)
     bonus.sort(function(a, b) {
       var ta = missDet[a].c1 + missDet[a].c2 + missDet[a].c3;
       var tb = missDet[b].c1 + missDet[b].c2 + missDet[b].c3;
-      return missDet[b].c1 - missDet[a].c1 || tb - ta || missDet[b].last - missDet[a].last || a - b;
+      return tb - ta || missDet[b].last - missDet[a].last || a - b;
     });
     bonus = bonus.slice(0, 12);
     if (bonus.length > 0) {
       var bHtml = '<span class="predict-numdetail-label">추가 추천 12 — 예측이 빗나간 회차(최근 ' + acc.tot +
-                  '회 중)에 실제 나온 당첨수 · 1등 횟수 우선 정렬 · 구간 ' + pr.start + '~' + pr.end + ' 제외</span>';
+                  '회 중)에 실제 나온 당첨수 · 전체 횟수순 (검증: 1등횟수 정렬보다 우수) · 구간 ' + pr.start + '~' + pr.end + ' 제외</span>';
       for (var bj = 0; bj < bonus.length; bj++) {
         var bd = missDet[bonus[bj]], bparts = [];
         if (bd.c1) bparts.push('<span class="rk-txt rk1-txt">1등 ' + bd.c1 + '</span>');

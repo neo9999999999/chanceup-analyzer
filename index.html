@@ -489,8 +489,8 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
   color: #fff; line-height: 1.1;
 }
 .predict-dec-cnt { font-size: 10px; font-weight: 600; opacity: 0.85; margin-top: 2px; }
-.predict-dec-big { font-size: 26px; padding: 14px 26px; width: 100%; box-sizing: border-box; }
-.predict-dec-2nd { font-size: 17px; padding: 10px 18px; width: 100%; box-sizing: border-box; opacity: 0.75; }
+.predict-dec-big { font-size: 26px; padding: 14px 26px; flex: 0 0 100%; box-sizing: border-box; }
+.predict-dec-2nd { font-size: 17px; padding: 10px 18px; flex: 1 1 42%; box-sizing: border-box; opacity: 0.8; }
 .predict-rank { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1px; opacity: 0.8; margin-bottom: 2px; }
 /* 번호대 컬러 (당첨흐름과 동일 톤) */
 .predict-dec[data-decade="0"]{background:#7f1d1d;} .predict-dec[data-decade="1"]{background:#9a3412;}
@@ -507,6 +507,14 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
   border-radius: 4px; font-size: 12px; font-weight: 700; }
 .predict-hit.ok { background: rgba(34,197,94,0.25); color: #34d399; }
 .predict-hit.no { background: rgba(255,255,255,0.05); color: var(--text-dim); }
+/* 1·2·3순위 고유컬러 (금/은/동) — 예측 박스 + 적중 O/X 공통 */
+.predict-dec.predict-rank1, .predict-hit.r1 { background: #f5c542; color: #0a0a0b; }
+.predict-dec.predict-rank2, .predict-hit.r2 { background: #c3cbd8; color: #0a0a0b; }
+.predict-dec.predict-rank3, .predict-hit.r3 { background: #cd8a4a; color: #0a0a0b; }
+.rk-txt { font-weight: 700; }
+.rk1-txt { color: #f5c542; }
+.rk2-txt { color: #c3cbd8; }
+.rk3-txt { color: #cd8a4a; }
 
 .decade-color-bar {
   display: grid;
@@ -1668,28 +1676,31 @@ function _predictHotRange(rounds, W) {
   var wgt = cnt.slice();
   var lastK = Math.min(6, sorted.length);
   for (var j = sorted.length - lastK; j < sorted.length; j++) wgt[sorted[j].first] += 0.5;
-  var bs = 1, bt = -1;
+  // 상위 3개 비겹침(거리 10+) 연속10칸 — 가중 점수로 선택, 표시는 실제 출현 횟수
+  var wins = [];
   for (var s = 1; s <= 91; s++) {
     var t = 0;
     for (var k = 0; k < 10; k++) t += wgt[s+k];
-    if (t > bt) { bt = t; bs = s; }
+    wins.push([s, t]);
   }
-  // 2순위: 1순위와 겹치지 않는(거리 10 이상) 최고 구간
-  var bs2 = null, bt2 = -1;
-  for (var s2 = 1; s2 <= 91; s2++) {
-    if (Math.abs(s2 - bs) < 10) continue;
-    var t2 = 0;
-    for (var k3 = 0; k3 < 10; k3++) t2 += wgt[s2+k3];
-    if (t2 > bt2) { bt2 = t2; bs2 = s2; }
+  wins.sort(function(a, b) { return b[1] - a[1] || a[0] - b[0]; });
+  var picks = [];
+  for (var pi = 0; pi < wins.length && picks.length < 3; pi++) {
+    var ps = wins[pi][0], okp = true;
+    for (var qi = 0; qi < picks.length; qi++) {
+      if (Math.abs(ps - picks[qi]) < 10) { okp = false; break; }
+    }
+    if (okp) picks.push(ps);
   }
-  // 표시용 카운트는 실제 출현 횟수(정수)
-  var raw = 0, raw2 = 0;
-  for (var k2 = 0; k2 < 10; k2++) {
-    raw += cnt[bs+k2];
-    if (bs2 !== null) raw2 += cnt[bs2+k2];
+  function mk(s0) {
+    if (s0 == null) return null;
+    var r = 0;
+    for (var k2 = 0; k2 < 10; k2++) r += cnt[s0+k2];
+    return { start: s0, end: s0 + 9, count: r };
   }
-  return { start: bs, end: bs + 9, count: raw, windowSize: win.length,
-           second: bs2 !== null ? { start: bs2, end: bs2 + 9, count: raw2 } : null };
+  var top1 = mk(picks[0]);
+  return { start: top1.start, end: top1.end, count: top1.count, windowSize: win.length,
+           second: mk(picks[1]), third: mk(picks[2]) };
 }
 
 // 십의자리 고정(1~10,11~20...) 최다 구간 — 연속10칸과 대비 증거용
@@ -1710,16 +1721,21 @@ function _hotRangeAccuracy(rounds, W, evalN) {
   var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
   var N = sorted.length;
   var start = Math.max(W, N - evalN);
-  var hit = 0, tot = 0, recent = [];
+  var hit = 0, hit2 = 0, hit3 = 0, tot = 0, recent = [];
   for (var i = start; i < N; i++) {
     var pr = _predictHotRange(sorted.slice(0, i), W);
     var f = sorted[i].first;
-    var ok = (f >= pr.start && f <= pr.end);
-    if (ok) hit++;
+    var rank = 0;
+    if (f >= pr.start && f <= pr.end) rank = 1;
+    else if (pr.second && f >= pr.second.start && f <= pr.second.end) rank = 2;
+    else if (pr.third && f >= pr.third.start && f <= pr.third.end) rank = 3;
+    if (rank === 1) hit++;
+    else if (rank === 2) hit2++;
+    else if (rank === 3) hit3++;
     tot++;
-    recent.push({ round: sorted[i].round, first: f, hit: ok });
+    recent.push({ round: sorted[i].round, first: f, hit: rank === 1, rank: rank });
   }
-  return { hit: hit, tot: tot, recent: recent };
+  return { hit: hit, hit2: hit2, hit3: hit3, tot: tot, recent: recent };
 }
 
 function _topFrequencyNumbers(rounds, window, count) {
@@ -2937,18 +2953,21 @@ function render() {
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);
     var prDec = _bestDecadeRange(rows, PW);  // 십의자리 고정 최다 (대비 증거)
-    var startDec = Math.floor((pr.start - 1) / 10);  // 시작 번호 십의자리 → 컬러
     var html = '';
     html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 최근 ' + PW + '회 · 연속 10칸 슬라이딩 전수검증 + 최근 6회 반복가중</div>';
     html += '<div class="predict-decs">';
-    html += '<span class="predict-dec predict-dec-big" data-decade="' + startDec + '">' +
+    html += '<span class="predict-dec predict-dec-big predict-rank1">' +
             '<span class="predict-rank">1순위</span>' + pr.start + ' ~ ' + pr.end +
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     if (pr.second) {
-      var secDec = Math.floor((pr.second.start - 1) / 10);
-      html += '<span class="predict-dec predict-dec-2nd" data-decade="' + secDec + '">' +
-              '<span class="predict-rank">2순위 (차선)</span>' + pr.second.start + ' ~ ' + pr.second.end +
+      html += '<span class="predict-dec predict-dec-2nd predict-rank2">' +
+              '<span class="predict-rank">2순위</span>' + pr.second.start + ' ~ ' + pr.second.end +
               '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.second.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
+    }
+    if (pr.third) {
+      html += '<span class="predict-dec predict-dec-2nd predict-rank3">' +
+              '<span class="predict-rank">3순위</span>' + pr.third.start + ' ~ ' + pr.third.end +
+              '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.third.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     }
     html += '</div>';
     // 십의자리 고정 대비 — 연속10칸이 왜 더 나은지 증거
@@ -2957,15 +2976,21 @@ function render() {
               ' &gt; 십의자리 ' + prDec.start + '~' + prDec.end + ' (' + prDec.count + '회) — 경계에 안 잘려 더 정확</div>';
     }
     var pct = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
-    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 예측 적중: <strong>' + acc.hit + '/' + acc.tot +
-            ' (' + pct + '%)</strong> <span style="color:var(--text-dim);font-size:11px;">· 10개 찍기, 랜덤 10% 대비</span></div>';
-    // 100회 전부 O/X (최신 → 과거 순)
+    var pct123 = acc.tot > 0 ? Math.round((acc.hit + acc.hit2 + acc.hit3) / acc.tot * 100) : 0;
+    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 적중 — ' +
+            '<span class="rk-txt rk1-txt">1순위 ' + acc.hit + '회</span> · ' +
+            '<span class="rk-txt rk2-txt">2순위 ' + acc.hit2 + '회</span> · ' +
+            '<span class="rk-txt rk3-txt">3순위 ' + acc.hit3 + '회</span>' +
+            '<span style="color:var(--text-dim);font-size:11px;"> · 1순위 ' + pct + '% (10개, 랜덤 10%) / 1~3순위 합 ' + pct123 + '% (30개, 랜덤 30%)</span></div>';
+    // 100회 전부 순위컬러 O/X (최신 → 과거 순)
     var all = acc.recent.slice().reverse();
     html += '<div class="predict-hits">';
     for (var hj = 0; hj < all.length; hj++) {
       var hh = all[hj];
-      html += '<span class="predict-hit ' + (hh.hit?'ok':'no') + '" title="' + hh.round + '회 1등 ' + hh.first + '">' +
-              (hh.hit ? '○' : '×') + '</span>';
+      var rk = hh.rank || 0;
+      var hcls = rk === 1 ? 'r1' : rk === 2 ? 'r2' : rk === 3 ? 'r3' : 'no';
+      html += '<span class="predict-hit ' + hcls + '" title="' + hh.round + '회 1등 ' + hh.first +
+              (rk ? ' (' + rk + '순위 적중)' : '') + '">' + (rk ? '○' : '×') + '</span>';
     }
     html += '</div>';
     document.getElementById('flow-predict').innerHTML = html;

@@ -525,6 +525,9 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .predict-bonus { margin-top: 10px; }
 .bonus-chip { border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.03); }
 .bonus-chip .predict-num { color: var(--text-dim); }
+.predict-prio { margin-top: 10px; }
+.prio-rank { font-size: 10px; font-weight: 700; color: var(--text-dim); background: rgba(255,255,255,0.08);
+  border-radius: 5px; padding: 1px 5px; }
 
 .decade-color-bar {
   display: grid;
@@ -3064,6 +3067,22 @@ function render() {
                  '<span class="rk-txt rk3-txt">' + missCnt[bonus[bj]] + '회</span></span>';
       }
       html += '<div class="predict-numdetail predict-bonus">' + bHtml + '</div>';
+    }
+    // 구매 우선순위 12: 밴드 10개(구간 내 강도순) + 실패 커버 상위 2개
+    var prio = (pr.numbers || []).slice().sort(function(a, b) {
+      return (b.n1*2 + b.n2 + b.n3) - (a.n1*2 + a.n2 + a.n3) ||
+             (b.n1 + b.n2 + b.n3) - (a.n1 + a.n2 + a.n3) || a.num - b.num;
+    }).map(function(d) { return d.num; });
+    var prio12 = prio.concat(bonus.slice(0, 2)).slice(0, 12);
+    if (prio12.length > 0) {
+      var pHtml = '<span class="predict-numdetail-label">구매 우선순위 12 (1~10위 = 예측 구간 강도순 · 11~12위 = 실패 커버)</span>';
+      for (var pk = 0; pk < prio12.length; pk++) {
+        var isCover = pk >= prio.length || prio.indexOf(prio12[pk]) < 0;
+        pHtml += '<span class="predict-num-chip' + (isCover ? ' bonus-chip' : '') + '">' +
+                 '<span class="prio-rank">' + (pk + 1) + '</span>' +
+                 '<b class="predict-num">' + prio12[pk] + '</b></span>';
+      }
+      html += '<div class="predict-numdetail predict-prio">' + pHtml + '</div>';
     }
     document.getElementById('flow-predict').innerHTML = html;
     predictCard.style.display = 'block';

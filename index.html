@@ -522,6 +522,9 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
   border: 1px solid rgba(245,197,66,0.25); border-radius: 8px; padding: 4px 8px; font-size: 11.5px; }
 .predict-num-chip .predict-num { font-size: 14px; font-weight: 800; color: #f5c542; }
 .predict-num-sep { color: var(--text-dim); }
+.predict-bonus { margin-top: 10px; }
+.bonus-chip { border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.03); }
+.bonus-chip .predict-num { color: var(--text-dim); }
 
 .decade-color-bar {
   display: grid;
@@ -3034,6 +3037,26 @@ function render() {
       html += '<span class="predict-hit ' + hcls + '" title="' + tip + '">' + (rk ? '○' : '×') + '</span>';
     }
     html += '</div>';
+    // 보너스 번호: 밴드 밖 + 인접(±2) 제외한 최근 당첨수 4개 (통계적 엣지 없음 — 커버리지 확장용)
+    var sortedRows = rows.slice().sort(function(a, b) { return a.round - b.round; });
+    var bonus = [];
+    for (var bi = sortedRows.length - 1; bi >= 0 && bonus.length < 4; bi--) {
+      var br = sortedRows[bi];
+      var candNums = [br.first, br.second, br.third];
+      for (var ci = 0; ci < candNums.length && bonus.length < 4; ci++) {
+        var bn = candNums[ci];
+        if (bn == null || bn < 1 || bn > 100) continue;
+        if (bn >= pr.start - 2 && bn <= pr.end + 2) continue;  // 밴드+인접 제외 (인접은 검증상 랜덤 이하)
+        if (bonus.indexOf(bn) < 0) bonus.push(bn);
+      }
+    }
+    if (bonus.length > 0) {
+      var bHtml = '<span class="predict-numdetail-label">보너스 번호 (밴드 밖 최근 당첨수 · 참고용 — 통계적 우위 없음, 커버리지 확장)</span>';
+      for (var bj = 0; bj < bonus.length; bj++) {
+        bHtml += '<span class="predict-num-chip bonus-chip"><b class="predict-num">' + bonus[bj] + '</b></span>';
+      }
+      html += '<div class="predict-numdetail predict-bonus">' + bHtml + '</div>';
+    }
     document.getElementById('flow-predict').innerHTML = html;
     predictCard.style.display = 'block';
   } else {

@@ -1662,13 +1662,20 @@ function _predictHotRange(rounds, W) {
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
   var cnt = new Array(101).fill(0);
   for (var i = 0; i < win.length; i++) cnt[win[i].first]++;
+  // 최근 6회 반복 가중 +0.5 (OOS: 최근100 19% / 전체 39/247, 무가중 대비 전 구간 비열등)
+  var wgt = cnt.slice();
+  var lastK = Math.min(6, sorted.length);
+  for (var j = sorted.length - lastK; j < sorted.length; j++) wgt[sorted[j].first] += 0.5;
   var bs = 1, bt = -1;
   for (var s = 1; s <= 91; s++) {
     var t = 0;
-    for (var k = 0; k < 10; k++) t += cnt[s+k];
+    for (var k = 0; k < 10; k++) t += wgt[s+k];
     if (t > bt) { bt = t; bs = s; }
   }
-  return { start: bs, end: bs + 9, count: bt, windowSize: win.length };
+  // 표시용 카운트는 실제 출현 횟수(정수)
+  var raw = 0;
+  for (var k2 = 0; k2 < 10; k2++) raw += cnt[bs+k2];
+  return { start: bs, end: bs + 9, count: raw, windowSize: win.length };
 }
 
 // 십의자리 고정(1~10,11~20...) 최다 구간 — 연속10칸과 대비 증거용

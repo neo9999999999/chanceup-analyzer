@@ -472,6 +472,36 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .flow-step.bf-step.bf-hits-3 .bf-hits-label { color: var(--accent); }
 
 /* 십의자리 컬러 가이드 바 */
+/* 🔮 다음 회차 예상 번호대 카드 */
+.predict-card {
+  margin-top: 16px;
+  padding: 14px;
+  background: linear-gradient(135deg, rgba(34,197,94,0.10), rgba(59,130,246,0.06));
+  border: 1px solid rgba(34,197,94,0.35);
+  border-radius: 12px;
+}
+.predict-title { font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+.predict-decs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.predict-dec {
+  display: inline-flex; flex-direction: column; align-items: center;
+  padding: 8px 14px; border-radius: 10px; font-size: 15px; font-weight: 800;
+  color: #fff; line-height: 1.1;
+}
+.predict-dec-cnt { font-size: 10px; font-weight: 600; opacity: 0.85; margin-top: 2px; }
+/* 번호대 컬러 (당첨흐름과 동일 톤) */
+.predict-dec[data-decade="0"]{background:#7f1d1d;} .predict-dec[data-decade="1"]{background:#9a3412;}
+.predict-dec[data-decade="2"]{background:#713f12;} .predict-dec[data-decade="3"]{background:#4d7c0f;}
+.predict-dec[data-decade="4"]{background:#15803d;} .predict-dec[data-decade="5"]{background:#0f766e;}
+.predict-dec[data-decade="6"]{background:#60a5fa;color:#0a0a0b;} .predict-dec[data-decade="7"]{background:#a78bfa;color:#0a0a0b;}
+.predict-dec[data-decade="8"]{background:#f0abfc;color:#0a0a0b;} .predict-dec[data-decade="9"]{background:#fcd34d;color:#0a0a0b;}
+.predict-acc { font-size: 13px; color: var(--text); margin-bottom: 8px; }
+.predict-acc strong { color: #34d399; font-size: 15px; }
+.predict-hits { display: flex; gap: 3px; flex-wrap: wrap; }
+.predict-hit { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px; font-size: 12px; font-weight: 700; }
+.predict-hit.ok { background: rgba(34,197,94,0.25); color: #34d399; }
+.predict-hit.no { background: rgba(255,255,255,0.05); color: var(--text-dim); }
+
 .decade-color-bar {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
@@ -1201,6 +1231,8 @@ tr.topfreq-rank-top3 .col-num {
     </div>
     <div class="decade-color-bar" id="decade-color-bar"></div>
     <div class="flow-recent" id="flow-recent"></div>
+    <!-- 🔮 다음 회차 예상 번호대 + 적중률 -->
+    <div id="flow-predict"></div>
     <div id="flow-stats-only"></div>
   </div>
 
@@ -1613,6 +1645,44 @@ function decadeLabel(d) {
 }
 
 // 🏆 빈도 TOP 10 — 최근 N회 1등 출현 횟수만 기준 (사용자 요청)
+// 🔮 다음 회차 예상 번호대(십의자리) — 최근 W회 1등 십의자리 빈도 TOP-K
+// OOS 검증: W30 TOP3 = 39% 적중 (랜덤 30% 대비 +9%p, 100회 walk-forward)
+function _predictNextDecades(rounds, W, topk) {
+  W = W || 30; topk = topk || 3;
+  var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
+  var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
+  var cnt = {};
+  for (var i = 0; i < win.length; i++) {
+    var d = Math.floor((win[i].first - 1) / 10);
+    cnt[d] = (cnt[d] || 0) + 1;
+  }
+  var arr = [];
+  for (var d0 = 0; d0 <= 9; d0++) arr.push({ dec: d0, c: cnt[d0] || 0 });
+  arr.sort(function(a,b){ return b.c !== a.c ? b.c - a.c : a.dec - b.dec; });
+  return arr.slice(0, topk).map(function(x){ return { dec: x.dec, count: x.c, windowSize: win.length }; });
+}
+
+// 흐름 예측 OOS 누적 적중률 (각 회차 직전 데이터로 예측 → 실제 1등 번호대 적중?)
+function _decadeFlowAccuracy(rounds, W, topk, evalN) {
+  W = W || 30; topk = topk || 3; evalN = evalN || 100;
+  var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
+  var N = sorted.length;
+  var start = Math.max(W, N - evalN);
+  var hit = 0, tot = 0, recent = [];
+  for (var i = start; i < N; i++) {
+    var preds = _predictNextDecades(sorted.slice(0, i), W, topk);
+    var predSet = {};
+    for (var p = 0; p < preds.length; p++) predSet[preds[p].dec] = true;
+    var actual = Math.floor((sorted[i].first - 1) / 10);
+    var ok = !!predSet[actual];
+    if (ok) hit++;
+    tot++;
+    recent.push({ round: sorted[i].round, actual: actual, first: sorted[i].first, hit: ok,
+                  preds: preds.map(function(x){return x.dec;}) });
+  }
+  return { hit: hit, tot: tot, recent: recent };
+}
+
 function _topFrequencyNumbers(rounds, window, count) {
   count = count || 10;
   var win = rounds.length >= window ? rounds.slice(-window) : rounds.slice();
@@ -2807,6 +2877,37 @@ function render() {
       colorBarEl.innerHTML = labels.map(function(l){ return '<div>' + l + '</div>'; }).join('');
       colorBarEl.dataset.init = '1';
     }
+
+    // 🔮 다음 회차 예상 번호대 + 100회 누적 적중률
+    (function(){
+      var PW = 30, PK = 3;  // 최근 30회, 번호대 TOP3 (OOS 39% 검증)
+      var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
+      var preds = _predictNextDecades(rows, PW, PK);
+      var acc = _decadeFlowAccuracy(rows, PW, PK, 100);
+      function decLabel(d){ return (d*10+1) + '~' + (d*10+10); }
+      var html = '<div class="predict-card">';
+      html += '<div class="predict-title">🔮 ' + nextRoundNum + '회 예상 1등 번호대 (최근 ' + PW + '회 흐름)</div>';
+      html += '<div class="predict-decs">';
+      for (var i = 0; i < preds.length; i++) {
+        html += '<span class="predict-dec" data-decade="' + preds[i].dec + '">' + decLabel(preds[i].dec) +
+                '<span class="predict-dec-cnt">' + preds[i].count + '회</span></span>';
+      }
+      html += '</div>';
+      var pct = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
+      html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 예측 적중: <strong>' + acc.hit + '/' + acc.tot +
+              ' (' + pct + '%)</strong> <span style="color:var(--text-dim);font-size:11px;">· 랜덤 30% 대비</span></div>';
+      // 최근 15회 적중 O/X
+      var last15 = acc.recent.slice(-15);
+      html += '<div class="predict-hits">';
+      for (var j = 0; j < last15.length; j++) {
+        var h = last15[j];
+        html += '<span class="predict-hit ' + (h.hit?'ok':'no') + '" title="' + h.round + '회 1등 ' + h.first + '">' +
+                (h.hit ? '○' : '×') + '</span>';
+      }
+      html += '</div>';
+      html += '</div>';
+      document.getElementById('flow-predict').innerHTML = html;
+    })();
 
     // 베팅 추천 백테스트 통계 (1등/2등/3등 적중)
     var bt = analyzeBettingBacktest(rows);

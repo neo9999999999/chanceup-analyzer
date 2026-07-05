@@ -3035,15 +3035,33 @@ function render() {
       return tb - ta || missDet[b].last - missDet[a].last || a - b;
     });
     cover = cover.slice(0, 20);
+    // ★ 폴백: 실패 풀이 20개 미만이면(초기 데이터/구간 이동 직후) 최근 당첨수(구간 밖)로 채워 항상 20개 유지
+    if (cover.length < 20) {
+      var pool = rows.slice().sort(function(a, b){ return b.round - a.round; });
+      for (var fpi = 0; fpi < pool.length && cover.length < 20; fpi++) {
+        var fn = [pool[fpi].first, pool[fpi].second, pool[fpi].third];
+        for (var fk = 0; fk < fn.length && cover.length < 20; fk++) {
+          var v = fn[fk];
+          if (v == null || v < 1 || v > 100) continue;
+          if (v >= pr.start - 2 && v <= pr.end + 2) continue;  // 밴드+인접 제외
+          if (cover.indexOf(v) < 0) cover.push(v);
+        }
+      }
+    }
     var tHtml = '<span class="predict-numdetail-label">추가 추천 TOP 20 — 예측 구간(' + pr.start + '~' + pr.end +
                 ') 제외 · 예측 빗나간 회차의 당첨수순 · 위에서부터 예산만큼</span>';
     for (var co = 0; co < cover.length; co++) {
       var cd = missDet[cover[co]];
-      var tp2 = [];
-      if (cd.c1) tp2.push('1등 ' + cd.c1 + '회');
-      if (cd.c2) tp2.push('2등 ' + cd.c2 + '회');
-      if (cd.c3) tp2.push('3등 ' + cd.c3 + '회');
-      tHtml += '<span class="predict-num-chip bonus-chip" title="예측 빗나간 회차: ' + tp2.join(' · ') + ' (마지막 ' + cd.last + '회)">' +
+      var tip, tp2 = [];
+      if (cd) {
+        if (cd.c1) tp2.push('1등 ' + cd.c1 + '회');
+        if (cd.c2) tp2.push('2등 ' + cd.c2 + '회');
+        if (cd.c3) tp2.push('3등 ' + cd.c3 + '회');
+        tip = '예측 빗나간 회차: ' + tp2.join(' · ') + ' (마지막 ' + cd.last + '회)';
+      } else {
+        tip = '최근 당첨수 (구간 밖, 보충)';  // 폴백으로 채운 번호
+      }
+      tHtml += '<span class="predict-num-chip bonus-chip" title="' + tip + '">' +
                '<span class="prio-rank">' + (co + 1) + '</span><b class="predict-num">' + cover[co] + '</b></span>';
     }
     html += '<div class="predict-numdetail predict-top20">' + tHtml + '</div>';

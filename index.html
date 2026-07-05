@@ -1532,7 +1532,21 @@ async function saveToSupabase() {
       setSyncStatus('error', '저장 실패: HTTP ' + res.status);
       return false;
     }
-    
+
+    // ★ 일별 스냅샷 (포인트인타임 복구용): 하루 한 번, snap_YYYY-MM-DD 행으로 사본 보관.
+    //   메인 행이 잘못된 병합으로 오염돼도 날짜별 사본에서 복구 가능. 실패해도 메인 저장엔 영향 없음.
+    try {
+      var dayKey = new Date().toISOString().slice(0, 10);
+      if (localStorage.getItem('chanceup_snap_day') !== dayKey) {
+        var snapRes = await fetch(SUPABASE_URL + '/rest/v1/' + SUPABASE_TABLE + '?on_conflict=id', {
+          method: 'POST',
+          headers: (function () { var h = supabaseHeaders(); h['Prefer'] = 'resolution=merge-duplicates'; return h; })(),
+          body: JSON.stringify({ id: 'snap_' + dayKey, payload: payload, updated_at: new Date().toISOString() })
+        });
+        if (snapRes.ok) localStorage.setItem('chanceup_snap_day', dayKey);
+      }
+    } catch (e) { /* 스냅샷 실패 무시 */ }
+
     var now = new Date();
     var timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
                   now.getMinutes().toString().padStart(2, '0') + ':' +

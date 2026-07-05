@@ -2956,19 +2956,8 @@ function render() {
     var html = '';
     html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 최근 ' + PW + '회 · 연속 10칸 슬라이딩 전수검증 + 최근 6회 반복가중</div>';
     html += '<div class="predict-decs">';
-    html += '<span class="predict-dec predict-dec-big predict-rank1">' +
-            '<span class="predict-rank">1순위</span>' + pr.start + ' ~ ' + pr.end +
+    html += '<span class="predict-dec predict-dec-big predict-rank1">' + pr.start + ' ~ ' + pr.end +
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
-    if (pr.second) {
-      html += '<span class="predict-dec predict-dec-2nd predict-rank2">' +
-              '<span class="predict-rank">2순위</span>' + pr.second.start + ' ~ ' + pr.second.end +
-              '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.second.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
-    }
-    if (pr.third) {
-      html += '<span class="predict-dec predict-dec-2nd predict-rank3">' +
-              '<span class="predict-rank">3순위</span>' + pr.third.start + ' ~ ' + pr.third.end +
-              '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.third.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
-    }
     html += '</div>';
     // 십의자리 고정 대비 — 연속10칸이 왜 더 나은지 증거
     if (pr.count > prDec.count) {
@@ -2976,21 +2965,16 @@ function render() {
               ' &gt; 십의자리 ' + prDec.start + '~' + prDec.end + ' (' + prDec.count + '회) — 경계에 안 잘려 더 정확</div>';
     }
     var pct = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
-    var pct123 = acc.tot > 0 ? Math.round((acc.hit + acc.hit2 + acc.hit3) / acc.tot * 100) : 0;
-    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 적중 — ' +
-            '<span class="rk-txt rk1-txt">1순위 ' + acc.hit + '회</span> · ' +
-            '<span class="rk-txt rk2-txt">2순위 ' + acc.hit2 + '회</span> · ' +
-            '<span class="rk-txt rk3-txt">3순위 ' + acc.hit3 + '회</span>' +
-            '<span style="color:var(--text-dim);font-size:11px;"> · 1순위 ' + pct + '% (10개, 랜덤 10%) / 1~3순위 합 ' + pct123 + '% (30개, 랜덤 30%)</span></div>';
-    // 100회 전부 순위컬러 O/X (최신 → 과거 순)
+    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 예측 적중: <strong>' + acc.hit + '/' + acc.tot +
+            ' (' + pct + '%)</strong> <span style="color:var(--text-dim);font-size:11px;">· 10개 찍기, 랜덤 10% 대비</span></div>';
+    html += '<div class="predict-cmp">보조 2·3순위 구간은 OOS 검증 결과 적중 기여가 랜덤 이하(5~9회/100)라 제외 — 신호는 1순위 구간에만 존재</div>';
+    // 100회 전부 O/X (최신 → 과거 순, 적중 = 1순위 컬러)
     var all = acc.recent.slice().reverse();
     html += '<div class="predict-hits">';
     for (var hj = 0; hj < all.length; hj++) {
       var hh = all[hj];
-      var rk = hh.rank || 0;
-      var hcls = rk === 1 ? 'r1' : rk === 2 ? 'r2' : rk === 3 ? 'r3' : 'no';
-      html += '<span class="predict-hit ' + hcls + '" title="' + hh.round + '회 1등 ' + hh.first +
-              (rk ? ' (' + rk + '순위 적중)' : '') + '">' + (rk ? '○' : '×') + '</span>';
+      html += '<span class="predict-hit ' + (hh.hit ? 'r1' : 'no') + '" title="' + hh.round + '회 1등 ' + hh.first + '">' +
+              (hh.hit ? '○' : '×') + '</span>';
     }
     html += '</div>';
     document.getElementById('flow-predict').innerHTML = html;

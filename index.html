@@ -2925,7 +2925,7 @@ function render() {
     var prDec = _bestDecadeRange(rows, PW);  // 십의자리 고정 최다 (대비 증거)
     var startDec = Math.floor((pr.start - 1) / 10);  // 시작 번호 십의자리 → 컬러
     var html = '';
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 최근 ' + PW + '회 · 연속 10칸 슬라이딩(모든 시작점 전수검증)</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 최근 ' + PW + '회 · 연속 10칸 슬라이딩 전수검증 + 최근 6회 반복가중</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big" data-decade="' + startDec + '">' + pr.start + ' ~ ' + pr.end +
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';

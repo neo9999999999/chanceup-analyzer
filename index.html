@@ -948,6 +948,22 @@ tr.topfreq-rank-top3 .col-num {
   overflow-y: auto;
 }
 .rounds-list { max-height: 400px; }
+/* 회차별 당첨번호 — 깨끗한 표 */
+.rounds-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rounds-table thead th {
+  position: sticky; top: 0; background: var(--bg-card, #141416); z-index: 1;
+  text-align: center; font-size: 11px; font-weight: 700; color: var(--text-dim);
+  padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.12);
+}
+.rounds-table td { text-align: center; padding: 7px 6px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.rounds-table tbody tr:hover { background: rgba(255,255,255,0.04); }
+.rounds-table .rt-round { color: var(--text-dim); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rounds-table .rt-n { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+.rounds-table .rt-1 { color: #f5c542; }
+.rounds-table .rt-2 { color: #c3cbd8; }
+.rounds-table .rt-3 { color: #cd8a4a; }
+.rounds-table .rt-del { width: 36px; }
+.rounds-table .delete-btn { width: 22px; height: 22px; line-height: 20px; }
 
 .hit-item {
   display: flex;
@@ -1264,12 +1280,6 @@ tr.topfreq-rank-top3 .col-num {
   <div class="card" id="predict-card" style="display:none;">
     <div class="card-title">🔮 다음 회차 예상 당첨 번호대 (1·2·3등)</div>
     <div id="flow-predict"></div>
-  </div>
-
-  <!-- 🏆 최근 1등 빈도 TOP 10 -->
-  <div class="card" id="topfreq-card" style="display:none;">
-    <div class="card-title">🏆 최근 1등 빈도 TOP 10</div>
-    <div id="topfreq-table"></div>
   </div>
 
   <!-- 📋 회차별 당첨번호 -->
@@ -3084,32 +3094,7 @@ function render() {
 
   // (추천 히스토리 카드 제거됨 — 사용자 요청)
 
-  // 🏆 최근 1등 빈도 TOP 10 (최근 40회, 회차 등록할 때마다 순위 변동)
-  var topFreqCard = document.getElementById('topfreq-card');
-  var freqResult = _topFrequencyNumbers(rows, 40, 10);
-  if (freqResult.top.length > 0) {
-    topFreqCard.style.display = 'block';
-    var fHtml = '<div class="topfreq-info">최근 ' + freqResult.windowSize + '회 1등 출현 횟수 순위 · 회차 등록할 때마다 갱신</div>';
-    fHtml += '<table class="rank-prob-table topfreq-table"><thead><tr>' +
-      '<th>순위</th><th>번호</th><th>1등 출현</th><th>비율</th>' +
-      '</tr></thead><tbody>';
-    for (var fi = 0; fi < freqResult.top.length; fi++) {
-      var ft = freqResult.top[fi];
-      var rankCls = fi < 3 ? 'topfreq-rank-top3' : '';
-      var rankEmoji = fi === 0 ? '🥇' : fi === 1 ? '🥈' : fi === 2 ? '🥉' : (fi+1);
-      var pct = freqResult.windowSize > 0 ? Math.round(ft.c1 / freqResult.windowSize * 100) : 0;
-      fHtml += '<tr class="' + rankCls + '">' +
-        '<td class="col-rank">' + rankEmoji + '</td>' +
-        '<td class="col-num">' + ft.num + '</td>' +
-        '<td class="col-1">' + ft.c1 + '회</td>' +
-        '<td class="col-sum">' + pct + '%</td>' +
-        '</tr>';
-    }
-    fHtml += '</tbody></table>';
-    document.getElementById('topfreq-table').innerHTML = fHtml;
-  } else {
-    topFreqCard.style.display = 'none';
-  }
+  // (1등 빈도 TOP 10 카드 제거됨 — 예측 카드와 기준이 달라 혼란 유발, 개별 번호 빈도는 검증상 노이즈)
 
   // 회차별 테이블
   var roundsList = document.getElementById('rounds-list');
@@ -3118,21 +3103,19 @@ function render() {
   } else {
     var sorted = rows.slice();
     sorted.sort(function (a, b) { return b.round - a.round; });
-    var roundsHtml = '';
+    var roundsHtml = '<table class="rounds-table"><thead><tr>' +
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th></th></tr></thead><tbody>';
     for (var n = 0; n < sorted.length; n++) {
       var row = sorted[n];
-      roundsHtml += '<div class="round-item">' +
-        '<div class="round-left">' +
-          '<span class="round-num">' + row.round + '</span>' +
-          '<div class="badges">' +
-            '<span class="badge badge-1"><span class="badge-label">1등</span>' + row.first + '</span>' +
-            '<span class="badge badge-2"><span class="badge-label">2등</span>' + row.second + '</span>' +
-            '<span class="badge badge-3"><span class="badge-label">3등</span>' + row.third + '</span>' +
-          '</div>' +
-        '</div>' +
-        '<button class="delete-btn" data-round="' + row.round + '">×</button>' +
-        '</div>';
+      roundsHtml += '<tr>' +
+        '<td class="rt-round">' + row.round + '</td>' +
+        '<td class="rt-n rt-1">' + row.first + '</td>' +
+        '<td class="rt-n rt-2">' + row.second + '</td>' +
+        '<td class="rt-n rt-3">' + row.third + '</td>' +
+        '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +
+        '</tr>';
     }
+    roundsHtml += '</tbody></table>';
     roundsList.innerHTML = roundsHtml;
 
     // 삭제 버튼

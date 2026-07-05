@@ -1724,16 +1724,18 @@ function _hotRangeAccuracy(rounds, W, evalN) {
   var hit = 0, hit2 = 0, hit3 = 0, tot = 0, recent = [];
   for (var i = start; i < N; i++) {
     var pr = _predictHotRange(sorted.slice(0, i), W);
-    var f = sorted[i].first;
+    var row = sorted[i];
+    var inB = function(x) { return x != null && x >= pr.start && x <= pr.end; };
+    // 예측 구간에 들어온 등수: 1등 우선 → 2등 → 3등
     var rank = 0;
-    if (f >= pr.start && f <= pr.end) rank = 1;
-    else if (pr.second && f >= pr.second.start && f <= pr.second.end) rank = 2;
-    else if (pr.third && f >= pr.third.start && f <= pr.third.end) rank = 3;
+    if (inB(row.first)) rank = 1;
+    else if (inB(row.second)) rank = 2;
+    else if (inB(row.third)) rank = 3;
     if (rank === 1) hit++;
     else if (rank === 2) hit2++;
     else if (rank === 3) hit3++;
     tot++;
-    recent.push({ round: sorted[i].round, first: f, hit: rank === 1, rank: rank });
+    recent.push({ round: row.round, first: row.first, second: row.second, third: row.third, hit: rank === 1, rank: rank });
   }
   return { hit: hit, hit2: hit2, hit3: hit3, tot: tot, recent: recent };
 }
@@ -2965,16 +2967,24 @@ function render() {
               ' &gt; 십의자리 ' + prDec.start + '~' + prDec.end + ' (' + prDec.count + '회) — 경계에 안 잘려 더 정확</div>';
     }
     var pct = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
-    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 예측 적중: <strong>' + acc.hit + '/' + acc.tot +
-            ' (' + pct + '%)</strong> <span style="color:var(--text-dim);font-size:11px;">· 10개 찍기, 랜덤 10% 대비</span></div>';
-    html += '<div class="predict-cmp">보조 2·3순위 구간은 OOS 검증 결과 적중 기여가 랜덤 이하(5~9회/100)라 제외 — 신호는 1순위 구간에만 존재</div>';
-    // 100회 전부 O/X (최신 → 과거 순, 적중 = 1순위 컬러)
+    var anyPct = acc.tot > 0 ? Math.round((acc.hit + acc.hit2 + acc.hit3) / acc.tot * 100) : 0;
+    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 — 1등 <strong>' + acc.hit + '/' + acc.tot +
+            ' (' + pct + '%)</strong> · <span class="rk-txt rk2-txt">2등 ' + acc.hit2 + '회</span> · ' +
+            '<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '회</span>' +
+            '<span style="color:var(--text-dim);font-size:11px;"> · 아무 등수 ' + anyPct + '% (랜덤 27%)</span></div>';
+    html += '<div class="predict-cmp">○ 컬러 = 예측 구간에 들어온 등수: <span class="rk-txt rk1-txt">금 1등</span> · ' +
+            '<span class="rk-txt rk2-txt">은 2등</span> · <span class="rk-txt rk3-txt">동 3등</span></div>';
+    // 100회 전부 O/X (최신 → 과거 순, 등수별 컬러)
     var all = acc.recent.slice().reverse();
     html += '<div class="predict-hits">';
     for (var hj = 0; hj < all.length; hj++) {
       var hh = all[hj];
-      html += '<span class="predict-hit ' + (hh.hit ? 'r1' : 'no') + '" title="' + hh.round + '회 1등 ' + hh.first + '">' +
-              (hh.hit ? '○' : '×') + '</span>';
+      var rk = hh.rank || 0;
+      var hcls = rk === 1 ? 'r1' : rk === 2 ? 'r2' : rk === 3 ? 'r3' : 'no';
+      var tip = hh.round + '회 1등 ' + hh.first;
+      if (rk === 2) tip += ' · 2등 ' + hh.second + ' 적중';
+      else if (rk === 3) tip += ' · 3등 ' + hh.third + ' 적중';
+      html += '<span class="predict-hit ' + hcls + '" title="' + tip + '">' + (rk ? '○' : '×') + '</span>';
     }
     html += '</div>';
     document.getElementById('flow-predict').innerHTML = html;

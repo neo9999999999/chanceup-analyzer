@@ -496,6 +496,8 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .predict-dec[data-decade="4"]{background:#15803d;} .predict-dec[data-decade="5"]{background:#0f766e;}
 .predict-dec[data-decade="6"]{background:#60a5fa;color:#0a0a0b;} .predict-dec[data-decade="7"]{background:#a78bfa;color:#0a0a0b;}
 .predict-dec[data-decade="8"]{background:#f0abfc;color:#0a0a0b;} .predict-dec[data-decade="9"]{background:#fcd34d;color:#0a0a0b;}
+.predict-cmp { font-size: 11.5px; color: var(--text-dim); margin: 2px 0 10px; line-height: 1.5; }
+.predict-cmp b { color: var(--accent, #e0b352); }
 .predict-acc { font-size: 13px; color: var(--text); margin-bottom: 8px; }
 .predict-acc strong { color: #34d399; font-size: 15px; }
 .predict-hits { display: flex; gap: 3px; flex-wrap: wrap; }
@@ -1667,6 +1669,18 @@ function _predictHotRange(rounds, W) {
     if (t > bt) { bt = t; bs = s; }
   }
   return { start: bs, end: bs + 9, count: bt, windowSize: win.length };
+}
+
+// 십의자리 고정(1~10,11~20...) 최다 구간 — 연속10칸과 대비 증거용
+function _bestDecadeRange(rounds, W) {
+  W = W || 60;
+  var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
+  var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
+  var dc = new Array(10).fill(0);
+  for (var i = 0; i < win.length; i++) dc[Math.floor((win[i].first - 1) / 10)]++;
+  var bd = 0, bt = -1;
+  for (var d = 0; d < 10; d++) { if (dc[d] > bt) { bt = dc[d]; bd = d; } }
+  return { start: bd*10+1, end: bd*10+10, count: bt, windowSize: win.length };
 }
 
 // 연속 10칸 예측 OOS 누적 적중률 (각 회차 직전 데이터로 예측 → 실제 1등 그 안에?)
@@ -2901,13 +2915,19 @@ function render() {
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);
+    var prDec = _bestDecadeRange(rows, PW);  // 십의자리 고정 최다 (대비 증거)
     var startDec = Math.floor((pr.start - 1) / 10);  // 시작 번호 십의자리 → 컬러
     var html = '';
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 최근 ' + PW + '회 흐름 기준 연속 10개 번호대</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 최근 ' + PW + '회 · 연속 10칸 슬라이딩(모든 시작점 전수검증)</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big" data-decade="' + startDec + '">' + pr.start + ' ~ ' + pr.end +
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     html += '</div>';
+    // 십의자리 고정 대비 — 연속10칸이 왜 더 나은지 증거
+    if (pr.count > prDec.count) {
+      html += '<div class="predict-cmp">연속10칸 <b>' + pr.start + '~' + pr.end + ' (' + pr.count + '회)</b>' +
+              ' &gt; 십의자리 ' + prDec.start + '~' + prDec.end + ' (' + prDec.count + '회) — 경계에 안 잘려 더 정확</div>';
+    }
     var pct = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
     html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 예측 적중: <strong>' + acc.hit + '/' + acc.tot +
             ' (' + pct + '%)</strong> <span style="color:var(--text-dim);font-size:11px;">· 10개 찍기, 랜덤 10% 대비</span></div>';

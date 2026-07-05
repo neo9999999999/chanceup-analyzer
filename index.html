@@ -2096,6 +2096,8 @@ function analyzeFlow(rows) {
         hit = (num >= prevHr.top[0].start && num <= prevHr.top[0].end);
       }
     }
+    // ★ 그 회차 직전 최근 60회 연속10칸 핫구간 (OOS 예측 흐름 — 현재 회차 미포함)
+    var hr60 = _predictHotRange(sorted.slice(0, i), 60);
     sequence.push({
       round: sorted[i].round,
       decade: d,
@@ -2103,6 +2105,8 @@ function analyzeFlow(rows) {
       seqLabel: seqLabel,
       seqStart: seqStart,
       seqEnd: seqEnd,
+      hotStart: hr60.start,
+      hotEnd: hr60.end,
       hit: hit
     });
     if (i > 0) {
@@ -2851,19 +2855,23 @@ function render() {
     function renderActualRow(sequence) {
       if (!sequence || sequence.length === 0) return '';
       var rec = sequence.slice(-50);
-      // 십의자리 그룹 카운트 (반복 강조용)
+      // 연속10칸 핫윈도우 라벨(seqStart~seqEnd) 카운트 — 같은 시퀀스 반복 강조용
       var groupCount = {};
       for (var fc = 0; fc < rec.length; fc++) {
-        var d0 = Math.floor((rec[fc].num - 1) / 10);
-        groupCount[d0] = (groupCount[d0] || 0) + 1;
+        var lbl = (rec[fc].seqStart != null) ? (rec[fc].seqStart + '~' + rec[fc].seqEnd)
+                  : ((Math.floor((rec[fc].num - 1) / 10) * 10 + 1) + '~' + (Math.floor((rec[fc].num - 1) / 10) * 10 + 10));
+        groupCount[lbl] = (groupCount[lbl] || 0) + 1;
       }
       var html = '';
       for (var fi = 0; fi < rec.length; fi++) {
         if (fi > 0) html += '<span class="flow-arrow">→</span>';
         var num = rec[fi].num;
-        var dec = Math.floor((num - 1) / 10); // 0~9
-        var groupLabel = (dec*10+1) + '~' + (dec*10+10);
-        var gCount = groupCount[dec];
+        // 그 1등 번호를 감싸는 연속10칸 핫윈도우 (fallback: 십의자리)
+        var hs = (rec[fi].seqStart != null) ? rec[fi].seqStart : (Math.floor((num - 1) / 10) * 10 + 1);
+        var he = (rec[fi].seqEnd != null) ? rec[fi].seqEnd : (hs + 9);
+        var groupLabel = hs + '~' + he;
+        var dec = Math.floor((hs - 1) / 10); // 윈도우 시작 기준 컬러 0~9
+        var gCount = groupCount[groupLabel];
         var cls = 'flow-step seq-box';
         if (gCount >= 2) cls += ' repeat-2';
         html += '<span class="' + cls + '" data-decade="' + dec + '">' +

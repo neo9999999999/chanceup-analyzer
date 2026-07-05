@@ -3059,30 +3059,17 @@ function render() {
     bonus.sort(function(a, b) {
       return missCnt[b] - missCnt[a] || missLast[b] - missLast[a] || a - b;
     });
-    bonus = bonus.slice(0, 4);
+    bonus = bonus.slice(0, 12);
     if (bonus.length > 0) {
-      var bHtml = '<span class="predict-numdetail-label">실패 커버 번호 (예측 빗나간 회차의 최다 당첨수 · 참고용 — 통계적 우위 없음)</span>';
+      var bHtml = '<span class="predict-numdetail-label">추가 추천 12 (예측 구간 ' + pr.start + '~' + pr.end +
+                  ' 제외 · 예측 빗나간 회차의 최다 당첨수순 · 참고용)</span>';
       for (var bj = 0; bj < bonus.length; bj++) {
-        bHtml += '<span class="predict-num-chip bonus-chip" title="실패 회차에 ' + missCnt[bonus[bj]] + '회 출현 (마지막 ' + missLast[bonus[bj]] + '회)"><b class="predict-num">' + bonus[bj] + '</b>' +
+        bHtml += '<span class="predict-num-chip bonus-chip" title="실패 회차에 ' + missCnt[bonus[bj]] + '회 출현 (마지막 ' + missLast[bonus[bj]] + '회)">' +
+                 '<span class="prio-rank">' + (bj + 1) + '</span>' +
+                 '<b class="predict-num">' + bonus[bj] + '</b>' +
                  '<span class="rk-txt rk3-txt">' + missCnt[bonus[bj]] + '회</span></span>';
       }
       html += '<div class="predict-numdetail predict-bonus">' + bHtml + '</div>';
-    }
-    // 구매 우선순위 12: 밴드 10개(구간 내 강도순) + 실패 커버 상위 2개
-    var prio = (pr.numbers || []).slice().sort(function(a, b) {
-      return (b.n1*2 + b.n2 + b.n3) - (a.n1*2 + a.n2 + a.n3) ||
-             (b.n1 + b.n2 + b.n3) - (a.n1 + a.n2 + a.n3) || a.num - b.num;
-    }).map(function(d) { return d.num; });
-    var prio12 = prio.concat(bonus.slice(0, 2)).slice(0, 12);
-    if (prio12.length > 0) {
-      var pHtml = '<span class="predict-numdetail-label">구매 우선순위 12 (1~10위 = 예측 구간 강도순 · 11~12위 = 실패 커버)</span>';
-      for (var pk = 0; pk < prio12.length; pk++) {
-        var isCover = pk >= prio.length || prio.indexOf(prio12[pk]) < 0;
-        pHtml += '<span class="predict-num-chip' + (isCover ? ' bonus-chip' : '') + '">' +
-                 '<span class="prio-rank">' + (pk + 1) + '</span>' +
-                 '<b class="predict-num">' + prio12[pk] + '</b></span>';
-      }
-      html += '<div class="predict-numdetail predict-prio">' + pHtml + '</div>';
     }
     document.getElementById('flow-predict').innerHTML = html;
     predictCard.style.display = 'block';

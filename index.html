@@ -1249,7 +1249,7 @@ tr.topfreq-rank-top3 .col-num {
 
   <!-- 🔮 다음 회차 예상 번호대 (별도 카드) -->
   <div class="card" id="predict-card" style="display:none;">
-    <div class="card-title">🔮 다음 회차 예상 1등 번호대</div>
+    <div class="card-title">🔮 다음 회차 예상 당첨 번호대 (1·2·3등)</div>
     <div id="flow-predict"></div>
   </div>
 
@@ -1667,13 +1667,20 @@ function decadeLabel(d) {
 // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회 1등 빈도 최다 연속구간)
 // OOS: 전체 15% / 최근 20% (랜덤 10% 대비 1.5~2배). 십의자리 고정보다 우수.
 function _predictHotRange(rounds, W) {
-  W = W || 50;
+  W = W || 80;
   var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
-  var cnt = new Array(101).fill(0);
-  for (var i = 0; i < win.length; i++) cnt[win[i].first]++;
-  // 최근 6회 반복 가중 +0.5 (OOS: 최근100 19% / 전체 39/247, 무가중 대비 전 구간 비열등)
-  var wgt = cnt.slice();
+  // 1·2·3등 통합 스코어 (1등 2배 가중) — 목표: 아무 등수나 예측 구간에 들어오게
+  // OOS(최근100): 아무등수 31~32% (랜덤 27.4%) — 1등 전용(19%/10%)보다 아무등수 기준 우수
+  var c1 = new Array(101).fill(0), c2 = new Array(101).fill(0), c3 = new Array(101).fill(0);
+  var wgt = new Array(101).fill(0);
+  for (var i = 0; i < win.length; i++) {
+    var rw = win[i];
+    if (rw.first  != null) { c1[rw.first]++;  wgt[rw.first]  += 2; }
+    if (rw.second != null) { c2[rw.second]++; wgt[rw.second] += 1; }
+    if (rw.third  != null) { c3[rw.third]++;  wgt[rw.third]  += 1; }
+  }
+  // 최근 6회 1등 반복 가중 +0.5 (박빙 시 신선한 열기 우대)
   var lastK = Math.min(6, sorted.length);
   for (var j = sorted.length - lastK; j < sorted.length; j++) wgt[sorted[j].first] += 0.5;
   // 상위 3개 비겹침(거리 10+) 연속10칸 — 가중 점수로 선택, 표시는 실제 출현 횟수
@@ -1694,12 +1701,15 @@ function _predictHotRange(rounds, W) {
   }
   function mk(s0) {
     if (s0 == null) return null;
-    var r = 0;
-    for (var k2 = 0; k2 < 10; k2++) r += cnt[s0+k2];
-    return { start: s0, end: s0 + 9, count: r };
+    var r1 = 0, r2 = 0, r3 = 0, sc = 0;
+    for (var k2 = 0; k2 < 10; k2++) {
+      r1 += c1[s0+k2]; r2 += c2[s0+k2]; r3 += c3[s0+k2]; sc += wgt[s0+k2];
+    }
+    return { start: s0, end: s0 + 9, count: r1 + r2 + r3, count1: r1, count2: r2, count3: r3, score: sc };
   }
   var top1 = mk(picks[0]);
-  return { start: top1.start, end: top1.end, count: top1.count, windowSize: win.length,
+  return { start: top1.start, end: top1.end, count: top1.count, score: top1.score,
+           count1: top1.count1, count2: top1.count2, count3: top1.count3, windowSize: win.length,
            second: mk(picks[1]), third: mk(picks[2]) };
 }
 
@@ -2950,16 +2960,16 @@ function render() {
   // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회), 100회 전부 O/X
   var predictCard = document.getElementById('predict-card');
   if (flow && flow.sequence && flow.sequence.length >= 2) {
-    var PW = 60;  // 최근 60회 (OOS 최근100회 18%, W50보다 우수)
+    var PW = 80;  // 최근 80회 · 1·2·3등 통합 (OOS 아무등수 31~32%, 랜덤 27.4%)
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);
-    var prDec = _bestDecadeRange(rows, PW);  // 십의자리 고정 최다 (대비 증거)
     var html = '';
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 최근 ' + PW + '회 · 연속 10칸 슬라이딩 전수검증 + 최근 6회 반복가중</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 1·2·3등 통합 예측 (최근 ' + PW + '회, 1등 2배 가중 + 최근 6회 반복가중)</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' + pr.start + ' ~ ' + pr.end +
-            '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
+            '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 +
+            '회 (최근 ' + pr.windowSize + '회)</span></span>';
     html += '</div>';
     // 판세: 현재 구간 유지 길이 + 2위 구간과 격차 (역전 시 예측 자동 교체)
     var starts = acc.recent.map(function(r){ return r.predStart; });
@@ -2968,24 +2978,21 @@ function render() {
     for (var mv = 1; mv < starts.length; mv++) if (starts[mv] !== starts[mv-1]) moves++;
     var keep = 1;
     for (var sk = starts.length - 2; sk >= 0 && starts[sk] === pr.start; sk--) keep++;
-    var raceTxt = '판세: 이 구간 <b>' + keep + '회째</b> 1위 유지';
+    var raceTxt = '판세: 이 구간 <b>' + keep + '회째</b> 1위 유지 (점수 ' + Math.round(pr.score * 10) / 10 + ')';
     if (pr.second) {
-      raceTxt += ' · 2위 ' + pr.second.start + '~' + pr.second.end + ' (' + pr.second.count + '회)와 격차 <b>' +
-                 (pr.count - pr.second.count) + '회</b> — 역전되면 예측 자동 교체';
+      raceTxt += ' · 2위 ' + pr.second.start + '~' + pr.second.end + ' (' + Math.round(pr.second.score * 10) / 10 + ')와 격차 <b>' +
+                 Math.round((pr.score - pr.second.score) * 10) / 10 + '점</b> — 역전되면 예측 자동 교체';
     }
     raceTxt += ' · 최근 ' + acc.tot + '회 동안 예측 ' + moves + '번 이동';
     html += '<div class="predict-cmp">' + raceTxt + '</div>';
-    // 십의자리 고정 대비 — 연속10칸이 왜 더 나은지 증거
-    if (pr.count > prDec.count) {
-      html += '<div class="predict-cmp">연속10칸 <b>' + pr.start + '~' + pr.end + ' (' + pr.count + '회)</b>' +
-              ' &gt; 십의자리 ' + prDec.start + '~' + prDec.end + ' (' + prDec.count + '회) — 경계에 안 잘려 더 정확</div>';
-    }
     var pct = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
-    var anyPct = acc.tot > 0 ? Math.round((acc.hit + acc.hit2 + acc.hit3) / acc.tot * 100) : 0;
-    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 — 1등 <strong>' + acc.hit + '/' + acc.tot +
-            ' (' + pct + '%)</strong> · <span class="rk-txt rk2-txt">2등 ' + acc.hit2 + '회</span> · ' +
-            '<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '회</span>' +
-            '<span style="color:var(--text-dim);font-size:11px;"> · 아무 등수 ' + anyPct + '% (랜덤 27%)</span></div>';
+    var anyHit = acc.hit + acc.hit2 + acc.hit3;
+    var anyPct = acc.tot > 0 ? Math.round(anyHit / acc.tot * 100) : 0;
+    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 — 1·2·3등 아무거나 <strong>' + anyHit + '/' + acc.tot +
+            ' (' + anyPct + '%)</strong><span style="color:var(--text-dim);font-size:11px;"> · 10개 찍기, 랜덤 27% 대비</span>' +
+            ' · <span class="rk-txt rk1-txt">1등 ' + acc.hit + '회</span> · ' +
+            '<span class="rk-txt rk2-txt">2등 ' + acc.hit2 + '회</span> · ' +
+            '<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '회</span></div>';
     html += '<div class="predict-cmp">○ 컬러 = 예측 구간에 들어온 등수: <span class="rk-txt rk1-txt">금 1등</span> · ' +
             '<span class="rk-txt rk2-txt">은 2등</span> · <span class="rk-txt rk3-txt">동 3등</span></div>';
     // 100회 전부 O/X (최신 → 과거 순, 등수별 컬러)

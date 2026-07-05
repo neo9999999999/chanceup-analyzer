@@ -481,6 +481,7 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
   border-radius: 12px;
 }
 .predict-title { font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+.predict-sub { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; }
 .predict-decs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .predict-dec {
   display: inline-flex; flex-direction: column; align-items: center;
@@ -1231,9 +1232,12 @@ tr.topfreq-rank-top3 .col-num {
     </div>
     <div class="decade-color-bar" id="decade-color-bar"></div>
     <div class="flow-recent" id="flow-recent"></div>
-    <!-- 🔮 다음 회차 예상 번호대 + 적중률 -->
+  </div>
+
+  <!-- 🔮 다음 회차 예상 번호대 (별도 카드) -->
+  <div class="card" id="predict-card" style="display:none;">
+    <div class="card-title">🔮 다음 회차 예상 1등 번호대</div>
     <div id="flow-predict"></div>
-    <div id="flow-stats-only"></div>
   </div>
 
   <!-- 🏆 최근 1등 빈도 TOP 10 -->
@@ -2878,60 +2882,42 @@ function render() {
       colorBarEl.dataset.init = '1';
     }
 
-    // 🔮 다음 회차 예상 번호대 + 100회 누적 적중률
-    (function(){
-      var PW = 30, PK = 3;  // 최근 30회, 번호대 TOP3 (OOS 39% 검증)
-      var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
-      var preds = _predictNextDecades(rows, PW, PK);
-      var acc = _decadeFlowAccuracy(rows, PW, PK, 100);
-      function decLabel(d){ return (d*10+1) + '~' + (d*10+10); }
-      var html = '<div class="predict-card">';
-      html += '<div class="predict-title">🔮 ' + nextRoundNum + '회 예상 1등 번호대 (최근 ' + PW + '회 흐름)</div>';
-      html += '<div class="predict-decs">';
-      for (var i = 0; i < preds.length; i++) {
-        html += '<span class="predict-dec" data-decade="' + preds[i].dec + '">' + decLabel(preds[i].dec) +
-                '<span class="predict-dec-cnt">' + preds[i].count + '회</span></span>';
-      }
-      html += '</div>';
-      var pct = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
-      html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 예측 적중: <strong>' + acc.hit + '/' + acc.tot +
-              ' (' + pct + '%)</strong> <span style="color:var(--text-dim);font-size:11px;">· 랜덤 30% 대비</span></div>';
-      // 최근 15회 적중 O/X
-      var last15 = acc.recent.slice(-15);
-      html += '<div class="predict-hits">';
-      for (var j = 0; j < last15.length; j++) {
-        var h = last15[j];
-        html += '<span class="predict-hit ' + (h.hit?'ok':'no') + '" title="' + h.round + '회 1등 ' + h.first + '">' +
-                (h.hit ? '○' : '×') + '</span>';
-      }
-      html += '</div>';
-      html += '</div>';
-      document.getElementById('flow-predict').innerHTML = html;
-    })();
-
-    // 베팅 추천 백테스트 통계 (1등/2등/3등 적중)
-    var bt = analyzeBettingBacktest(rows);
-    var statsHtml = '';
-    if (bt && bt.total > 0) {
-      statsHtml = '<div class="flow-stats">' +
-        '<div class="flow-stat-item">' +
-          '<div class="flow-stat-label">1등 적중</div>' +
-          '<div class="flow-stat-value success">' + bt.h1 + '/' + bt.total + '</div>' +
-        '</div>' +
-        '<div class="flow-stat-item">' +
-          '<div class="flow-stat-label">2등 적중</div>' +
-          '<div class="flow-stat-value success">' + bt.h2 + '/' + bt.total + '</div>' +
-        '</div>' +
-        '<div class="flow-stat-item">' +
-          '<div class="flow-stat-label">3등 적중</div>' +
-          '<div class="flow-stat-value success">' + bt.h3 + '/' + bt.total + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="muted" style="text-align:center;font-size:11px;margin-top:8px;">21회차부터 ' + bt.total + '회 검증</div>';
-    }
-    document.getElementById('flow-stats-only').innerHTML = statsHtml;
   } else {
     flowCard.style.display = 'none';
+  }
+
+  // 🔮 다음 회차 예상 번호대 (별도 카드) — 최근 50회 흐름, 100회 전부 O/X
+  var predictCard = document.getElementById('predict-card');
+  if (flow && flow.sequence && flow.sequence.length >= 2) {
+    var PW = 50, PK = 3;  // 최근 50회, 번호대 TOP3
+    var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
+    var preds = _predictNextDecades(rows, PW, PK);
+    var acc = _decadeFlowAccuracy(rows, PW, PK, 100);
+    function _decLabel(d){ return (d*10+1) + '~' + (d*10+10); }
+    var html = '';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 최근 ' + PW + '회 흐름 기준 TOP3 번호대</div>';
+    html += '<div class="predict-decs">';
+    for (var pi = 0; pi < preds.length; pi++) {
+      html += '<span class="predict-dec" data-decade="' + preds[pi].dec + '">' + _decLabel(preds[pi].dec) +
+              '<span class="predict-dec-cnt">' + preds[pi].count + '회</span></span>';
+    }
+    html += '</div>';
+    var pct = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
+    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 예측 적중: <strong>' + acc.hit + '/' + acc.tot +
+            ' (' + pct + '%)</strong> <span style="color:var(--text-dim);font-size:11px;">· 랜덤 30% 대비</span></div>';
+    // 100회 전부 O/X (최신 → 과거 순)
+    var all = acc.recent.slice().reverse();
+    html += '<div class="predict-hits">';
+    for (var hj = 0; hj < all.length; hj++) {
+      var hh = all[hj];
+      html += '<span class="predict-hit ' + (hh.hit?'ok':'no') + '" title="' + hh.round + '회 1등 ' + hh.first + '">' +
+              (hh.hit ? '○' : '×') + '</span>';
+    }
+    html += '</div>';
+    document.getElementById('flow-predict').innerHTML = html;
+    predictCard.style.display = 'block';
+  } else {
+    predictCard.style.display = 'none';
   }
 
   // (추천 히스토리 카드 제거됨 — 사용자 요청)

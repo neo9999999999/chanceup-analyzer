@@ -1176,9 +1176,7 @@ tr.topfreq-rank-top3 .col-num {
   </div>
 
   <div class="tabs">
-    <button class="tab active" data-tab="basic">🍫 기본</button>
-    <button class="tab" data-tab="premium">💎 프리미엄</button>
-    <button class="tab" data-tab="food">🍱 푸드박스</button>
+    <button class="tab active" data-tab="basic">🍫 찬스업</button>
   </div>
 
   <!-- 회차 등록 -->
@@ -1203,32 +1201,6 @@ tr.topfreq-rank-top3 .col-num {
     <div class="decade-color-bar" id="decade-color-bar"></div>
     <div class="flow-recent" id="flow-recent"></div>
     <div id="flow-stats-only"></div>
-  </div>
-
-  <!-- 🎯 베팅 추천 (1·2·3등 합산 기반) -->
-  <div class="card highlight" id="betting-card" style="display:none;">
-    <div class="card-title" id="betting-title">🎯 베팅 추천</div>
-    <div class="betting-info" id="betting-info"></div>
-    <!-- 메인 추천 시퀀스 박스 -->
-    <div id="betting-sequence-main"></div>
-    <!-- 시퀀스 안 10개 번호 -->
-    <div class="betting-section">
-      <div class="betting-section-title">🔥 시퀀스 안 10개 번호</div>
-      <div class="betting-numbers" id="betting-numbers-2"></div>
-    </div>
-    <!-- 백테스트 적중률 (이 시퀀스의 1·2·3등 적중률) -->
-    <div class="betting-stats" id="betting-stats"></div>
-    <!-- 1·2·3등 혼합 흐름 (회차별 적중 개수) -->
-    <div class="betting-section" id="betting-flow-section" style="display:none;">
-      <div class="betting-section-title">📈 1·2·3등 혼합 흐름 (각 회차 시점 추천에 들어온 등수 개수)</div>
-      <div class="flow-recent betting-flow-row" id="betting-flow-recent"></div>
-    </div>
-  </div>
-
-  <!-- 📚 추천 히스토리 (회차 등록 시 자동 저장) -->
-  <div class="card" id="rechistory-card" style="display:none;">
-    <div class="card-title">📚 추천 히스토리 (회차 등록 시 자동 저장)</div>
-    <div id="rechistory-table"></div>
   </div>
 
   <!-- 🏆 최근 1등 빈도 TOP 10 -->
@@ -2792,157 +2764,7 @@ function render() {
   // 회차 카운트
   document.getElementById('round-count').textContent = '총 ' + rows.length + '회차';
 
-  // 🎯 베팅 추천 (최근 20회 1·2·3등 빈도 분석)
-  var bettingCard = document.getElementById('betting-card');
-  var betting = analyzeBetting(rows);
-  if (betting) {
-    bettingCard.style.display = 'block';
-
-    // 다음 회차 번호
-    var maxR = 0;
-    for (var br = 0; br < rows.length; br++) {
-      if (rows[br].round > maxR) maxR = rows[br].round;
-    }
-    var nextRound = maxR + 1;
-
-    document.getElementById('betting-title').innerHTML =
-      '🎯 ' + nextRound + '회 베팅 추천';
-    var cfgNow = ALGO_CONFIG[currentTab];
-    var autoBadge = (cfgNow && cfgNow.auto)
-      ? ' <span style="color:#34d399;font-weight:700;">🤖 자가보정 채택</span>'
-      : ' <span style="color:var(--text-dim);">📌 v17 유지</span>';
-    var learnInfo = '';
-    if (cfgNow && cfgNow.lastEval) {
-      var le = cfgNow.lastEval;
-      var pctAny = (le.hitAny / le.total * 100).toFixed(0);
-      var pct1 = (le.hit1 / le.total * 100).toFixed(0);
-      learnInfo = '<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">' +
-        '<strong>OOS walk-forward 최근 ' + le.total + '회 검증</strong>: ' +
-        '1등 ' + le.hit1 + '/' + le.total + ' (' + pct1 + '%) · 통합 ' + le.hitAny + '/' + le.total + ' (' + pctAny + '%)';
-      // 중첩 OOS(검증 tail) 비교 — 과적합 방지 근거 표시
-      if (cfgNow.nested && cfgNow.nested.champHold && cfgNow.nested.baseHold) {
-        var nh = cfgNow.nested, ch = nh.champHold, bh = nh.baseHold;
-        learnInfo += '<br><span style="color:#fbbf24;">🔁 중첩검증(미검증 ' + nh.hold + '회 tail)</span>: ' +
-          'baseline 1등 ' + (bh.p1*100).toFixed(0) + '%' +
-          (ch ? ' vs 후보 1등 ' + (ch.p1*100).toFixed(0) + '%' : '');
-      }
-      if (cfgNow.note) learnInfo += '<br>ℹ️ ' + cfgNow.note;
-      // 학습 진화 이력 (최근 변화)
-      if (window.__learnLog && window.__learnLog.length >= 2) {
-        var lg = window.__learnLog, switches = 0;
-        for (var li = 1; li < lg.length; li++) if (lg[li].adopted !== lg[li-1].adopted) switches++;
-        learnInfo += '<br>📚 자가보정 이력 ' + lg.length + '회차 누적 · 전략 전환 ' + switches + '회';
-      }
-      learnInfo += '</div>';
-    }
-    document.getElementById('betting-info').innerHTML =
-      '최근 ' + betting.windowSize + '회 분석 · <strong>' + betting.algoLabel + '</strong>' + autoBadge + learnInfo;
-
-    // ⭐ 메인 추천 박스 (전략별: 연속/자유/분할)
-    var seqMain = document.getElementById('betting-sequence-main');
-    if (betting.sequence) {
-      var sq = betting.sequence;
-      var labelTxt = {
-        'consecutive': '⭐ 최고 시퀀스 (10개 연속)',
-        'free': '⭐ 자유 추천 (1등 적중률 최적)',
-        'two_seg': '⭐ 분할 추천 (2구간 × 5개)',
-        'two_seg_echo': '⭐ 분할+에코 추천 (2구간 + 재출현 후보)',
-        'free_echo': '⭐ 자유+에코 추천 (TOP + 재출현 후보)'
-      }[sq.strategy] || '⭐ 추천';
-      var rangeTxt = sq.strategy === 'free' ? '아래 10개 번호' : sq.label;
-      seqMain.innerHTML = '<div class="seq-main-card">' +
-        '<div class="seq-main-label">' + labelTxt + '</div>' +
-        '<div class="seq-main-range">' + rangeTxt + '</div>' +
-        '<div class="seq-main-sub">최근 ' + sq.windowSize + '회 분석 · OOS 1등 적중률 최적화</div>' +
-        '</div>';
-    } else {
-      seqMain.innerHTML = '';
-    }
-
-    // 시퀀스 안 10개 번호 (1등/2·3등만 배지, 신규는 배지 없음)
-    var dup2 = betting.dup2;
-    if (dup2.length > 0) {
-      var n2Html = '';
-      for (var i2 = 0; i2 < dup2.length; i2++) {
-        var item = dup2[i2];
-        var badge = '', badgeClass = '';
-        if (item.c1 >= 1) {
-          badge = '1등 ' + item.c1;
-          badgeClass = 'bn-count bn-first';
-        } else if (item.c2 + item.c3 >= 1) {
-          badge = '2·3등 ' + (item.c2 + item.c3);
-          badgeClass = 'bn-count bn-mix';
-        }
-        // 신규는 배지 없음 (제거)
-        var badgeHtml = badge ? '<span class="' + badgeClass + '">' + badge + '</span>' : '';
-        n2Html += '<div class="betting-number">' +
-          badgeHtml +
-          item.number +
-          '</div>';
-      }
-      document.getElementById('betting-numbers-2').innerHTML = n2Html;
-    } else {
-      document.getElementById('betting-numbers-2').innerHTML =
-        '<div class="betting-empty">데이터 부족</div>';
-    }
-
-    // 📈 1·2·3등 혼합 흐름 (베팅 카드 안)
-    if (betting.combinedFlow && betting.combinedFlow.length > 0) {
-      var bfSection = document.getElementById('betting-flow-section');
-      var bfRecent = betting.combinedFlow.slice(-20);
-      var bfHtml = '';
-      // 같은 시퀀스 라벨 반복 카운트
-      var bfLabelCount = {};
-      for (var bfc = 0; bfc < bfRecent.length; bfc++) {
-        var bflbl = bfRecent[bfc].seqLabel;
-        bfLabelCount[bflbl] = (bfLabelCount[bflbl] || 0) + 1;
-      }
-      for (var bfi = 0; bfi < bfRecent.length; bfi++) {
-        if (bfi > 0) bfHtml += '<span class="flow-arrow">→</span>';
-        var bfit = bfRecent[bfi];
-        var isLatest = (bfi === bfRecent.length - 1);
-        var bfsCount = bfLabelCount[bfit.seqLabel];
-        var cls = 'flow-step seq-box bf-step';
-        if (bfit.hits > 0) cls += ' bf-hits-' + bfit.hits;  // 1/2/3 적중 강도
-        if (isLatest) cls += ' latest';
-        if (!isLatest && bfsCount >= 2) cls += ' repeat-2';
-        // 박스: 시퀀스 + 적중 개수 (예: 73~82 / 2·3)
-        var numLabel = bfit.hits > 0
-          ? bfit.displayNums.join('·')
-          : (bfit.first + '·' + bfit.second + '·' + bfit.third);
-        bfHtml += '<span class="' + cls + '">' +
-          '<span class="flow-step-group">' + bfit.seqLabel + '</span>' +
-          '<span class="flow-step-num bf-num">' + numLabel + '</span>' +
-          '<span class="bf-hits-label">' + bfit.hits + '/3</span>' +
-          '</span>';
-      }
-      document.getElementById('betting-flow-recent').innerHTML = bfHtml;
-      bfSection.style.display = 'block';
-    }
-
-    // 백테스트 적중률 (1·2·3등 분리)
-    var stats = betting.stats;
-    document.getElementById('betting-stats').innerHTML =
-      '<div class="betting-stat">' +
-        '<div class="betting-stat-label">🥇 1등 적중</div>' +
-        '<div class="betting-stat-value">' + stats.p1 + '%</div>' +
-      '</div>' +
-      '<div class="betting-stat">' +
-        '<div class="betting-stat-label">🥈 2등 적중</div>' +
-        '<div class="betting-stat-value">' + stats.p2 + '%</div>' +
-      '</div>' +
-      '<div class="betting-stat">' +
-        '<div class="betting-stat-label">🥉 3등 적중</div>' +
-        '<div class="betting-stat-value">' + stats.p3 + '%</div>' +
-      '</div>' +
-      '<div class="betting-stat" style="grid-column: span 3; margin-top:6px;">' +
-        '<div class="betting-stat-label">1·2·3등 중 하나라도 적중 (통합)</div>' +
-        '<div class="betting-stat-value" style="font-size:22px;color:rgba(134,239,172,1);">' + stats.pany + '%</div>' +
-      '</div>';
-
-  } else {
-    bettingCard.style.display = 'none';
-  }
+  // 베팅 추천 카드 제거됨 (사용자 요청)
 
   // 🌊 1등 흐름 분석 (간소화, 반복 패턴 색상 강조)
   var flow = analyzeFlow(rows);
@@ -2950,35 +2772,10 @@ function render() {
   if (flow && flow.sequence.length >= 2) {
     flowCard.style.display = 'block';
 
-    // 최근 흐름 (최대 7회) + 반복 구간 색상 강조
-    // 추천 흐름: 면처리는 진짜 OOS 적중 시만. 라인 처리 시퀀스 반복.
-    function renderRecommendRow(sequence) {
-      if (!sequence || sequence.length === 0) return '';
-      var rec = sequence.slice(-20);
-      var labelCount = {};
-      for (var fc = 0; fc < rec.length; fc++) {
-        labelCount[rec[fc].seqLabel] = (labelCount[rec[fc].seqLabel] || 0) + 1;
-      }
-      var html = '';
-      for (var fi = 0; fi < rec.length; fi++) {
-        if (fi > 0) html += '<span class="flow-arrow">→</span>';
-        var isLatest = (fi === rec.length - 1);
-        var sCount = labelCount[rec[fi].seqLabel];
-        var cls = 'flow-step seq-box';
-        if (rec[fi].hit) cls += ' in-hot-range'; // 면처리: OOS hit만
-        if (isLatest) cls += ' latest';
-        if (!isLatest && sCount >= 2) cls += ' repeat-2';
-        html += '<span class="' + cls + '">' +
-          '<span class="flow-step-group">' + rec[fi].seqLabel + '</span>' +
-          '<span class="flow-step-num">' + rec[fi].num + '</span>' +
-          '</span>';
-      }
-      return html;
-    }
-    // 당첨 흐름: 십의자리 그룹 라벨, 최근 30회 누적
+    // 당첨 흐름: 십의자리 그룹 라벨, 최근 50회 누적
     function renderActualRow(sequence) {
       if (!sequence || sequence.length === 0) return '';
-      var rec = sequence.slice(-30);
+      var rec = sequence.slice(-50);
       // 십의자리 그룹 카운트 (반복 강조용)
       var groupCount = {};
       for (var fc = 0; fc < rec.length; fc++) {
@@ -3028,63 +2825,18 @@ function render() {
           '<div class="flow-stat-value success">' + bt.h3 + '/' + bt.total + '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="muted" style="text-align:center;font-size:11px;margin-top:8px;">베팅 추천 기준 · 21회차부터 ' + bt.total + '회 검증</div>';
+      '<div class="muted" style="text-align:center;font-size:11px;margin-top:8px;">21회차부터 ' + bt.total + '회 검증</div>';
     }
     document.getElementById('flow-stats-only').innerHTML = statsHtml;
   } else {
     flowCard.style.display = 'none';
   }
 
-  // 📚 추천 히스토리 (자동 저장된 과거 추천 + 실제 결과 + 적중 여부)
-  var recHistCard = document.getElementById('rechistory-card');
-  var recHist = _loadRecHistory(currentTab);
-  if (recHist.length > 0) {
-    recHistCard.style.display = 'block';
-    var shown = recHist.slice(-30).reverse();
-    var rhHtml = '<div class="topfreq-info">회차 등록 시점의 추천 시퀀스 자동 저장 · 실제 1·2·3등과 매칭</div>';
-    rhHtml += '<table class="rank-prob-table"><thead><tr>' +
-      '<th>회차</th><th>추천 시퀀스</th><th>1등</th><th>2등</th><th>3등</th><th>적중</th>' +
-      '</tr></thead><tbody>';
-    for (var rh = 0; rh < shown.length; rh++) {
-      var h = shown[rh];
-      var hitBadge = h.hitCount === 0 ? '<span style="color:var(--text-dim);">0/3</span>' :
-                     h.hitCount === 3 ? '<span style="color:#34d399;font-weight:800;">🎯 3/3</span>' :
-                     '<span style="color:var(--accent);font-weight:700;">' + h.hitCount + '/3</span>';
-      function _cell(num, isHit) {
-        var color = isHit ? 'color:var(--accent);font-weight:800;' : 'color:var(--text-dim);';
-        return '<td style="' + color + '">' + num + (isHit ? ' ✓' : '') + '</td>';
-      }
-      rhHtml += '<tr>' +
-        '<td class="col-num">' + h.round + '</td>' +
-        '<td style="font-weight:700;">' + h.recStart + '~' + h.recEnd + '</td>' +
-        _cell(h.actualFirst, h.hit1) +
-        _cell(h.actualSecond, h.hit2) +
-        _cell(h.actualThird, h.hit3) +
-        '<td>' + hitBadge + '</td>' +
-        '</tr>';
-    }
-    rhHtml += '</tbody></table>';
-    var totalH = recHist.length;
-    var totH1 = recHist.filter(function(h){ return h.hit1; }).length;
-    var totH2 = recHist.filter(function(h){ return h.hit2; }).length;
-    var totH3 = recHist.filter(function(h){ return h.hit3; }).length;
-    var totAny = recHist.filter(function(h){ return h.hitCount > 0; }).length;
-    rhHtml += '<div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--border);font-size:12px;">' +
-      '<strong style="color:var(--accent);">📊 누적 적중률 (' + totalH + '회 기록)</strong><br>' +
-      '1등 ' + totH1 + ' (' + (totH1/totalH*100).toFixed(0) + '%) · ' +
-      '2등 ' + totH2 + ' (' + (totH2/totalH*100).toFixed(0) + '%) · ' +
-      '3등 ' + totH3 + ' (' + (totH3/totalH*100).toFixed(0) + '%) · ' +
-      '<strong>통합 ' + totAny + ' (' + (totAny/totalH*100).toFixed(0) + '%)</strong>' +
-      '</div>';
-    document.getElementById('rechistory-table').innerHTML = rhHtml;
-  } else {
-    recHistCard.style.display = 'none';
-  }
+  // (추천 히스토리 카드 제거됨 — 사용자 요청)
 
-  // 🏆 최근 1등 빈도 TOP 10 (회차 등록할 때마다 순위 변동)
+  // 🏆 최근 1등 빈도 TOP 10 (최근 40회, 회차 등록할 때마다 순위 변동)
   var topFreqCard = document.getElementById('topfreq-card');
-  var freqWindow = (ALGO_CONFIG[currentTab] || ALGO_CONFIG.basic).window || 20;
-  var freqResult = _topFrequencyNumbers(rows, freqWindow * 2, 10);
+  var freqResult = _topFrequencyNumbers(rows, 40, 10);
   if (freqResult.top.length > 0) {
     topFreqCard.style.display = 'block';
     var fHtml = '<div class="topfreq-info">최근 ' + freqResult.windowSize + '회 1등 출현 횟수 순위 · 회차 등록할 때마다 갱신</div>';

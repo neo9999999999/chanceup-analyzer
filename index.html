@@ -2889,7 +2889,7 @@ function render() {
   // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회), 100회 전부 O/X
   var predictCard = document.getElementById('predict-card');
   if (flow && flow.sequence && flow.sequence.length >= 2) {
-    var PW = 50;  // 최근 50회
+    var PW = 60;  // 최근 60회 (OOS 최근100회 18%, W50보다 우수)
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);

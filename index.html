@@ -490,6 +490,8 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 }
 .predict-dec-cnt { font-size: 10px; font-weight: 600; opacity: 0.85; margin-top: 2px; }
 .predict-dec-big { font-size: 26px; padding: 14px 26px; width: 100%; box-sizing: border-box; }
+.predict-dec-2nd { font-size: 17px; padding: 10px 18px; width: 100%; box-sizing: border-box; opacity: 0.75; }
+.predict-rank { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1px; opacity: 0.8; margin-bottom: 2px; }
 /* 번호대 컬러 (당첨흐름과 동일 톤) */
 .predict-dec[data-decade="0"]{background:#7f1d1d;} .predict-dec[data-decade="1"]{background:#9a3412;}
 .predict-dec[data-decade="2"]{background:#713f12;} .predict-dec[data-decade="3"]{background:#4d7c0f;}
@@ -1672,10 +1674,22 @@ function _predictHotRange(rounds, W) {
     for (var k = 0; k < 10; k++) t += wgt[s+k];
     if (t > bt) { bt = t; bs = s; }
   }
+  // 2순위: 1순위와 겹치지 않는(거리 10 이상) 최고 구간
+  var bs2 = null, bt2 = -1;
+  for (var s2 = 1; s2 <= 91; s2++) {
+    if (Math.abs(s2 - bs) < 10) continue;
+    var t2 = 0;
+    for (var k3 = 0; k3 < 10; k3++) t2 += wgt[s2+k3];
+    if (t2 > bt2) { bt2 = t2; bs2 = s2; }
+  }
   // 표시용 카운트는 실제 출현 횟수(정수)
-  var raw = 0;
-  for (var k2 = 0; k2 < 10; k2++) raw += cnt[bs+k2];
-  return { start: bs, end: bs + 9, count: raw, windowSize: win.length };
+  var raw = 0, raw2 = 0;
+  for (var k2 = 0; k2 < 10; k2++) {
+    raw += cnt[bs+k2];
+    if (bs2 !== null) raw2 += cnt[bs2+k2];
+  }
+  return { start: bs, end: bs + 9, count: raw, windowSize: win.length,
+           second: bs2 !== null ? { start: bs2, end: bs2 + 9, count: raw2 } : null };
 }
 
 // 십의자리 고정(1~10,11~20...) 최다 구간 — 연속10칸과 대비 증거용
@@ -2927,8 +2941,15 @@ function render() {
     var html = '';
     html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 최근 ' + PW + '회 · 연속 10칸 슬라이딩 전수검증 + 최근 6회 반복가중</div>';
     html += '<div class="predict-decs">';
-    html += '<span class="predict-dec predict-dec-big" data-decade="' + startDec + '">' + pr.start + ' ~ ' + pr.end +
+    html += '<span class="predict-dec predict-dec-big" data-decade="' + startDec + '">' +
+            '<span class="predict-rank">1순위</span>' + pr.start + ' ~ ' + pr.end +
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
+    if (pr.second) {
+      var secDec = Math.floor((pr.second.start - 1) / 10);
+      html += '<span class="predict-dec predict-dec-2nd" data-decade="' + secDec + '">' +
+              '<span class="predict-rank">2순위 (차선)</span>' + pr.second.start + ' ~ ' + pr.second.end +
+              '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.second.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
+    }
     html += '</div>';
     // 십의자리 고정 대비 — 연속10칸이 왜 더 나은지 증거
     if (pr.count > prDec.count) {

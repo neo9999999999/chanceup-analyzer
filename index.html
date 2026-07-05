@@ -1667,7 +1667,7 @@ function decadeLabel(d) {
 // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회 1등 빈도 최다 연속구간)
 // OOS: 전체 15% / 최근 20% (랜덤 10% 대비 1.5~2배). 십의자리 고정보다 우수.
 function _predictHotRange(rounds, W) {
-  W = W || 80;
+  W = W || 60;
   var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
   // 1·2·3등 통합 스코어 (1등 2배 가중) — 목표: 아무 등수나 예측 구간에 들어오게
@@ -2960,12 +2960,12 @@ function render() {
   // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회), 100회 전부 O/X
   var predictCard = document.getElementById('predict-card');
   if (flow && flow.sequence && flow.sequence.length >= 2) {
-    var PW = 80;  // 최근 80회 · 1·2·3등 통합 (OOS 아무등수 31~32%, 랜덤 27.4%)
+    var PW = 60;  // 최근 60회 기준 · 1·2·3등 통합 · 검증은 최근 100회 (OOS 아무등수 31%, 랜덤 27.4%)
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);
     var html = '';
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 1·2·3등 통합 예측 (최근 ' + PW + '회, 1등 2배 가중 + 최근 6회 반복가중)</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 1·2·3등 통합 예측 (최근 ' + PW + '회 기준, 1등 2배 가중 + 최근 6회 반복가중 · 검증 최근 100회)</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' + pr.start + ' ~ ' + pr.end +
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 +

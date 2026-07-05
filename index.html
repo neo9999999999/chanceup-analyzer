@@ -1735,7 +1735,7 @@ function _hotRangeAccuracy(rounds, W, evalN) {
     else if (rank === 2) hit2++;
     else if (rank === 3) hit3++;
     tot++;
-    recent.push({ round: row.round, first: row.first, second: row.second, third: row.third, hit: rank === 1, rank: rank });
+    recent.push({ round: row.round, first: row.first, second: row.second, third: row.third, hit: rank === 1, rank: rank, predStart: pr.start });
   }
   return { hit: hit, hit2: hit2, hit3: hit3, tot: tot, recent: recent };
 }
@@ -2961,6 +2961,20 @@ function render() {
     html += '<span class="predict-dec predict-dec-big predict-rank1">' + pr.start + ' ~ ' + pr.end +
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     html += '</div>';
+    // 판세: 현재 구간 유지 길이 + 2위 구간과 격차 (역전 시 예측 자동 교체)
+    var starts = acc.recent.map(function(r){ return r.predStart; });
+    starts.push(pr.start);
+    var moves = 0;
+    for (var mv = 1; mv < starts.length; mv++) if (starts[mv] !== starts[mv-1]) moves++;
+    var keep = 1;
+    for (var sk = starts.length - 2; sk >= 0 && starts[sk] === pr.start; sk--) keep++;
+    var raceTxt = '판세: 이 구간 <b>' + keep + '회째</b> 1위 유지';
+    if (pr.second) {
+      raceTxt += ' · 2위 ' + pr.second.start + '~' + pr.second.end + ' (' + pr.second.count + '회)와 격차 <b>' +
+                 (pr.count - pr.second.count) + '회</b> — 역전되면 예측 자동 교체';
+    }
+    raceTxt += ' · 최근 ' + acc.tot + '회 동안 예측 ' + moves + '번 이동';
+    html += '<div class="predict-cmp">' + raceTxt + '</div>';
     // 십의자리 고정 대비 — 연속10칸이 왜 더 나은지 증거
     if (pr.count > prDec.count) {
       html += '<div class="predict-cmp">연속10칸 <b>' + pr.start + '~' + pr.end + ' (' + pr.count + '회)</b>' +

@@ -2972,7 +2972,7 @@ function render() {
         var hs = (rec[fi].seqStart != null) ? rec[fi].seqStart : (Math.floor((num - 1) / 10) * 10 + 1);
         var he = (rec[fi].seqEnd != null) ? rec[fi].seqEnd : (hs + 9);
         var groupLabel = hs + '~' + he;
-        var dec = Math.floor((hs - 1) / 10); // 윈도우 시작 기준 컬러 0~9
+        var dec = Math.floor((num - 1) / 10); // ★ 실제 1등 번호대 기준 컬러 0~9 (범례와 일치)
         var gCount = groupCount[groupLabel];
         var cls = 'flow-step seq-box';
         if (gCount >= 2) cls += ' repeat-2';

@@ -3000,12 +3000,13 @@ function render() {
   // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회), 100회 전부 O/X
   var predictCard = document.getElementById('predict-card');
   if (flow && flow.sequence && flow.sequence.length >= 2) {
-    var PW = 60;  // 최근 60회 기준 · 1·2·3등 통합 · 검증은 최근 100회 (OOS 아무등수 31%, 랜덤 27.4%)
+    var PW = 70;  // 최근 70회 기준 · 1·2·3등 통합 (OOS 재검증: W63~75 고원 ~34%, W60(30%)보다 우수) · 검증 최근 100회
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);
     var html = '';
     html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 1·2·3등 통합 예측 (최근 ' + PW + '회 기준, 1등 2배 가중 + 최근 6회 반복가중 · 검증 최근 100회)</div>';
+    // (윈도우 W=70: OOS 재검증 결과 W63~75 고원이 최적, 아무등수 ~34% vs W60 30%)
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' +
             '<span class="predict-rank">1순위</span>' + pr.start + ' ~ ' + pr.end +

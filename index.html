@@ -490,6 +490,7 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 }
 .predict-dec-cnt { font-size: 10px; font-weight: 600; opacity: 0.85; margin-top: 2px; }
 .predict-dec-big { font-size: 26px; padding: 14px 26px; flex: 0 0 100%; box-sizing: border-box; }
+.predict-dec-big.predict-rank2 { font-size: 21px; padding: 11px 22px; opacity: 0.92; }
 .predict-dec-2nd { font-size: 17px; padding: 10px 18px; flex: 1 1 42%; box-sizing: border-box; opacity: 0.8; }
 .predict-rank { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1px; opacity: 0.8; margin-bottom: 2px; }
 /* 번호대 컬러 (당첨흐름과 동일 톤) */
@@ -3006,9 +3007,16 @@ function render() {
     var html = '';
     html += '<div class="predict-sub">' + nextRoundNum + '회 예상 · 1·2·3등 통합 예측 (최근 ' + PW + '회 기준, 1등 2배 가중 + 최근 6회 반복가중 · 검증 최근 100회)</div>';
     html += '<div class="predict-decs">';
-    html += '<span class="predict-dec predict-dec-big predict-rank1">' + pr.start + ' ~ ' + pr.end +
+    html += '<span class="predict-dec predict-dec-big predict-rank1">' +
+            '<span class="predict-rank">1순위</span>' + pr.start + ' ~ ' + pr.end +
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 +
             '회 (최근 ' + pr.windowSize + '회)</span></span>';
+    if (pr.second) {
+      html += '<span class="predict-dec predict-dec-big predict-rank2">' +
+              '<span class="predict-rank">2순위</span>' + pr.second.start + ' ~ ' + pr.second.end +
+              '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.second.count1 + ' · 2등 ' + pr.second.count2 + ' · 3등 ' + pr.second.count3 +
+              '회 (최근 ' + pr.windowSize + '회)</span></span>';
+    }
     html += '</div>';
     // 추가 추천 TOP 20 (예측 구간 제외) — 분석은 백단, 앞단은 순위+번호만 (상세는 툴팁)
     // 실패 커버: 예측이 빗나간 회차의 당첨수, 전체 횟수순 (밴드+인접 ±2 제외)
@@ -3021,6 +3029,7 @@ function render() {
         var mn = mNums[mj];
         if (mn == null || mn < 1 || mn > 100) continue;
         if (mn >= pr.start - 2 && mn <= pr.end + 2) continue;
+        if (pr.second && mn >= pr.second.start - 2 && mn <= pr.second.end + 2) continue;  // 2순위 밴드도 제외
         if (!missDet[mn]) missDet[mn] = { c1: 0, c2: 0, c3: 0, last: 0 };
         if (mj === 0) missDet[mn].c1++;
         else if (mj === 1) missDet[mn].c2++;
@@ -3043,7 +3052,8 @@ function render() {
         for (var fk = 0; fk < fn.length && cover.length < 20; fk++) {
           var v = fn[fk];
           if (v == null || v < 1 || v > 100) continue;
-          if (v >= pr.start - 2 && v <= pr.end + 2) continue;  // 밴드+인접 제외
+          if (v >= pr.start - 2 && v <= pr.end + 2) continue;  // 1순위 밴드+인접 제외
+          if (pr.second && v >= pr.second.start - 2 && v <= pr.second.end + 2) continue;  // 2순위 밴드 제외
           if (cover.indexOf(v) < 0) cover.push(v);
         }
       }

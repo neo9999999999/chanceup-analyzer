@@ -980,8 +980,14 @@ tr.topfreq-rank-top3 .col-num {
 .rounds-table .rt-band { color: #f5c542; font-weight: 700; font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .rounds-table .rt-res { font-size: 12px; }
 .rounds-table td.rt-hit { background: rgba(245,197,66,0.22); color: #f5c542; border-radius: 5px; }
+.rounds-table td.rt-hit2 { background: rgba(96,165,250,0.22); color: #8fc0ff; border-radius: 5px; }
 .rounds-table .rt-dim { color: var(--text-dim); opacity: 0.5; }
 .rounds-table .rt-miss { color: var(--text-dim); opacity: 0.45; font-size: 11px; }
+.rounds-table .rt-b1 { color: #f5c542; font-weight: 700; }
+.rounds-table .rt-b2 { color: #8fc0ff; font-weight: 700; font-size: 11px; }
+.rounds-table .rt-res1 { color: #f5c542; font-weight: 700; font-size: 11px; }
+.rounds-table .rt-res2 { color: #8fc0ff; font-weight: 700; font-size: 11px; }
+.rounds-table .rt-res1 .rt-rescol, .rounds-table .rt-res2 .rt-rescol { color: inherit; }
 
 .hit-item {
   display: flex;
@@ -3152,7 +3158,7 @@ function render() {
     sorted.sort(function (a, b) { return b.round - a.round; });
     // ★ 회차별 예측 구간 사전계산 (그 회차 직전 데이터로 OOS 예측, 현행 2:1:0.5 W70과 동일)
     var asc = rows.slice().sort(function (a, b) { return a.round - b.round; });
-    function _bandFast(endIdx, W) {
+    function _bandFast2(endIdx, W) {  // 비겹침 상위 2구간 시작점 반환
       var lo = Math.max(0, endIdx - W), wgt = new Array(101).fill(0);
       for (var j = lo; j < endIdx; j++) {
         var r = asc[j];
@@ -3160,35 +3166,60 @@ function render() {
         if (r.second != null) wgt[r.second] += 1;
         if (r.third != null) wgt[r.third] += 0.5;
       }
-      var bs = 1, bt = -1;
-      for (var s = 1; s <= 91; s++) { var t = 0; for (var k = 0; k < 10; k++) t += wgt[s + k]; if (t > bt) { bt = t; bs = s; } }
-      return bs;
+      var ws = [];
+      for (var s = 1; s <= 91; s++) { var t = 0; for (var k = 0; k < 10; k++) t += wgt[s + k]; ws.push([s, t]); }
+      ws.sort(function (a, b) { return b[1] - a[1] || a[0] - b[0]; });
+      var picks = [];
+      for (var wi = 0; wi < ws.length && picks.length < 2; wi++) {
+        var ps = ws[wi][0], ok = true;
+        for (var qi = 0; qi < picks.length; qi++) if (Math.abs(ps - picks[qi]) < 10) { ok = false; break; }
+        if (ok) picks.push(ps);
+      }
+      return picks;
+    }
+    function _rankIn(rr, s) {  // 구간 s~s+9에 걸린 등수 (1>2>3), 없으면 0
+      if (s == null) return 0;
+      if (rr.first != null && rr.first >= s && rr.first <= s + 9) return 1;
+      if (rr.second != null && rr.second >= s && rr.second <= s + 9) return 2;
+      if (rr.third != null && rr.third >= s && rr.third <= s + 9) return 3;
+      return 0;
     }
     var predMap = {};
     for (var pi = 10; pi < asc.length; pi++) {
-      var bs2 = _bandFast(pi, 70), rr = asc[pi], rk = 0;
-      if (rr.first != null && rr.first >= bs2 && rr.first <= bs2 + 9) rk = 1;
-      else if (rr.second != null && rr.second >= bs2 && rr.second <= bs2 + 9) rk = 2;
-      else if (rr.third != null && rr.third >= bs2 && rr.third <= bs2 + 9) rk = 3;
-      predMap[rr.round] = { s: bs2, e: bs2 + 9, rank: rk };
+      var bb = _bandFast2(pi, 70), rr = asc[pi];
+      var s1 = bb[0], s2 = bb.length > 1 ? bb[1] : null;
+      predMap[rr.round] = { s: s1, e: s1 + 9, rank: _rankIn(rr, s1),
+                            s2: s2, e2: s2 != null ? s2 + 9 : null, rank2: _rankIn(rr, s2) };
     }
     var roundsHtml = '<table class="rounds-table"><thead><tr>' +
       '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측구간</th><th>결과</th><th></th></tr></thead><tbody>';
     for (var n = 0; n < sorted.length; n++) {
       var row = sorted[n];
       var pm = predMap[row.round];
-      var inb = function (x) { return pm && x != null && x >= pm.s && x <= pm.e; };
-      var band = pm ? (pm.s + '~' + pm.e) : '<span class="rt-dim">-</span>';
-      var res = !pm ? '<span class="rt-dim">-</span>'
-        : pm.rank === 1 ? '<span class="rk-txt rk1-txt">1등</span>'
-        : pm.rank === 2 ? '<span class="rk-txt rk2-txt">2등</span>'
-        : pm.rank === 3 ? '<span class="rk-txt rk3-txt">3등</span>'
-        : '<span class="rt-miss">미적중</span>';
+      var in1 = function (x) { return pm && x != null && x >= pm.s && x <= pm.e; };
+      var in2 = function (x) { return pm && pm.s2 != null && x != null && x >= pm.s2 && x <= pm.e2; };
+      var numCls = function (x) { return in1(x) ? ' rt-hit' : (in2(x) ? ' rt-hit2' : ''); };
+      var band = pm
+        ? '<span class="rt-b1">' + pm.s + '~' + pm.e + '</span>' + (pm.s2 != null ? '<br><span class="rt-b2">' + pm.s2 + '~' + pm.e2 + '</span>' : '')
+        : '<span class="rt-dim">-</span>';
+      function rankLabel(rk, cls) {
+        return rk === 1 ? '<span class="' + cls + '">1등</span>'
+             : rk === 2 ? '<span class="' + cls + '">2등</span>'
+             : rk === 3 ? '<span class="' + cls + '">3등</span>' : '';
+      }
+      var res;
+      if (!pm) res = '<span class="rt-dim">-</span>';
+      else {
+        var parts = [];
+        if (pm.rank) parts.push('<span class="rt-res1">1순위 ' + rankLabel(pm.rank, 'rt-rescol') + '</span>');
+        if (pm.rank2) parts.push('<span class="rt-res2">2순위 ' + rankLabel(pm.rank2, 'rt-rescol') + '</span>');
+        res = parts.length ? parts.join('<br>') : '<span class="rt-miss">미적중</span>';
+      }
       roundsHtml += '<tr>' +
         '<td class="rt-round">' + row.round + '</td>' +
-        '<td class="rt-n rt-1' + (inb(row.first) ? ' rt-hit' : '') + '">' + row.first + '</td>' +
-        '<td class="rt-n rt-2' + (inb(row.second) ? ' rt-hit' : '') + '">' + row.second + '</td>' +
-        '<td class="rt-n rt-3' + (inb(row.third) ? ' rt-hit' : '') + '">' + row.third + '</td>' +
+        '<td class="rt-n rt-1' + numCls(row.first) + '">' + row.first + '</td>' +
+        '<td class="rt-n rt-2' + numCls(row.second) + '">' + row.second + '</td>' +
+        '<td class="rt-n rt-3' + numCls(row.third) + '">' + row.third + '</td>' +
         '<td class="rt-band">' + band + '</td>' +
         '<td class="rt-res">' + res + '</td>' +
         '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +

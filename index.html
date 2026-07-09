@@ -523,6 +523,18 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
   border: 1px solid rgba(245,197,66,0.25); border-radius: 8px; padding: 4px 8px; font-size: 11.5px; }
 .predict-num-chip .predict-num { font-size: 14px; font-weight: 800; color: #f5c542; }
 .predict-num-sep { color: var(--text-dim); }
+/* 회차별 예측 검증 상세 */
+.predict-detail { margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; }
+.predict-detail summary { cursor: pointer; font-size: 12px; color: var(--accent, #e0b352); font-weight: 700; padding: 4px 0; }
+.predict-detail-scroll { max-height: 340px; overflow-y: auto; margin-top: 8px; }
+.bt-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.bt-table thead th { position: sticky; top: 0; background: var(--bg-card,#141416); color: var(--text-dim);
+  font-size: 10.5px; font-weight: 700; padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,0.12); text-align: center; }
+.bt-table td { text-align: center; padding: 5px 4px; border-bottom: 1px solid rgba(255,255,255,0.05); font-variant-numeric: tabular-nums; }
+.bt-table .bt-round { color: var(--text-dim); font-weight: 700; }
+.bt-table .bt-band { color: #f5c542; font-weight: 700; }
+.bt-table td.bt-in { background: rgba(245,197,66,0.22); color: #f5c542; font-weight: 800; border-radius: 4px; }
+.bt-table .bt-miss { color: var(--text-dim); }
 .predict-bonus { margin-top: 10px; }
 .bonus-chip { border-color: rgba(96,165,250,0.4); background: rgba(96,165,250,0.08); }
 .bonus-chip .predict-num { color: #eaf2ff; }
@@ -3096,6 +3108,13 @@ function render() {
     html += '<div class="predict-cmp">○ 컬러 = 걸린 등수: <span class="rk-txt rk1-txt">금 1등</span> · <span class="rk-txt rk2-txt">은 2등</span> · <span class="rk-txt rk3-txt">동 3등</span> · 더 원하면 1+2순위 20개(≈52%)</div>';
     // 100회 전부 O/X (최신 → 과거 순) — 걸린 등수 컬러 (금/은/동)
     var all = acc.recent.slice().reverse();
+    // 연속 미적중 통계
+    var curMiss = 0;
+    for (var cm = 0; cm < all.length; cm++) { if (all[cm].rank === 0) curMiss++; else break; }
+    var maxMiss = 0, runMiss = 0;
+    for (var xm = 0; xm < all.length; xm++) { if (all[xm].rank === 0) { runMiss++; if (runMiss > maxMiss) maxMiss = runMiss; } else runMiss = 0; }
+    html += '<div class="predict-cmp">📉 현재 <b>' + curMiss + '연속 미적중</b> · 최근 ' + acc.tot + '회 최장 ' + maxMiss +
+            '연속 미적중 · 평균 ' + (anyPct>0?(100/anyPct).toFixed(1):'-') + '회에 1번꼴 (변동 큼)</div>';
     html += '<div class="predict-hits">';
     for (var hj = 0; hj < all.length; hj++) {
       var hh = all[hj];
@@ -3107,6 +3126,26 @@ function render() {
       html += '<span class="predict-hit ' + hcls + '" title="' + tip + '">' + (rk ? '○' : '×') + '</span>';
     }
     html += '</div>';
+    // 회차별 상세 백테스트 (접기/펼치기) — 예측 구간 vs 실제 당첨 vs 결과
+    html += '<details class="predict-detail"><summary>📋 최근 ' + acc.tot + '회 예측 검증 상세 (회차 · 예측구간 · 실제 당첨 · 결과)</summary>';
+    html += '<div class="predict-detail-scroll"><table class="bt-table"><thead><tr>' +
+            '<th>회차</th><th>예측 구간</th><th>1등</th><th>2등</th><th>3등</th><th>결과</th></tr></thead><tbody>';
+    for (var dj = 0; dj < all.length; dj++) {
+      var dh = all[dj];
+      var ps = dh.predStart, pe = ps + 9;
+      var inb = function(x){ return x != null && x >= ps && x <= pe; };
+      function cellCls(x){ return inb(x) ? ' class="bt-in"' : ''; }
+      var res = dh.rank === 1 ? '<span class="rk-txt rk1-txt">1등 적중</span>'
+              : dh.rank === 2 ? '<span class="rk-txt rk2-txt">2등 적중</span>'
+              : dh.rank === 3 ? '<span class="rk-txt rk3-txt">3등 적중</span>'
+              : '<span class="bt-miss">미적중</span>';
+      html += '<tr><td class="bt-round">' + dh.round + '</td><td class="bt-band">' + ps + '~' + pe + '</td>' +
+              '<td' + cellCls(dh.first) + '>' + dh.first + '</td>' +
+              '<td' + cellCls(dh.second) + '>' + (dh.second==null?'-':dh.second) + '</td>' +
+              '<td' + cellCls(dh.third) + '>' + (dh.third==null?'-':dh.third) + '</td>' +
+              '<td>' + res + '</td></tr>';
+    }
+    html += '</tbody></table></div></details>';
     // (추가 추천 12는 구간 주요수 바로 아래로 이동됨)
     document.getElementById('flow-predict').innerHTML = html;
     predictCard.style.display = 'block';

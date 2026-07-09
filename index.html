@@ -3091,8 +3091,9 @@ function render() {
     html += '<div class="predict-cmp">' + raceTxt + '</div>';
     var pct = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
     html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 <strong>1등 적중: ' + acc.hit + '/' + acc.tot +
-            ' (' + pct + '%)</strong><span style="color:var(--text-dim);font-size:11px;"> · 10개 찍기, 랜덤 10% 대비 ' +
+            ' (' + pct + '%)</strong><span style="color:var(--text-dim);font-size:11px;"> · 1순위 10개, 랜덤 10% 대비 ' +
             (pct >= 10 ? (pct/10).toFixed(1) + '배' : '') + '</span></div>';
+    html += '<div class="predict-cmp">💡 확률 올리려면 개수 늘리기 (OOS 검증): <b>1순위 10개 = 1등 17%</b> · <b>1+2순위 20개 = 1등 24%</b> — 그 이상은 랜덤 수렴</div>';
     // 100회 전부 O/X (최신 → 과거 순) — 1등이 예측 구간에 들어왔으면 금색 ○
     var all = acc.recent.slice().reverse();
     html += '<div class="predict-hits">';

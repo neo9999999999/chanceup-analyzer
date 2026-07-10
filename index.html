@@ -541,36 +541,6 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .bt-table .bt-res1 { color: #f5c542; font-weight: 700; font-size: 11.5px; }
 .bt-table .bt-res2 { color: #8fc0ff; font-weight: 700; font-size: 11.5px; }
 .predict-detail-title { font-size: 12px; font-weight: 700; color: var(--accent, #e0b352); margin: 12px 0 6px; }
-/* 🎲 랜덤 생성기 */
-.rand-sub { font-size: 11.5px; color: var(--text-dim); margin-bottom: 12px; }
-.rand-nums { display: flex; gap: 12px; justify-content: center; margin: 6px 0 14px; }
-.rand-ball { position: relative; width: 84px; height: 84px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-size: 30px; font-weight: 800; color: #0a0a0b; }
-.rand-b1 { background: radial-gradient(circle at 35% 30%, #ffe89a, #f5c542); }
-.rand-b2 { background: radial-gradient(circle at 35% 30%, #eef2f7, #c3cbd8); }
-.rand-b3 { background: radial-gradient(circle at 35% 30%, #e8b98a, #cd8a4a); }
-.rand-ball-lbl { position: absolute; top: 8px; font-size: 10px; font-weight: 800; }
-.rand-pick10-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.rand-pick10-label { font-size: 11px; color: var(--text-dim); font-weight: 700; }
-.rand-pick10 { display: flex; flex-wrap: wrap; gap: 6px; }
-.rand-p10 { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 6px;
-  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; font-size: 14px; font-weight: 700; }
-.rand-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--accent, #e0b352); color: #0a0a0b;
-  font-size: 15px; font-weight: 800; cursor: pointer; }
-.rand-btn:active { opacity: 0.85; }
-.rand-p10.rand-plus { border-color: rgba(52,211,153,0.45); background: rgba(52,211,153,0.12); color: #6ee7b7; }
-.rand-plus4-note { font-size: 10.5px; color: var(--text-dim); }
-.rand-target-title { font-size: 12px; font-weight: 700; color: var(--accent, #e0b352); margin: 16px 0 8px; }
-.rand-target-btns { display: flex; gap: 8px; }
-.rand-tbtn { flex: 1; padding: 8px 4px; border: 1px solid rgba(255,255,255,0.18); border-radius: 9px; background: rgba(255,255,255,0.04);
-  color: var(--text); font-size: 13px; font-weight: 800; cursor: pointer; line-height: 1.35; }
-.rand-tbtn span { font-size: 10px; font-weight: 600; color: var(--text-dim); }
-.rand-tbtn:active { background: rgba(224,179,82,0.2); }
-.rand-target-out { margin-top: 10px; }
-.rand-target-rate { font-size: 12px; font-weight: 700; color: #34d399; margin-bottom: 6px; }
-.rand-target-nums { display: flex; flex-wrap: wrap; gap: 5px; }
-.rand-tn { display: inline-flex; align-items: center; justify-content: center; min-width: 27px; height: 27px; padding: 0 5px;
-  background: rgba(52,211,153,0.14); border: 1px solid rgba(52,211,153,0.35); border-radius: 6px; font-size: 12.5px; font-weight: 700; }
 /* 겹침 구간만 매수 박스 */
 .overlap-box { margin: 12px 0; padding: 12px 14px; border: 1px solid rgba(52,211,153,0.4); background: rgba(52,211,153,0.08); border-radius: 12px; }
 .overlap-head { font-size: 13px; font-weight: 800; color: #34d399; }
@@ -1379,24 +1349,6 @@ tr.topfreq-rank-top3 .col-num {
     </div>
     <div class="decade-color-bar" id="decade-color-bar"></div>
     <div class="flow-recent" id="flow-recent"></div>
-  </div>
-
-  <!-- 🎲 다음 회차 랜덤 생성기 -->
-  <div class="card" id="rand-card">
-    <div class="card-title">🎲 <span id="rand-round">다음 회차</span> 1등 확률 최대 랜덤 추첨</div>
-    <div class="rand-sub">최근 60회 1등 번호 핫구간에 집중 추첨 (80% 집중 + 20% 랜덤) · 과거검증 1등 적중 14% (랜덤 10%) · 중복없이 3개</div>
-    <div class="rand-nums" id="rand-nums"></div>
-    <div class="rand-pick10-wrap"><span class="rand-pick10-label">10개 세트</span><div class="rand-pick10" id="rand-pick10"></div></div>
-    <div class="rand-pick10-wrap"><span class="rand-pick10-label">+4 추가분</span><div class="rand-pick10" id="rand-plus4"></div><span class="rand-plus4-note">10+4 = 1등 17% · 아무등수 36%</span></div>
-    <button class="rand-btn" id="rand-btn">🎲 다시 뽑기</button>
-    <div class="rand-target-title">🎯 목표 적중률 세트 (개수↑ = 확률↑ · 핫구간 집중)</div>
-    <div class="rand-target-btns">
-      <button class="rand-tbtn" data-k="10">10개<br><span>1등12%</span></button>
-      <button class="rand-tbtn" data-k="30">30개<br><span>아무67%</span></button>
-      <button class="rand-tbtn" data-k="60">60개<br><span>아무90%</span></button>
-      <button class="rand-tbtn" data-k="85">85개<br><span>1등85%</span></button>
-    </div>
-    <div class="rand-target-out" id="rand-target-out"></div>
   </div>
 
   <!-- 🔮 다음 회차 예상 번호대 (별도 카드) -->
@@ -3050,91 +3002,7 @@ function escapeHtml(s) {
   });
 }
 
-// 🎲 다음 회차 예상 랜덤기 — 이전 실제 회차 반영, 찬스업 방식(82% 균등 + 18% 최근 핫존 편향) 생성
-//   검증 피팅값(bias≈0.18) 그대로. 최근 회차의 밀도를 확률에 얹어 "이전→다음" 흐름을 반영하되 대부분 랜덤.
-// 1등 확률 최대화 분포: 최근 60회 '1등 번호만' 최다 연속10칸 구간에 80% 집중 (OOS 1등적중 14% > 2:1:0.5 13%)
-function _chanceupDist(rows) {
-  var BIAS = 0.8, W = 60;
-  var asc = rows.slice().sort(function (a, b) { return a.round - b.round; });
-  var win = asc.slice(Math.max(0, asc.length - W));
-  var c = new Array(101).fill(0);
-  for (var j = 0; j < win.length; j++) { if (win[j].first != null) c[win[j].first]++; }  // 1등만
-  var bs = 1, bt = -1;
-  for (var s = 1; s <= 91; s++) { var t = 0; for (var k = 0; k < 10; k++) t += c[s + k]; if (t > bt) { bt = t; bs = s; } }
-  var be = bs + 9;
-  var p = new Array(101).fill(0);
-  for (var n = 1; n <= 100; n++) p[n] = BIAS * ((n >= bs && n <= be ? 1 : 0) / 10) + (1 - BIAS) * 0.01;
-  return { p: p, hotStart: bs, hotEnd: be };
-}
-function _sampleDistinct(p, k) {
-  var avail = []; for (var n = 1; n <= 100; n++) avail.push(n);
-  var w = avail.map(function (n) { return p[n]; });
-  var out = [];
-  for (var s = 0; s < k; s++) {
-    var sum = w.reduce(function (a, b) { return a + b; }, 0);
-    var rnd = Math.random() * sum, acc = 0, idx = 0;
-    for (var i = 0; i < avail.length; i++) { acc += w[i]; if (acc >= rnd) { idx = i; break; } }
-    out.push(avail[idx]); avail.splice(idx, 1); w.splice(idx, 1);
-  }
-  return out;
-}
-function drawRandom() {
-  var rows = getCurrent();
-  var nextR = rows.length ? Math.max.apply(null, rows.map(function (r) { return r.round; })) + 1 : 1;
-  var rr = document.getElementById('rand-round'); if (rr) rr.textContent = nextR + '회';
-  var dd = _chanceupDist(rows); var p = dd.p;
-  var prize = _sampleDistinct(p, 3);
-  var labels = ['1등', '2등', '3등'], cls = ['rk1-txt', 'rk2-txt', 'rk3-txt'];
-  var h = '';
-  for (var i = 0; i < 3; i++) {
-    h += '<div class="rand-ball rand-b' + (i + 1) + '"><span class="rand-ball-lbl ' + cls[i] + '">' + labels[i] + '</span>' + prize[i] + '</div>';
-  }
-  document.getElementById('rand-nums').innerHTML = h;
-  var ten = _sampleDistinct(p, 10).sort(function (a, b) { return a - b; });
-  document.getElementById('rand-pick10').innerHTML = ten.map(function (n) { return '<span class="rand-p10">' + n + '</span>'; }).join('');
-  // +4 추가분 (10+4 구조): 밴드 밖 전체밀도(2:1:0.5, W70) 상위 4개 — 검증 10+4=1등17%·아무36%
-  var p4El = document.getElementById('rand-plus4');
-  if (p4El) {
-    var asc4 = rows.slice().sort(function (a, b) { return a.round - b.round; });
-    var win4 = asc4.slice(Math.max(0, asc4.length - 70));
-    var d4 = new Array(101).fill(0);
-    for (var j4 = 0; j4 < win4.length; j4++) { var r4 = win4[j4];
-      if (r4.first != null) d4[r4.first] += 2;
-      if (r4.second != null) d4[r4.second] += 1;
-      if (r4.third != null) d4[r4.third] += 0.5;
-    }
-    var bs4 = dd.hotStart, be4 = dd.hotEnd;
-    var plus4 = [];
-    var ord4 = [];
-    for (var n4 = 1; n4 <= 100; n4++) ord4.push(n4);
-    ord4.sort(function (a, b) { return d4[b] - d4[a] || a - b; });
-    for (var o4 = 0; o4 < ord4.length && plus4.length < 4; o4++) {
-      var v4 = ord4[o4];
-      if (v4 >= bs4 && v4 <= be4) continue;  // 밴드 안 제외
-      plus4.push(v4);
-    }
-    plus4.sort(function (a, b) { return a - b; });
-    p4El.innerHTML = plus4.map(function (n) { return '<span class="rand-p10 rand-plus">' + n + '</span>'; }).join('');
-  }
-}
-// 🎯 목표 확률 세트: K개를 핫구간 우선으로 뽑기 (개수↑=확률↑)
-function drawTargetSet(K) {
-  var rows = getCurrent();
-  var pr = _predictHotRange(rows, 70);
-  var asc = rows.slice().sort(function (a, b) { return a.round - b.round; });
-  var win = asc.slice(Math.max(0, asc.length - 70));
-  var dens = new Array(101).fill(0);
-  for (var j = 0; j < win.length; j++) { var r = win[j]; if (r.first) dens[r.first] += 2; if (r.second) dens[r.second] += 1; if (r.third) dens[r.third] += 0.5; }
-  // 핫 밀도순 정렬, 상위 K개 (동densitiy는 예측구간 근처 우선)
-  var order = [];
-  for (var n = 1; n <= 100; n++) order.push(n);
-  order.sort(function (a, b) { return dens[b] - dens[a] || Math.abs(a - (pr.start + 4.5)) - Math.abs(b - (pr.start + 4.5)); });
-  var pick = order.slice(0, K).sort(function (a, b) { return a - b; });
-  var rate = { 10: '1등 12% · 아무 27%', 30: '아무등수 67%', 60: '아무등수 90%', 85: '1등 85% · 아무 100%' };
-  var out = document.getElementById('rand-target-out');
-  out.innerHTML = '<div class="rand-target-rate">' + K + '개 세트 · 예상 ' + (rate[K] || '') + '</div>' +
-    '<div class="rand-target-nums">' + pick.map(function (n) { return '<span class="rand-tn">' + n + '</span>'; }).join('') + '</div>';
-}
+// (🎲 랜덤 생성기 삭제됨 — 사용자 요청)
 
 function render() {
   var rows = getCurrent();
@@ -3714,12 +3582,7 @@ async function init() {
   document.getElementById('btn-add').addEventListener('click', handleAdd);
 
   // 🎲 랜덤 생성기
-  var randBtn = document.getElementById('rand-btn');
-  if (randBtn) { randBtn.addEventListener('click', drawRandom); drawRandom(); }
-  var tbtns = document.querySelectorAll('.rand-tbtn');
-  for (var tb = 0; tb < tbtns.length; tb++) {
-    tbtns[tb].addEventListener('click', function () { drawTargetSet(parseInt(this.getAttribute('data-k'), 10)); });
-  }
+  // (랜덤 생성기 이벤트 제거됨)
 
   // 새로고침(클라우드 동기화) — 헤더 + 푸터 둘 다
   var btnRefresh = document.getElementById('btn-refresh');

@@ -1371,7 +1371,7 @@ tr.topfreq-rank-top3 .col-num {
   <!-- 🎲 다음 회차 랜덤 생성기 -->
   <div class="card" id="rand-card">
     <div class="card-title">🎲 <span id="rand-round">다음 회차</span> 랜덤 추첨</div>
-    <div class="rand-sub">이전 회차 반영 · 찬스업 방식 생성 (82% 균등 + 18% 최근 핫존 편향, 중복없이 3개)</div>
+    <div class="rand-sub">회차별 대조 결과 순수 균등이 실제 찬스업과 가장 유사 (per-round 예측은 랜덤이 한계 · 1~100 중복없이 3개)</div>
     <div class="rand-nums" id="rand-nums"></div>
     <div class="rand-pick10-wrap"><span class="rand-pick10-label">10개 세트</span><div class="rand-pick10" id="rand-pick10"></div></div>
     <button class="rand-btn" id="rand-btn">🎲 다시 뽑기</button>
@@ -3031,7 +3031,7 @@ function escapeHtml(s) {
 // 🎲 다음 회차 예상 랜덤기 — 이전 실제 회차 반영, 찬스업 방식(82% 균등 + 18% 최근 핫존 편향) 생성
 //   검증 피팅값(bias≈0.18) 그대로. 최근 회차의 밀도를 확률에 얹어 "이전→다음" 흐름을 반영하되 대부분 랜덤.
 function _chanceupDist(rows) {
-  var W = 60, RB = 0.18;  // 최근 60회 · 핫존 편향 18%
+  var W = 60, RB = 0.0;  // 회차별 대조 결과: 편향 0(순수 균등)이 실제와 가장 유사 (per-round는 랜덤이 한계)
   var asc = rows.slice().sort(function (a, b) { return a.round - b.round; });
   var win = asc.slice(Math.max(0, asc.length - W));
   var dens = new Array(101).fill(0); var tot = 0, wi = 0;

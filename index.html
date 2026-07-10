@@ -3088,65 +3088,7 @@ function render() {
               '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.second.count1 + ' · 2등 ' + pr.second.count2 + ' · 3등 ' + pr.second.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     }
     html += '</div>';
-    // (최근 10회 단기 열기 구간은 별도 카드 #short10-card 로 분리됨)
-    // 추가 추천 TOP 20 (예측 구간 제외) — 분석은 백단, 앞단은 순위+번호만 (상세는 툴즙)
-    // 실패 커버: 예측이 빗나간 회차의 당첨수, 전체 횟수순 (밴드+인접 ±2 제외)
-    var missDet = {};
-    for (var mi = 0; mi < acc.recent.length; mi++) {
-      var mr = acc.recent[mi];
-      if (mr.rank !== 0) continue;  // 적중 회차 제외
-      var mNums = [mr.first, mr.second, mr.third];
-      for (var mj = 0; mj < mNums.length; mj++) {
-        var mn = mNums[mj];
-        if (mn == null || mn < 1 || mn > 100) continue;
-        if (mn >= pr.start - 2 && mn <= pr.end + 2) continue;
-        if (pr.second && mn >= pr.second.start - 2 && mn <= pr.second.end + 2) continue;  // 2순위 밴드도 제외
-        if (!missDet[mn]) missDet[mn] = { c1: 0, c2: 0, c3: 0, last: 0 };
-        if (mj === 0) missDet[mn].c1++;
-        else if (mj === 1) missDet[mn].c2++;
-        else missDet[mn].c3++;
-        missDet[mn].last = mr.round;
-      }
-    }
-    var cover = Object.keys(missDet).map(Number);
-    cover.sort(function(a, b) {
-      var ta = missDet[a].c1 + missDet[a].c2 + missDet[a].c3;
-      var tb = missDet[b].c1 + missDet[b].c2 + missDet[b].c3;
-      return tb - ta || missDet[b].last - missDet[a].last || a - b;
-    });
-    cover = cover.slice(0, 20);
-    // ★ 폴백: 실패 풀이 20개 미만이면(초기 데이터/구간 이동 직후) 최근 당첨수(구간 밖)로 채워 항상 20개 유지
-    if (cover.length < 20) {
-      var pool = rows.slice().sort(function(a, b){ return b.round - a.round; });
-      for (var fpi = 0; fpi < pool.length && cover.length < 20; fpi++) {
-        var fn = [pool[fpi].first, pool[fpi].second, pool[fpi].third];
-        for (var fk = 0; fk < fn.length && cover.length < 20; fk++) {
-          var v = fn[fk];
-          if (v == null || v < 1 || v > 100) continue;
-          if (v >= pr.start - 2 && v <= pr.end + 2) continue;  // 1순위 밴드+인접 제외
-          if (pr.second && v >= pr.second.start - 2 && v <= pr.second.end + 2) continue;  // 2순위 밴드 제외
-          if (cover.indexOf(v) < 0) cover.push(v);
-        }
-      }
-    }
-    var tHtml = '<span class="predict-numdetail-label">추가 추천 TOP 20 — 예측 구간(' + pr.start + '~' + pr.end +
-                ') 제외 · 예측 빗나간 회차의 당첨수순 · 위에서부터 예산만큼</span>';
-    for (var co = 0; co < cover.length; co++) {
-      var cd = missDet[cover[co]];
-      var tip, tp2 = [];
-      if (cd) {
-        if (cd.c1) tp2.push('1등 ' + cd.c1 + '회');
-        if (cd.c2) tp2.push('2등 ' + cd.c2 + '회');
-        if (cd.c3) tp2.push('3등 ' + cd.c3 + '회');
-        tip = '예측 빗나간 회차: ' + tp2.join(' · ') + ' (마지막 ' + cd.last + '회)';
-      } else {
-        tip = '최근 당첨수 (구간 밖, 보충)';  // 폴백으로 채운 번호
-      }
-      tHtml += '<span class="predict-num-chip bonus-chip" title="' + tip + '">' +
-               '<span class="prio-rank">' + (co + 1) + '</span><b class="predict-num">' + cover[co] + '</b></span>';
-    }
-    html += '<div class="predict-numdetail predict-top20">' + tHtml + '</div>';
-    // (추천 TOP 20으로 통합됨)
+    // (추가 추천 TOP 20 제거 — 사용자 요청)
     // 판세: 현재 구간 유지 길이 + 2위 구간과 격차 (역전 시 예측 자동 교체)
     var starts = acc.recent.map(function(r){ return r.predStart; });
     starts.push(pr.start);
@@ -3290,9 +3232,9 @@ function render() {
       sHtml += '<span class="predict-hit ' + ocls + '" title="' + oh.round + '회 · 구간 ' + oh.s + '~' + oh.e + (ork ? ' · ' + ork + '등 적중' : ' · 미적중') + '">' + (ork ? '○' : '×') + '</span>';
     }
     sHtml += '</div>';
-    sHtml += '<details class="predict-detail"><summary>📋 1순위 최근 ' + evalN + '회 1·2·3등 당첨 회차 내역</summary>';
+    sHtml += '<div class="predict-detail-title">📋 회차별 단기 검증 (최근 ' + evalN + '회)</div>';
     sHtml += '<div class="predict-detail-scroll"><table class="bt-table"><thead><tr>' +
-      '<th>회차</th><th>1순위 구간</th><th>1등</th><th>2등</th><th>3등</th><th>결과</th></tr></thead><tbody>';
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>단기구간</th><th>결과</th></tr></thead><tbody>';
     for (var dj = s1rows.length - 1; dj >= 0; dj--) {
       var dh = s1rows[dj];
       var inb2 = function (x) { return x != null && x >= dh.s && x <= dh.e; };
@@ -3300,11 +3242,12 @@ function render() {
       var rz = dh.rank === 1 ? '<span class="rk-txt rk1-txt">1등</span>'
         : dh.rank === 2 ? '<span class="rk-txt rk2-txt">2등</span>'
         : dh.rank === 3 ? '<span class="rk-txt rk3-txt">3등</span>' : '<span class="bt-miss">미적중</span>';
-      sHtml += '<tr><td class="bt-round">' + dh.round + '</td><td class="bt-band">' + dh.s + '~' + dh.e + '</td>' +
+      sHtml += '<tr><td class="bt-round">' + dh.round + '</td>' +
         '<td' + cc2(dh.first) + '>' + dh.first + '</td><td' + cc2(dh.second) + '>' + (dh.second == null ? '-' : dh.second) + '</td>' +
-        '<td' + cc2(dh.third) + '>' + (dh.third == null ? '-' : dh.third) + '</td><td>' + rz + '</td></tr>';
+        '<td' + cc2(dh.third) + '>' + (dh.third == null ? '-' : dh.third) + '</td>' +
+        '<td><span class="bt-band" style="color:#7dd3fc;">' + dh.s + '~' + dh.e + '</span></td><td>' + rz + '</td></tr>';
     }
-    sHtml += '</tbody></table></div></details>';
+    sHtml += '</tbody></table></div>';
     document.getElementById('short10-body').innerHTML = sHtml;
     short10Card.style.display = 'block';
   } else {

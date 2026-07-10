@@ -3174,8 +3174,23 @@ function render() {
       html += '<span class="predict-hit ' + hcls + '" title="' + tip + '">' + (rk ? '○' : '×') + '</span>';
     }
     html += '</div>';
-    html += '<div class="predict-cmp" style="opacity:.7;">↓ 아래 <b>회차별 당첨번호</b> 표에서 회차마다 예측 구간·적중 결과를 전부 확인</div>';
-    // (회차별 상세 검증은 아래 회차별 당첨번호 표로 통합됨 — 전체 회차 커버)
+    // 주예측 회차별 검증표 (이 카드 전용) — 회차 · 1순위 예측구간 · 1·2·3등 · 결과
+    html += '<details class="predict-detail"><summary>📋 주예측(1순위) 최근 ' + acc.tot + '회 1·2·3등 당첨 회차 내역</summary>';
+    html += '<div class="predict-detail-scroll"><table class="bt-table"><thead><tr>' +
+            '<th>회차</th><th>1순위 구간</th><th>1등</th><th>2등</th><th>3등</th><th>결과</th></tr></thead><tbody>';
+    var mrows = acc.recent;
+    for (var mdj = mrows.length - 1; mdj >= 0; mdj--) {
+      var mh = mrows[mdj], mps = mh.predStart, mpe = mps + 9;
+      var min = function (x) { return x != null && x >= mps && x <= mpe; };
+      var mcc = function (x) { return min(x) ? ' class="bt-in"' : ''; };
+      var mrz = mh.rank === 1 ? '<span class="rk-txt rk1-txt">1등</span>'
+              : mh.rank === 2 ? '<span class="rk-txt rk2-txt">2등</span>'
+              : mh.rank === 3 ? '<span class="rk-txt rk3-txt">3등</span>' : '<span class="bt-miss">미적중</span>';
+      html += '<tr><td class="bt-round">' + mh.round + '</td><td class="bt-band">' + mps + '~' + mpe + '</td>' +
+              '<td' + mcc(mh.first) + '>' + mh.first + '</td><td' + mcc(mh.second) + '>' + (mh.second == null ? '-' : mh.second) + '</td>' +
+              '<td' + mcc(mh.third) + '>' + (mh.third == null ? '-' : mh.third) + '</td><td>' + mrz + '</td></tr>';
+    }
+    html += '</tbody></table></div></details>';
     document.getElementById('flow-predict').innerHTML = html;
     predictCard.style.display = 'block';
   } else {
@@ -3287,118 +3302,16 @@ function render() {
   } else {
     var sorted = rows.slice();
     sorted.sort(function (a, b) { return b.round - a.round; });
-    // ★ 회차별 예측 구간 사전계산 (그 회차 직전 데이터로 OOS 예측, 현행 2:1:0.5 W70과 동일)
-    var asc = rows.slice().sort(function (a, b) { return a.round - b.round; });
-    function _bandFast2(endIdx, W) {  // 비겹침 상위 2구간 시작점 반환
-      var lo = Math.max(0, endIdx - W), wgt = new Array(101).fill(0);
-      for (var j = lo; j < endIdx; j++) {
-        var r = asc[j];
-        if (r.first != null) wgt[r.first] += 2;
-        if (r.second != null) wgt[r.second] += 1;
-        if (r.third != null) wgt[r.third] += 0.5;
-      }
-      var ws = [];
-      for (var s = 1; s <= 91; s++) { var t = 0; for (var k = 0; k < 10; k++) t += wgt[s + k]; ws.push([s, t]); }
-      ws.sort(function (a, b) { return b[1] - a[1] || a[0] - b[0]; });
-      var picks = [];
-      for (var wi = 0; wi < ws.length && picks.length < 2; wi++) {
-        var ps = ws[wi][0], ok = true;
-        for (var qi = 0; qi < picks.length; qi++) if (Math.abs(ps - picks[qi]) < 10) { ok = false; break; }
-        if (ok) picks.push(ps);
-      }
-      return picks;
-    }
-    function _rankIn(rr, s) {  // 구간 s~s+9에 걸린 등수 (1>2>3), 없으면 0
-      if (s == null) return 0;
-      if (rr.first != null && rr.first >= s && rr.first <= s + 9) return 1;
-      if (rr.second != null && rr.second >= s && rr.second <= s + 9) return 2;
-      if (rr.third != null && rr.third >= s && rr.third <= s + 9) return 3;
-      return 0;
-    }
-    // 단기(최근 8회) 비겹침 상위 2구간 — 당첨횟수 우선 → 최신가중
-    function _shortBandsTbl(endIdx) {
-      var lo = Math.max(0, endIdx - 8), cnt = new Array(101).fill(0), wsc = new Array(101).fill(0), wi = 0;
-      for (var j = lo; j < endIdx; j++) { wi++; var r = asc[j];
-        if (r.first != null) { cnt[r.first]++; wsc[r.first] += wi; }
-        if (r.second != null) { cnt[r.second]++; wsc[r.second] += wi; }
-        if (r.third != null) { cnt[r.third]++; wsc[r.third] += wi; }
-      }
-      var ws = [];
-      for (var s = 1; s <= 91; s++) { var c = 0, w = 0; for (var k = 0; k < 10; k++) { c += cnt[s + k]; w += wsc[s + k]; } ws.push([s, c, w]); }
-      ws.sort(function (a, b) { return b[1] - a[1] || b[2] - a[2] || a[0] - b[0]; });
-      var picks = [];
-      for (var pi3 = 0; pi3 < ws.length && picks.length < 2; pi3++) {
-        var ps = ws[pi3][0], ok = true;
-        for (var qi = 0; qi < picks.length; qi++) if (Math.abs(ps - picks[qi]) < 10) { ok = false; break; }
-        if (ok) picks.push(ps);
-      }
-      return picks;
-    }
-    var predMap = {}, shortMap = {};
-    for (var pi = 10; pi < asc.length; pi++) {
-      var bb = _bandFast2(pi, 70), rr = asc[pi];
-      var s1 = bb[0], s2 = bb.length > 1 ? bb[1] : null;
-      predMap[rr.round] = { s: s1, e: s1 + 9, rank: _rankIn(rr, s1),
-                            s2: s2, e2: s2 != null ? s2 + 9 : null, rank2: _rankIn(rr, s2) };
-    }
-    for (var pj = 8; pj < asc.length; pj++) {
-      var sb = _shortBandsTbl(pj), r3 = asc[pj];
-      var ss1 = sb[0], ss2 = sb.length > 1 ? sb[1] : null;
-      shortMap[r3.round] = { s: ss1, e: ss1 + 9, rank: _rankIn(r3, ss1),
-                             s2: ss2, e2: ss2 != null ? ss2 + 9 : null, rank2: _rankIn(r3, ss2) };
-    }
-    var roundsHtml = '<table class="rounds-table"><thead>' +
-      '<tr class="rt-grp"><th rowspan="2">회차</th><th colspan="3" class="grp-win">당첨번호</th>' +
-      '<th colspan="2" class="grp-main">주예측 (최근 70회)</th>' +
-      '<th colspan="2" class="grp-short">단기예측 (최근 8회)</th><th rowspan="2"></th></tr>' +
-      '<tr><th>1등</th><th>2등</th><th>3등</th>' +
-      '<th class="grp-main">예측구간</th><th class="grp-main">결과</th>' +
-      '<th class="grp-short">단기구간</th><th class="grp-short">단기결과</th></tr>' +
-      '</thead><tbody>';
+    // 순수 당첨번호만 (예측 검증은 각 예측 카드 안에서 따로 제공)
+    var roundsHtml = '<table class="rounds-table"><thead><tr>' +
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th></th></tr></thead><tbody>';
     for (var n = 0; n < sorted.length; n++) {
       var row = sorted[n];
-      var pm = predMap[row.round];
-      var in1 = function (x) { return pm && x != null && x >= pm.s && x <= pm.e; };
-      var in2 = function (x) { return pm && pm.s2 != null && x != null && x >= pm.s2 && x <= pm.e2; };
-      var numCls = function (x) { return in1(x) ? ' rt-hit' : (in2(x) ? ' rt-hit2' : ''); };
-      var band = pm
-        ? '<span class="rt-b1">' + pm.s + '~' + pm.e + '</span>' + (pm.s2 != null ? '<br><span class="rt-b2">' + pm.s2 + '~' + pm.e2 + '</span>' : '')
-        : '<span class="rt-dim">-</span>';
-      function rankLabel(rk, cls) {
-        return rk === 1 ? '<span class="' + cls + '">1등</span>'
-             : rk === 2 ? '<span class="' + cls + '">2등</span>'
-             : rk === 3 ? '<span class="' + cls + '">3등</span>' : '';
-      }
-      var res;
-      if (!pm) res = '<span class="rt-dim">-</span>';
-      else {
-        var parts = [];
-        if (pm.rank) parts.push('<span class="rt-res1">1순위 ' + rankLabel(pm.rank, 'rt-rescol') + '</span>');
-        if (pm.rank2) parts.push('<span class="rt-res2">2순위 ' + rankLabel(pm.rank2, 'rt-rescol') + '</span>');
-        res = parts.length ? parts.join('<br>') : '<span class="rt-miss">미적중</span>';
-      }
-      // 단기 구간·결과
-      var sm = shortMap[row.round];
-      var sband = sm
-        ? '<span class="rt-sb1">' + sm.s + '~' + sm.e + '</span>' + (sm.s2 != null ? '<br><span class="rt-sb2">' + sm.s2 + '~' + sm.e2 + '</span>' : '')
-        : '<span class="rt-dim">-</span>';
-      var sres;
-      if (!sm) sres = '<span class="rt-dim">-</span>';
-      else {
-        var sp = [];
-        if (sm.rank) sp.push('<span class="rt-sres">1 ' + rankLabel(sm.rank, 'rt-rescol') + '</span>');
-        if (sm.rank2) sp.push('<span class="rt-sres">2 ' + rankLabel(sm.rank2, 'rt-rescol') + '</span>');
-        sres = sp.length ? sp.join('<br>') : '<span class="rt-miss">미적중</span>';
-      }
       roundsHtml += '<tr>' +
         '<td class="rt-round">' + row.round + '</td>' +
-        '<td class="rt-n rt-1' + numCls(row.first) + '">' + row.first + '</td>' +
-        '<td class="rt-n rt-2' + numCls(row.second) + '">' + row.second + '</td>' +
-        '<td class="rt-n rt-3' + numCls(row.third) + '">' + row.third + '</td>' +
-        '<td class="rt-band grp-sep">' + band + '</td>' +
-        '<td class="rt-res">' + res + '</td>' +
-        '<td class="rt-band rt-sband grp-sep">' + sband + '</td>' +
-        '<td class="rt-res">' + sres + '</td>' +
+        '<td class="rt-n rt-1">' + row.first + '</td>' +
+        '<td class="rt-n rt-2">' + row.second + '</td>' +
+        '<td class="rt-n rt-3">' + row.third + '</td>' +
         '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +
         '</tr>';
     }

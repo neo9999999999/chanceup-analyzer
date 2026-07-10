@@ -1371,7 +1371,7 @@ tr.topfreq-rank-top3 .col-num {
   <!-- 🎲 다음 회차 랜덤 생성기 -->
   <div class="card" id="rand-card">
     <div class="card-title">🎲 <span id="rand-round">다음 회차</span> 랜덤 추첨</div>
-    <div class="rand-sub">찬스업은 검증상 순수 균등 랜덤 — 실제 추첨과 동일 방식(1~100 중복없이 3개)</div>
+    <div class="rand-sub">이전 회차 반영 · 찬스업 방식 생성 (82% 균등 + 18% 최근 핫존 편향, 중복없이 3개)</div>
     <div class="rand-nums" id="rand-nums"></div>
     <div class="rand-pick10-wrap"><span class="rand-pick10-label">10개 세트</span><div class="rand-pick10" id="rand-pick10"></div></div>
     <button class="rand-btn" id="rand-btn">🎲 다시 뽑기</button>
@@ -3028,28 +3028,47 @@ function escapeHtml(s) {
   });
 }
 
-// 🎲 다음 회차 랜덤 추첨 (찬스업과 동일: 1~100 중복없이 균등추출)
-function _shuffle100() {
-  var pool = [];
-  for (var i = 1; i <= 100; i++) pool.push(i);
-  for (var k = 99; k > 0; k--) { var j = Math.floor(Math.random() * (k + 1)); var t = pool[k]; pool[k] = pool[j]; pool[j] = t; }
-  return pool;
+// 🎲 다음 회차 예상 랜덤기 — 이전 실제 회차 반영, 찬스업 방식(82% 균등 + 18% 최근 핫존 편향) 생성
+//   검증 피팅값(bias≈0.18) 그대로. 최근 회차의 밀도를 확률에 얹어 "이전→다음" 흐름을 반영하되 대부분 랜덤.
+function _chanceupDist(rows) {
+  var W = 60, RB = 0.18;  // 최근 60회 · 핫존 편향 18%
+  var asc = rows.slice().sort(function (a, b) { return a.round - b.round; });
+  var win = asc.slice(Math.max(0, asc.length - W));
+  var dens = new Array(101).fill(0); var tot = 0, wi = 0;
+  for (var j = 0; j < win.length; j++) {
+    wi++; var r = win[j];  // 최신일수록 가중
+    [r.first, r.second, r.third].forEach(function (x) { if (x) { dens[x] += wi; tot += wi; } });
+  }
+  // p(n) = 18% 핫밀도 + 82% 균등
+  var p = new Array(101).fill(0);
+  for (var n = 1; n <= 100; n++) p[n] = RB * (tot ? dens[n] / tot : 0.01) + (1 - RB) * 0.01;
+  return p;
+}
+function _sampleDistinct(p, k) {
+  var avail = []; for (var n = 1; n <= 100; n++) avail.push(n);
+  var w = avail.map(function (n) { return p[n]; });
+  var out = [];
+  for (var s = 0; s < k; s++) {
+    var sum = w.reduce(function (a, b) { return a + b; }, 0);
+    var rnd = Math.random() * sum, acc = 0, idx = 0;
+    for (var i = 0; i < avail.length; i++) { acc += w[i]; if (acc >= rnd) { idx = i; break; } }
+    out.push(avail[idx]); avail.splice(idx, 1); w.splice(idx, 1);
+  }
+  return out;
 }
 function drawRandom() {
   var rows = getCurrent();
   var nextR = rows.length ? Math.max.apply(null, rows.map(function (r) { return r.round; })) + 1 : 1;
   var rr = document.getElementById('rand-round'); if (rr) rr.textContent = nextR + '회';
-  // 1·2·3등: 중복 없이 3개
-  var p = _shuffle100();
-  var prize = [p[0], p[1], p[2]];
+  var p = _chanceupDist(rows);
+  var prize = _sampleDistinct(p, 3);
   var labels = ['1등', '2등', '3등'], cls = ['rk1-txt', 'rk2-txt', 'rk3-txt'];
   var h = '';
   for (var i = 0; i < 3; i++) {
     h += '<div class="rand-ball rand-b' + (i + 1) + '"><span class="rand-ball-lbl ' + cls[i] + '">' + labels[i] + '</span>' + prize[i] + '</div>';
   }
   document.getElementById('rand-nums').innerHTML = h;
-  // 10개 세트 (별도 추첨, 정렬)
-  var ten = _shuffle100().slice(0, 10).sort(function (a, b) { return a - b; });
+  var ten = _sampleDistinct(p, 10).sort(function (a, b) { return a - b; });
   document.getElementById('rand-pick10').innerHTML = ten.map(function (n) { return '<span class="rand-p10">' + n + '</span>'; }).join('');
 }
 

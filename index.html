@@ -541,6 +541,10 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .bt-table .bt-res1 { color: #f5c542; font-weight: 700; font-size: 11.5px; }
 .bt-table .bt-res2 { color: #8fc0ff; font-weight: 700; font-size: 11.5px; }
 .predict-detail-title { font-size: 12px; font-weight: 700; color: var(--accent, #e0b352); margin: 12px 0 6px; }
+.bt-table td.bt-in-c { background: rgba(125,211,252,0.28); color: #7dd3fc; font-weight: 800; border-radius: 4px; }
+.bt-table td.bt-in-c2 { background: rgba(103,169,214,0.20); color: #a9d3ef; font-weight: 800; border-radius: 4px; }
+.bt-table .bt-sc1 { color: #7dd3fc; font-weight: 700; font-size: 11.5px; }
+.bt-table .bt-sc2 { color: #a9d3ef; font-weight: 700; font-size: 11px; }
 .predict-short20 { margin-top: 10px; }
 .st-chip { border-color: rgba(125,211,252,0.35); background: rgba(125,211,252,0.08); }
 .st-chip .predict-num { color: #7dd3fc; font-size: 13px; }
@@ -3209,17 +3213,23 @@ function render() {
         '<span class="short10-score">' + pk[si][1] + '회 · ' + pk[si][2] + '점</span></div>' +
         '<div class="short10-nums">' + (numHtml || '<span class="rt-dim">해당 없음</span>') + '</div></div>';
     }
-    // 1순위 최근 100회 OOS 검증 + 회차별 상세
+    // 최근 100회 OOS 검증 (1·2순위) + 회차별 상세
     var evalN = Math.min(100, ascS.length - SW);
     var s1hit = 0, s1rows = [];
+    function _rk(rr, s) {
+      if (s == null) return 0;
+      if (rr.first != null && rr.first >= s && rr.first <= s + 9) return 1;
+      if (rr.second != null && rr.second >= s && rr.second <= s + 9) return 2;
+      if (rr.third != null && rr.third >= s && rr.third <= s + 9) return 3;
+      return 0;
+    }
     for (var ei = ascS.length - evalN; ei < ascS.length; ei++) {
-      var bandArr = _shortBands(ei, 1);
-      var bs = bandArr.length ? bandArr[0][0] : 1, rr2 = ascS[ei], rank = 0;
-      if (rr2.first != null && rr2.first >= bs && rr2.first <= bs + 9) rank = 1;
-      else if (rr2.second != null && rr2.second >= bs && rr2.second <= bs + 9) rank = 2;
-      else if (rr2.third != null && rr2.third >= bs && rr2.third <= bs + 9) rank = 3;
+      var bandArr = _shortBands(ei, 2);
+      var bs = bandArr.length ? bandArr[0][0] : 1, bs2 = bandArr.length > 1 ? bandArr[1][0] : null;
+      var rr2 = ascS[ei], rank = _rk(rr2, bs), rankB = _rk(rr2, bs2);
       if (rank) s1hit++;
-      s1rows.push({ round: rr2.round, s: bs, e: bs + 9, first: rr2.first, second: rr2.second, third: rr2.third, rank: rank });
+      s1rows.push({ round: rr2.round, s: bs, e: bs + 9, s2: bs2, e2: bs2 != null ? bs2 + 9 : null,
+                    first: rr2.first, second: rr2.second, third: rr2.third, rank: rank, rank2: rankB });
     }
     var s1pct = evalN > 0 ? Math.round(s1hit / evalN * 100) : 0;
     sHtml += '<div class="predict-acc" style="margin-top:12px;">✅ 1순위 구간 최근 ' + evalN + '회 <strong>1·2·3등 적중: ' + s1hit + '/' + evalN + ' (' + s1pct + '%)</strong>' +
@@ -3237,15 +3247,19 @@ function render() {
       '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>단기구간</th><th>결과</th></tr></thead><tbody>';
     for (var dj = s1rows.length - 1; dj >= 0; dj--) {
       var dh = s1rows[dj];
-      var inb2 = function (x) { return x != null && x >= dh.s && x <= dh.e; };
-      var cc2 = function (x) { return inb2(x) ? ' class="bt-in"' : ''; };
-      var rz = dh.rank === 1 ? '<span class="rk-txt rk1-txt">1등</span>'
-        : dh.rank === 2 ? '<span class="rk-txt rk2-txt">2등</span>'
-        : dh.rank === 3 ? '<span class="rk-txt rk3-txt">3등</span>' : '<span class="bt-miss">미적중</span>';
+      var sin1 = function (x) { return x != null && x >= dh.s && x <= dh.e; };
+      var sin2 = function (x) { return dh.s2 != null && x != null && x >= dh.s2 && x <= dh.e2; };
+      var scel = function (x) { return sin1(x) ? ' class="bt-in-c"' : (sin2(x) ? ' class="bt-in-c2"' : ''); };
+      var srn = function (r) { return r === 1 ? '1등' : r === 2 ? '2등' : r === 3 ? '3등' : ''; };
+      var sbandTxt = '<span class="bt-sc1">' + dh.s + '~' + dh.e + '</span>' + (dh.s2 != null ? '<br><span class="bt-sc2">' + dh.s2 + '~' + dh.e2 + '</span>' : '');
+      var sresP = [];
+      if (dh.rank) sresP.push('<span class="bt-sc1">1순위 ' + srn(dh.rank) + '</span>');
+      if (dh.rank2) sresP.push('<span class="bt-sc2">2순위 ' + srn(dh.rank2) + '</span>');
+      var sresTxt = sresP.length ? sresP.join('<br>') : '<span class="bt-miss">미적중</span>';
       sHtml += '<tr><td class="bt-round">' + dh.round + '</td>' +
-        '<td' + cc2(dh.first) + '>' + dh.first + '</td><td' + cc2(dh.second) + '>' + (dh.second == null ? '-' : dh.second) + '</td>' +
-        '<td' + cc2(dh.third) + '>' + (dh.third == null ? '-' : dh.third) + '</td>' +
-        '<td><span class="bt-band" style="color:#7dd3fc;">' + dh.s + '~' + dh.e + '</span></td><td>' + rz + '</td></tr>';
+        '<td' + scel(dh.first) + '>' + dh.first + '</td><td' + scel(dh.second) + '>' + (dh.second == null ? '-' : dh.second) + '</td>' +
+        '<td' + scel(dh.third) + '>' + (dh.third == null ? '-' : dh.third) + '</td>' +
+        '<td>' + sbandTxt + '</td><td>' + sresTxt + '</td></tr>';
     }
     sHtml += '</tbody></table></div>';
     document.getElementById('short10-body').innerHTML = sHtml;

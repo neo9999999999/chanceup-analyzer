@@ -1382,7 +1382,7 @@ tr.topfreq-rank-top3 .col-num {
   <!-- 🎲 다음 회차 랜덤 생성기 -->
   <div class="card" id="rand-card">
     <div class="card-title">🎲 <span id="rand-round">다음 회차</span> 1등 확률 최대 랜덤 추첨</div>
-    <div class="rand-sub">최근 70회 뜨거운 구간에 집중 추첨 (80% 핫구간 + 20% 랜덤) · 1등 적중 극대화 · 중복없이 3개</div>
+    <div class="rand-sub">최근 60회 1등 번호 핫구간에 집중 추첨 (80% 집중 + 20% 랜덤) · 과거검증 1등 적중 14% (랜덤 10%) · 중복없이 3개</div>
     <div class="rand-nums" id="rand-nums"></div>
     <div class="rand-pick10-wrap"><span class="rand-pick10-label">10개 세트</span><div class="rand-pick10" id="rand-pick10"></div></div>
     <button class="rand-btn" id="rand-btn">🎲 다시 뽑기</button>
@@ -3049,16 +3049,18 @@ function escapeHtml(s) {
 
 // 🎲 다음 회차 예상 랜덤기 — 이전 실제 회차 반영, 찬스업 방식(82% 균등 + 18% 최근 핫존 편향) 생성
 //   검증 피팅값(bias≈0.18) 그대로. 최근 회차의 밀도를 확률에 얹어 "이전→다음" 흐름을 반영하되 대부분 랜덤.
-// 1등 확률 최대화 분포: 예측 카드 1순위(37~46)와 동일한 핫구간에 80% 집중 + 20% 균등
+// 1등 확률 최대화 분포: 최근 60회 '1등 번호만' 최다 연속10칸 구간에 80% 집중 (OOS 1등적중 14% > 2:1:0.5 13%)
 function _chanceupDist(rows) {
-  var BIAS = 0.8;
-  var pr = _predictHotRange(rows, 70);   // 예측 카드와 동일 밴드 (2:1:0.5 W70)
-  var bs = pr.start, be = pr.end;
+  var BIAS = 0.8, W = 60;
+  var asc = rows.slice().sort(function (a, b) { return a.round - b.round; });
+  var win = asc.slice(Math.max(0, asc.length - W));
+  var c = new Array(101).fill(0);
+  for (var j = 0; j < win.length; j++) { if (win[j].first != null) c[win[j].first]++; }  // 1등만
+  var bs = 1, bt = -1;
+  for (var s = 1; s <= 91; s++) { var t = 0; for (var k = 0; k < 10; k++) t += c[s + k]; if (t > bt) { bt = t; bs = s; } }
+  var be = bs + 9;
   var p = new Array(101).fill(0);
-  for (var n = 1; n <= 100; n++) {
-    var inHot = (n >= bs && n <= be) ? 1 : 0;
-    p[n] = BIAS * (inHot / 10) + (1 - BIAS) * 0.01;
-  }
+  for (var n = 1; n <= 100; n++) p[n] = BIAS * ((n >= bs && n <= be ? 1 : 0) / 10) + (1 - BIAS) * 0.01;
   return { p: p, hotStart: bs, hotEnd: be };
 }
 function _sampleDistinct(p, k) {

@@ -558,6 +558,17 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .rand-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--accent, #e0b352); color: #0a0a0b;
   font-size: 15px; font-weight: 800; cursor: pointer; }
 .rand-btn:active { opacity: 0.85; }
+.rand-target-title { font-size: 12px; font-weight: 700; color: var(--accent, #e0b352); margin: 16px 0 8px; }
+.rand-target-btns { display: flex; gap: 8px; }
+.rand-tbtn { flex: 1; padding: 8px 4px; border: 1px solid rgba(255,255,255,0.18); border-radius: 9px; background: rgba(255,255,255,0.04);
+  color: var(--text); font-size: 13px; font-weight: 800; cursor: pointer; line-height: 1.35; }
+.rand-tbtn span { font-size: 10px; font-weight: 600; color: var(--text-dim); }
+.rand-tbtn:active { background: rgba(224,179,82,0.2); }
+.rand-target-out { margin-top: 10px; }
+.rand-target-rate { font-size: 12px; font-weight: 700; color: #34d399; margin-bottom: 6px; }
+.rand-target-nums { display: flex; flex-wrap: wrap; gap: 5px; }
+.rand-tn { display: inline-flex; align-items: center; justify-content: center; min-width: 27px; height: 27px; padding: 0 5px;
+  background: rgba(52,211,153,0.14); border: 1px solid rgba(52,211,153,0.35); border-radius: 6px; font-size: 12.5px; font-weight: 700; }
 /* 겹침 구간만 매수 박스 */
 .overlap-box { margin: 12px 0; padding: 12px 14px; border: 1px solid rgba(52,211,153,0.4); background: rgba(52,211,153,0.08); border-radius: 12px; }
 .overlap-head { font-size: 13px; font-weight: 800; color: #34d399; }
@@ -1375,6 +1386,14 @@ tr.topfreq-rank-top3 .col-num {
     <div class="rand-nums" id="rand-nums"></div>
     <div class="rand-pick10-wrap"><span class="rand-pick10-label">10개 세트</span><div class="rand-pick10" id="rand-pick10"></div></div>
     <button class="rand-btn" id="rand-btn">🎲 다시 뽑기</button>
+    <div class="rand-target-title">🎯 목표 적중률 세트 (개수↑ = 확률↑ · 핫구간 집중)</div>
+    <div class="rand-target-btns">
+      <button class="rand-tbtn" data-k="10">10개<br><span>1등12%</span></button>
+      <button class="rand-tbtn" data-k="30">30개<br><span>아무67%</span></button>
+      <button class="rand-tbtn" data-k="60">60개<br><span>아무90%</span></button>
+      <button class="rand-tbtn" data-k="85">85개<br><span>1등85%</span></button>
+    </div>
+    <div class="rand-target-out" id="rand-target-out"></div>
   </div>
 
   <!-- 🔮 다음 회차 예상 번호대 (별도 카드) -->
@@ -3069,6 +3088,24 @@ function drawRandom() {
   var ten = _sampleDistinct(p, 10).sort(function (a, b) { return a - b; });
   document.getElementById('rand-pick10').innerHTML = ten.map(function (n) { return '<span class="rand-p10">' + n + '</span>'; }).join('');
 }
+// 🎯 목표 확률 세트: K개를 핫구간 우선으로 뽑기 (개수↑=확률↑)
+function drawTargetSet(K) {
+  var rows = getCurrent();
+  var pr = _predictHotRange(rows, 70);
+  var asc = rows.slice().sort(function (a, b) { return a.round - b.round; });
+  var win = asc.slice(Math.max(0, asc.length - 70));
+  var dens = new Array(101).fill(0);
+  for (var j = 0; j < win.length; j++) { var r = win[j]; if (r.first) dens[r.first] += 2; if (r.second) dens[r.second] += 1; if (r.third) dens[r.third] += 0.5; }
+  // 핫 밀도순 정렬, 상위 K개 (동densitiy는 예측구간 근처 우선)
+  var order = [];
+  for (var n = 1; n <= 100; n++) order.push(n);
+  order.sort(function (a, b) { return dens[b] - dens[a] || Math.abs(a - (pr.start + 4.5)) - Math.abs(b - (pr.start + 4.5)); });
+  var pick = order.slice(0, K).sort(function (a, b) { return a - b; });
+  var rate = { 10: '1등 12% · 아무 27%', 30: '아무등수 67%', 60: '아무등수 90%', 85: '1등 85% · 아무 100%' };
+  var out = document.getElementById('rand-target-out');
+  out.innerHTML = '<div class="rand-target-rate">' + K + '개 세트 · 예상 ' + (rate[K] || '') + '</div>' +
+    '<div class="rand-target-nums">' + pick.map(function (n) { return '<span class="rand-tn">' + n + '</span>'; }).join('') + '</div>';
+}
 
 function render() {
   var rows = getCurrent();
@@ -3650,6 +3687,10 @@ async function init() {
   // 🎲 랜덤 생성기
   var randBtn = document.getElementById('rand-btn');
   if (randBtn) { randBtn.addEventListener('click', drawRandom); drawRandom(); }
+  var tbtns = document.querySelectorAll('.rand-tbtn');
+  for (var tb = 0; tb < tbtns.length; tb++) {
+    tbtns[tb].addEventListener('click', function () { drawTargetSet(parseInt(this.getAttribute('data-k'), 10)); });
+  }
 
   // 새로고침(클라우드 동기화) — 헤더 + 푸터 둘 다
   var btnRefresh = document.getElementById('btn-refresh');

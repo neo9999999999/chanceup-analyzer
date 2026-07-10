@@ -535,6 +535,9 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .bt-table .bt-band { color: #f5c542; font-weight: 700; }
 .bt-table td.bt-in { background: rgba(245,197,66,0.22); color: #f5c542; font-weight: 800; border-radius: 4px; }
 .bt-table .bt-miss { color: var(--text-dim); }
+.predict-short20 { margin-top: 10px; }
+.st-chip { border-color: rgba(125,211,252,0.35); background: rgba(125,211,252,0.08); }
+.st-chip .predict-num { color: #7dd3fc; font-size: 13px; }
 .predict-bonus { margin-top: 10px; }
 .bonus-chip { border-color: rgba(96,165,250,0.4); background: rgba(96,165,250,0.08); }
 .bonus-chip .predict-num { color: #eaf2ff; }
@@ -3039,6 +3042,34 @@ function render() {
               '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.second.count1 + ' · 2등 ' + pr.second.count2 + ' · 3등 ' + pr.second.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     }
     html += '</div>';
+    // 📈 최근 20회 단기 열기 구간 TOP3 (참고용 — 1·2·3등 합산 출현 최다, 비겹침 연속10칸)
+    (function () {
+      var W20 = 20, lo = Math.max(0, rows.length - W20);
+      var ascR = rows.slice().sort(function (a, b) { return a.round - b.round; });
+      var cc = new Array(101).fill(0);
+      for (var j = Math.max(0, ascR.length - W20); j < ascR.length; j++) {
+        var r = ascR[j];
+        if (r.first != null) cc[r.first]++;
+        if (r.second != null) cc[r.second]++;
+        if (r.third != null) cc[r.third]++;
+      }
+      var ws = [];
+      for (var s = 1; s <= 91; s++) { var t = 0; for (var k = 0; k < 10; k++) t += cc[s + k]; ws.push([s, t]); }
+      ws.sort(function (a, b) { return b[1] - a[1] || a[0] - b[0]; });
+      var pk = [];
+      for (var wi = 0; wi < ws.length && pk.length < 3; wi++) {
+        var ps = ws[wi][0], ok = true;
+        for (var qi = 0; qi < pk.length; qi++) if (Math.abs(ps - pk[qi][0]) < 10) { ok = false; break; }
+        if (ok) pk.push([ps, ws[wi][1]]);
+      }
+      var sh = '<span class="predict-numdetail-label">📈 최근 20회 단기 열기 구간 (1·2·3등 합산 최다 · 참고용, 예측은 위 W70 기준)</span>';
+      for (var si = 0; si < pk.length; si++) {
+        sh += '<span class="predict-num-chip st-chip"><span class="prio-rank">' + (si + 1) + '</span>' +
+              '<b class="predict-num">' + pk[si][0] + '~' + (pk[si][0] + 9) + '</b>' +
+              '<span class="rk-txt" style="color:#7dd3fc;">' + pk[si][1] + '개</span></span>';
+      }
+      html += '<div class="predict-numdetail predict-short20">' + sh + '</div>';
+    })();
     // 추가 추천 TOP 20 (예측 구간 제외) — 분석은 백단, 앞단은 순위+번호만 (상세는 툴팁)
     // 실패 커버: 예측이 빗나간 회차의 당첨수, 전체 횟수순 (밴드+인접 ±2 제외)
     var missDet = {};

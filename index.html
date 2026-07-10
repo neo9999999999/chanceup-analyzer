@@ -986,6 +986,13 @@ tr.topfreq-rank-top3 .col-num {
 .rounds-table .rt-sb2 { color: #67a9d6; font-weight: 700; font-size: 11px; }
 .rounds-table .rt-sres { color: #7dd3fc; font-weight: 700; font-size: 11px; }
 .rounds-table .rt-sres .rt-rescol { color: inherit; }
+/* 그룹 헤더 (당첨번호 / 주예측 / 단기예측) */
+.rounds-table tr.rt-grp th { font-size: 10.5px; padding-top: 8px; padding-bottom: 6px; }
+.rounds-table th.grp-win { color: #cbd5e1; }
+.rounds-table th.grp-main { color: #f5c542; }
+.rounds-table th.grp-short { color: #7dd3fc; }
+.rounds-table th.grp-main, .rounds-table th.grp-short,
+.rounds-table td.grp-sep { border-left: 1px solid rgba(255,255,255,0.12); }
 .rounds-table thead th {
   position: sticky; top: 0; background: var(--bg-card, #141416); z-index: 1;
   text-align: center; font-size: 11px; font-weight: 700; color: var(--text-dim);
@@ -3340,8 +3347,14 @@ function render() {
       shortMap[r3.round] = { s: ss1, e: ss1 + 9, rank: _rankIn(r3, ss1),
                              s2: ss2, e2: ss2 != null ? ss2 + 9 : null, rank2: _rankIn(r3, ss2) };
     }
-    var roundsHtml = '<table class="rounds-table"><thead><tr>' +
-      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측구간</th><th>결과</th><th>단기구간</th><th>단기결과</th><th></th></tr></thead><tbody>';
+    var roundsHtml = '<table class="rounds-table"><thead>' +
+      '<tr class="rt-grp"><th rowspan="2">회차</th><th colspan="3" class="grp-win">당첨번호</th>' +
+      '<th colspan="2" class="grp-main">주예측 (최근 70회)</th>' +
+      '<th colspan="2" class="grp-short">단기예측 (최근 8회)</th><th rowspan="2"></th></tr>' +
+      '<tr><th>1등</th><th>2등</th><th>3등</th>' +
+      '<th class="grp-main">예측구간</th><th class="grp-main">결과</th>' +
+      '<th class="grp-short">단기구간</th><th class="grp-short">단기결과</th></tr>' +
+      '</thead><tbody>';
     for (var n = 0; n < sorted.length; n++) {
       var row = sorted[n];
       var pm = predMap[row.round];
@@ -3382,9 +3395,9 @@ function render() {
         '<td class="rt-n rt-1' + numCls(row.first) + '">' + row.first + '</td>' +
         '<td class="rt-n rt-2' + numCls(row.second) + '">' + row.second + '</td>' +
         '<td class="rt-n rt-3' + numCls(row.third) + '">' + row.third + '</td>' +
-        '<td class="rt-band">' + band + '</td>' +
+        '<td class="rt-band grp-sep">' + band + '</td>' +
         '<td class="rt-res">' + res + '</td>' +
-        '<td class="rt-band rt-sband">' + sband + '</td>' +
+        '<td class="rt-band rt-sband grp-sep">' + sband + '</td>' +
         '<td class="rt-res">' + sres + '</td>' +
         '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +
         '</tr>';

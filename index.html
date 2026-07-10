@@ -541,6 +541,14 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .bt-table .bt-res1 { color: #f5c542; font-weight: 700; font-size: 11.5px; }
 .bt-table .bt-res2 { color: #8fc0ff; font-weight: 700; font-size: 11.5px; }
 .predict-detail-title { font-size: 12px; font-weight: 700; color: var(--accent, #e0b352); margin: 12px 0 6px; }
+/* 겹침 구간만 매수 박스 */
+.overlap-box { margin: 12px 0; padding: 12px 14px; border: 1px solid rgba(52,211,153,0.4); background: rgba(52,211,153,0.08); border-radius: 12px; }
+.overlap-head { font-size: 13px; font-weight: 800; color: #34d399; }
+.overlap-head .overlap-sub { display: block; font-size: 11px; font-weight: 500; color: var(--text-dim); margin-top: 2px; }
+.overlap-nums { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.overlap-num { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 8px;
+  background: rgba(52,211,153,0.18); border: 1px solid rgba(52,211,153,0.5); border-radius: 8px; color: #6ee7b7; font-size: 16px; font-weight: 800; }
+.overlap-none { margin-top: 8px; font-size: 12px; color: var(--text-dim); }
 .bt-table td.bt-in-c { background: rgba(125,211,252,0.28); color: #7dd3fc; font-weight: 800; border-radius: 4px; }
 .bt-table td.bt-in-c2 { background: rgba(167,139,250,0.24); color: #c4b5fd; font-weight: 800; border-radius: 4px; }
 .bt-table .bt-sc1 { color: #7dd3fc; font-weight: 700; font-size: 11.5px; }
@@ -3141,9 +3149,15 @@ function render() {
         ot++;
       }
       var opct = ot > 0 ? Math.round(oh / ot * 100) : 0;
-      var ovTxt = nowOv.length ? '<b style="color:#34d399;">' + nowOv.join(', ') + '</b> (' + nowOv.length + '개)' : '<span style="color:var(--text-dim);">없음 — 두 전략 불일치</span>';
-      html += '<div class="predict-cmp">🎯 주예측 ∩ 단기 겹침(두 전략 동의): ' + ovTxt +
-              ' · OOS 겹침영역 아무등수 <b>' + opct + '%</b> (' + oh + '/' + ot + '회, 평균 소수 번호)</div>';
+      // 겹침만 매수 박스 (두 전략 동의 = 고신뢰 소액)
+      var ovBox = '<div class="overlap-box"><div class="overlap-head">🎯 겹침 구간만 매수 <span class="overlap-sub">주예측 ∩ 단기 (두 전략 동의) · OOS 아무등수 ' + opct + '% (' + oh + '/' + ot + '회, ~6개)</span></div>';
+      if (nowOv.length) {
+        ovBox += '<div class="overlap-nums">' + nowOv.map(function (n) { return '<span class="overlap-num">' + n + '</span>'; }).join('') + '</div>';
+      } else {
+        ovBox += '<div class="overlap-none">이번 회차는 겹침 없음 — 두 전략이 다른 구간을 가리킴 (약 5회 중 1회는 겹침 없음)</div>';
+      }
+      ovBox += '</div>';
+      html += ovBox;
     })();
     var anyHit = acc.hit + acc.hit2 + acc.hit3;
     var anyPct = acc.tot > 0 ? Math.round(anyHit / acc.tot * 100) : 0;

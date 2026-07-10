@@ -538,6 +538,22 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .predict-short20 { margin-top: 10px; }
 .st-chip { border-color: rgba(125,211,252,0.35); background: rgba(125,211,252,0.08); }
 .st-chip .predict-num { color: #7dd3fc; font-size: 13px; }
+/* 최근 10회 단기 열기 구간 — 큰 박스 */
+.predict-short10 { margin-top: 14px; }
+.short10-title { font-size: 13px; font-weight: 800; color: #7dd3fc; margin-bottom: 8px; }
+.short10-title .short10-sub { font-size: 11px; font-weight: 500; color: var(--text-dim); }
+.short10-box { background: rgba(125,211,252,0.08); border: 1px solid rgba(125,211,252,0.3);
+  border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; }
+.short10-box.s10-r1 { border-color: rgba(125,211,252,0.6); background: rgba(125,211,252,0.14); }
+.short10-head { display: flex; align-items: baseline; gap: 10px; }
+.short10-rank { font-size: 11px; font-weight: 700; color: #7dd3fc; }
+.short10-range { font-size: 24px; font-weight: 800; color: #eaf6ff; letter-spacing: 0.5px; }
+.short10-box.s10-r2 .short10-range, .short10-box.s10-r3 .short10-range { font-size: 20px; }
+.short10-score { margin-left: auto; font-size: 13px; font-weight: 800; color: #7dd3fc; }
+.short10-nums { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.s10-num { display: inline-flex; align-items: center; gap: 3px; background: rgba(0,0,0,0.25);
+  border-radius: 6px; padding: 3px 7px; font-size: 12px; }
+.s10-num b { font-size: 14px; color: #eaf6ff; }
 .predict-bonus { margin-top: 10px; }
 .bonus-chip { border-color: rgba(96,165,250,0.4); background: rgba(96,165,250,0.08); }
 .bonus-chip .predict-num { color: #eaf2ff; }
@@ -3042,16 +3058,14 @@ function render() {
               '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.second.count1 + ' · 2등 ' + pr.second.count2 + ' · 3등 ' + pr.second.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     }
     html += '</div>';
-    // 📈 최근 10회 단기 열기 구간 TOP3 (참고용 — 1·2·3등 합산, 최신 회차일수록 가중 배점)
+    // 📈 최근 10회 단기 열기 구간 TOP3 — 큰 박스 + 점수 + 실제 당첨번호·등수 (최신 회차일수록 가중)
     (function () {
       var W10 = 10;
       var ascR = rows.slice().sort(function (a, b) { return a.round - b.round; });
-      var st = Math.max(0, ascR.length - W10), win = ascR.slice(st);
+      var win = ascR.slice(Math.max(0, ascR.length - W10));
       var cc = new Array(101).fill(0);
-      // 최신일수록 높은 배점: 가장 최근=W10점 … 가장 오래=1점 (선형)
       for (var j = 0; j < win.length; j++) {
-        var wgtR = j + 1;  // win[0]=가장 오래(1점) … win[last]=최신(win.length점)
-        var r = win[j];
+        var wgtR = j + 1, r = win[j];  // 최신일수록 높은 배점
         if (r.first != null) cc[r.first] += wgtR;
         if (r.second != null) cc[r.second] += wgtR;
         if (r.third != null) cc[r.third] += wgtR;
@@ -3065,13 +3079,33 @@ function render() {
         for (var qi = 0; qi < pk.length; qi++) if (Math.abs(ps - pk[qi][0]) < 10) { ok = false; break; }
         if (ok) pk.push([ps, ws[wi][1]]);
       }
-      var sh = '<span class="predict-numdetail-label">📈 최근 10회 단기 열기 구간 (1·2·3등 · 최신 회차일수록 가중 배점 · 참고용, 예측은 위 W70)</span>';
-      for (var si = 0; si < pk.length; si++) {
-        sh += '<span class="predict-num-chip st-chip"><span class="prio-rank">' + (si + 1) + '</span>' +
-              '<b class="predict-num">' + pk[si][0] + '~' + (pk[si][0] + 9) + '</b>' +
-              '<span class="rk-txt" style="color:#7dd3fc;">' + pk[si][1] + '점</span></span>';
+      // 구간별 최근10회 당첨번호·등수 수집 (최신 회차 먼저)
+      function hitsIn(s) {
+        var out = [];
+        for (var wj = win.length - 1; wj >= 0; wj--) {
+          var rr = win[wj];
+          [[rr.first, 1], [rr.second, 2], [rr.third, 3]].forEach(function (pr2) {
+            if (pr2[0] != null && pr2[0] >= s && pr2[0] <= s + 9)
+              out.push({ num: pr2[0], rank: pr2[1], round: rr.round });
+          });
+        }
+        return out;
       }
-      html += '<div class="predict-numdetail predict-short20">' + sh + '</div>';
+      var sh = '<div class="short10-title">📈 최근 10회 단기 열기 구간 <span class="short10-sub">최신 회차일수록 가중 · 참고용</span></div>';
+      var rankName = ['', '1순위', '2순위', '3순위'];
+      for (var si = 0; si < pk.length; si++) {
+        var s0 = pk[si][0], hits = hitsIn(s0);
+        var numHtml = hits.map(function (h) {
+          var rc = h.rank === 1 ? 'rk1-txt' : h.rank === 2 ? 'rk2-txt' : 'rk3-txt';
+          return '<span class="s10-num"><b>' + h.num + '</b><span class="rk-txt ' + rc + '">' + h.rank + '등</span></span>';
+        }).join('');
+        sh += '<div class="short10-box s10-r' + (si + 1) + '">' +
+              '<div class="short10-head"><span class="short10-rank">' + rankName[si + 1] + '</span>' +
+              '<span class="short10-range">' + s0 + ' ~ ' + (s0 + 9) + '</span>' +
+              '<span class="short10-score">' + pk[si][1] + '점</span></div>' +
+              '<div class="short10-nums">' + (numHtml || '<span class="rt-dim">해당 없음</span>') + '</div></div>';
+      }
+      html += '<div class="predict-short10">' + sh + '</div>';
     })();
     // 추가 추천 TOP 20 (예측 구간 제외) — 분석은 백단, 앞단은 순위+번호만 (상세는 툴팁)
     // 실패 커버: 예측이 빗나간 회차의 당첨수, 전체 횟수순 (밴드+인접 ±2 제외)

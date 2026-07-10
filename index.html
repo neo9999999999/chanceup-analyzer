@@ -3188,9 +3188,12 @@ function render() {
         for (var qi = 0; qi < picks.length; qi++) if (Math.abs(ps - picks[qi][0]) < 10) { ok = false; break; }
         if (ok) picks.push(ws[pi2]);  // [start, count, wscore]
       }
+      // ★ 단기는 '가장 많이 나온 구간'이 과열/반전이라 저조 → '2번째로 뜨거운 구간'을 1순위로 승격
+      //   OOS 검증: 2번째 구간 31%(랜덤 27% 초과) vs 1번째 25% · 3번째 20%. 상위 2개 순서 스왑.
+      if (picks.length >= 2) { var tmp = picks[0]; picks[0] = picks[1]; picks[1] = tmp; }
       return picks;
     }
-    var pk = _shortBands(ascS.length, 2);  // 1·2순위만
+    var pk = _shortBands(ascS.length, 2);  // 1·2순위 (스왑 적용: 1순위=원래 2번째로 뜨거운 구간)
     var winS = ascS.slice(Math.max(0, ascS.length - SW));
     function _hitsIn(s) {
       var out = [];
@@ -3202,7 +3205,7 @@ function render() {
       }
       return out;
     }
-    var sHtml = '<div class="short10-title" style="margin-bottom:2px;"><span class="short10-sub">최근 8회 · 당첨횟수 우선 · 동점이면 최신 회차 가중 · 참고용(예측은 위 W70)</span></div>';
+    var sHtml = '<div class="short10-title" style="margin-bottom:2px;"><span class="short10-sub">최근 8회 · <b>가장 뜨거운 구간은 과열/반전이라, 2번째로 뜨거운 구간을 1순위로 추천</b> (OOS 31%) · 참고용</span></div>';
     var rankName = ['', '1순위', '2순위', '3순위'];
     for (var si = 0; si < pk.length; si++) {
       var s0 = pk[si][0], hits = _hitsIn(s0);

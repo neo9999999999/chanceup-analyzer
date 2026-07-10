@@ -3110,6 +3110,41 @@ function render() {
     }
     raceTxt += ' · 최근 ' + acc.tot + '회 동안 예측 ' + moves + '번 이동';
     html += '<div class="predict-cmp">' + raceTxt + '</div>';
+    // 🎯 주예측 ∩ 단기 겹침 구간 (두 전략 동의 = 고신뢰) + OOS 검증
+    (function () {
+      var ascO = rows.slice().sort(function (a, b) { return a.round - b.round; });
+      function mBands(ei) {
+        var lo = Math.max(0, ei - 70), c = new Array(101).fill(0);
+        for (var j = lo; j < ei; j++) { var r = ascO[j]; if (r.first) c[r.first] += 2; if (r.second) c[r.second] += 1; if (r.third) c[r.third] += 0.5; }
+        var ws = []; for (var s = 1; s <= 91; s++) { var t = 0; for (var k = 0; k < 10; k++) t += c[s + k]; ws.push([s, t]); }
+        ws.sort(function (a, b) { return b[1] - a[1] || a[0] - b[0]; });
+        var p = []; for (var i = 0; i < ws.length && p.length < 2; i++) { var ps = ws[i][0], ok = true; for (var q = 0; q < p.length; q++) if (Math.abs(ps - p[q]) < 10) { ok = false; break; } if (ok) p.push(ps); } return p;
+      }
+      function sBands(ei) {
+        var lo = Math.max(0, ei - 8), cnt = new Array(101).fill(0), wsc = new Array(101).fill(0), wi = 0;
+        for (var j = lo; j < ei; j++) { wi++; var r = ascO[j]; [r.first, r.second, r.third].forEach(function (x) { if (x) { cnt[x]++; wsc[x] += wi; } }); }
+        var ws = []; for (var s = 1; s <= 91; s++) { var cc = 0, w = 0; for (var k = 0; k < 10; k++) { cc += cnt[s + k]; w += wsc[s + k]; } ws.push([s, cc, w]); }
+        ws.sort(function (a, b) { return b[1] - a[1] || b[2] - a[2] || a[0] - b[0]; });
+        var p = []; for (var i = 0; i < ws.length && p.length < 2; i++) { var ps = ws[i][0], ok = true; for (var q = 0; q < p.length; q++) if (Math.abs(ps - p[q]) < 10) { ok = false; break; } if (ok) p.push(ps); }
+        if (p.length >= 2) { var t = p[0]; p[0] = p[1]; p[1] = t; } return p;
+      }
+      function bset(st) { var s = {}; st.forEach(function (x) { for (var k = 0; k < 10; k++) s[x + k] = 1; }); return s; }
+      // 현재(다음 회차) 겹침 번호
+      var nowOv = Object.keys(bset(mBands(ascO.length))).filter(function (n) { return bset(sBands(ascO.length))[n]; }).map(Number).sort(function (a, b) { return a - b; });
+      // OOS: 겹침 영역에 아무등수 적중 (겹침 있던 회차만)
+      var oh = 0, ot = 0, oN = Math.min(100, ascO.length - 70);
+      for (var ei = ascO.length - oN; ei < ascO.length; ei++) {
+        var ov = Object.keys(bset(mBands(ei))).filter(function (n) { return bset(sBands(ei))[n]; }).map(Number);
+        if (ov.length === 0) continue;
+        var rr = ascO[ei];
+        if ([rr.first, rr.second, rr.third].some(function (x) { return ov.indexOf(x) >= 0; })) oh++;
+        ot++;
+      }
+      var opct = ot > 0 ? Math.round(oh / ot * 100) : 0;
+      var ovTxt = nowOv.length ? '<b style="color:#34d399;">' + nowOv.join(', ') + '</b> (' + nowOv.length + '개)' : '<span style="color:var(--text-dim);">없음 — 두 전략 불일치</span>';
+      html += '<div class="predict-cmp">🎯 주예측 ∩ 단기 겹침(두 전략 동의): ' + ovTxt +
+              ' · OOS 겹침영역 아무등수 <b>' + opct + '%</b> (' + oh + '/' + ot + '회, 평균 소수 번호)</div>';
+    })();
     var anyHit = acc.hit + acc.hit2 + acc.hit3;
     var anyPct = acc.tot > 0 ? Math.round(anyHit / acc.tot * 100) : 0;
     html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 <strong>1·2·3등 아무거나: ' + anyHit + '/' + acc.tot +

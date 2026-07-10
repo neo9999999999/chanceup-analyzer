@@ -979,9 +979,13 @@ tr.topfreq-rank-top3 .col-num {
   max-height: 280px;
   overflow-y: auto;
 }
-.rounds-list { max-height: 400px; }
+.rounds-list { max-height: 400px; overflow-x: auto; }
 /* 회차별 당첨번호 — 깨끗한 표 */
-.rounds-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rounds-table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px; }
+.rounds-table .rt-sb1 { color: #7dd3fc; font-weight: 700; }
+.rounds-table .rt-sb2 { color: #67a9d6; font-weight: 700; font-size: 11px; }
+.rounds-table .rt-sres { color: #7dd3fc; font-weight: 700; font-size: 11px; }
+.rounds-table .rt-sres .rt-rescol { color: inherit; }
 .rounds-table thead th {
   position: sticky; top: 0; background: var(--bg-card, #141416); z-index: 1;
   text-align: center; font-size: 11px; font-weight: 700; color: var(--text-dim);
@@ -1325,9 +1329,9 @@ tr.topfreq-rank-top3 .col-num {
     <div id="flow-predict"></div>
   </div>
 
-  <!-- 📈 최근 10회 단기 열기 구간 (별도 카드) -->
+  <!-- 📈 최근 8회 단기 열기 구간 (별도 카드) -->
   <div class="card" id="short10-card" style="display:none;">
-    <div class="card-title">📈 최근 10회 단기 열기 구간</div>
+    <div class="card-title">📈 최근 8회 단기 열기 구간 (1·2순위)</div>
     <div id="short10-body"></div>
   </div>
 
@@ -3173,11 +3177,12 @@ function render() {
 
   // 📈 최근 10회 단기 열기 구간 (별도 카드) — 당첨횟수 우선 → 최신가중 타이브레이크
   var short10Card = document.getElementById('short10-card');
-  if (rows.length >= 10) {
+  if (rows.length >= 8) {
     var ascS = rows.slice().sort(function (a, b) { return a.round - b.round; });
-    // 구간 계산: 최근 W10회, [당첨횟수 desc, 최신가중 점수 desc]
+    var SW = 8;  // 단기 창 8회
+    // 구간 계산: 최근 8회, [당첨횟수 desc, 최신가중 점수 desc]
     function _shortBands(endIdx, topN) {
-      var lo = Math.max(0, endIdx - 10), cnt = new Array(101).fill(0), wsc = new Array(101).fill(0), wi = 0;
+      var lo = Math.max(0, endIdx - SW), cnt = new Array(101).fill(0), wsc = new Array(101).fill(0), wi = 0;
       for (var j = lo; j < endIdx; j++) { wi++; var r = ascS[j];
         if (r.first != null) { cnt[r.first]++; wsc[r.first] += wi; }
         if (r.second != null) { cnt[r.second]++; wsc[r.second] += wi; }
@@ -3194,8 +3199,8 @@ function render() {
       }
       return picks;
     }
-    var pk = _shortBands(ascS.length, 3);
-    var winS = ascS.slice(Math.max(0, ascS.length - 10));
+    var pk = _shortBands(ascS.length, 2);  // 1·2순위만
+    var winS = ascS.slice(Math.max(0, ascS.length - SW));
     function _hitsIn(s) {
       var out = [];
       for (var wj = winS.length - 1; wj >= 0; wj--) {
@@ -3206,7 +3211,7 @@ function render() {
       }
       return out;
     }
-    var sHtml = '<div class="short10-title" style="margin-bottom:2px;"><span class="short10-sub">당첨횟수 우선 · 동점이면 최신 회차 가중 · 참고용(예측은 위 W70)</span></div>';
+    var sHtml = '<div class="short10-title" style="margin-bottom:2px;"><span class="short10-sub">최근 8회 · 당첨횟수 우선 · 동점이면 최신 회차 가중 · 참고용(예측은 위 W70)</span></div>';
     var rankName = ['', '1순위', '2순위', '3순위'];
     for (var si = 0; si < pk.length; si++) {
       var s0 = pk[si][0], hits = _hitsIn(s0);
@@ -3221,7 +3226,7 @@ function render() {
         '<div class="short10-nums">' + (numHtml || '<span class="rt-dim">해당 없음</span>') + '</div></div>';
     }
     // 1순위 최근 100회 OOS 검증 + 회차별 상세
-    var evalN = Math.min(100, ascS.length - 10);
+    var evalN = Math.min(100, ascS.length - SW);
     var s1hit = 0, s1rows = [];
     for (var ei = ascS.length - evalN; ei < ascS.length; ei++) {
       var bandArr = _shortBands(ei, 1);
@@ -3235,6 +3240,14 @@ function render() {
     var s1pct = evalN > 0 ? Math.round(s1hit / evalN * 100) : 0;
     sHtml += '<div class="predict-acc" style="margin-top:12px;">✅ 1순위 구간 최근 ' + evalN + '회 <strong>1·2·3등 적중: ' + s1hit + '/' + evalN + ' (' + s1pct + '%)</strong>' +
       '<span style="color:var(--text-dim);font-size:11px;"> · 랜덤 27% · 단기전략은 참고용</span></div>';
+    // 100회 전체 성공유무 O/X (최신 → 과거) — 걸린 등수 컬러
+    sHtml += '<div class="predict-hits">';
+    for (var ox = s1rows.length - 1; ox >= 0; ox--) {
+      var oh = s1rows[ox], ork = oh.rank || 0;
+      var ocls = ork === 1 ? 'r1' : ork === 2 ? 'r2' : ork === 3 ? 'r3' : 'no';
+      sHtml += '<span class="predict-hit ' + ocls + '" title="' + oh.round + '회 · 구간 ' + oh.s + '~' + oh.e + (ork ? ' · ' + ork + '등 적중' : ' · 미적중') + '">' + (ork ? '○' : '×') + '</span>';
+    }
+    sHtml += '</div>';
     sHtml += '<details class="predict-detail"><summary>📋 1순위 최근 ' + evalN + '회 1·2·3등 당첨 회차 내역</summary>';
     sHtml += '<div class="predict-detail-scroll"><table class="bt-table"><thead><tr>' +
       '<th>회차</th><th>1순위 구간</th><th>1등</th><th>2등</th><th>3등</th><th>결과</th></tr></thead><tbody>';
@@ -3295,15 +3308,40 @@ function render() {
       if (rr.third != null && rr.third >= s && rr.third <= s + 9) return 3;
       return 0;
     }
-    var predMap = {};
+    // 단기(최근 8회) 비겹침 상위 2구간 — 당첨횟수 우선 → 최신가중
+    function _shortBandsTbl(endIdx) {
+      var lo = Math.max(0, endIdx - 8), cnt = new Array(101).fill(0), wsc = new Array(101).fill(0), wi = 0;
+      for (var j = lo; j < endIdx; j++) { wi++; var r = asc[j];
+        if (r.first != null) { cnt[r.first]++; wsc[r.first] += wi; }
+        if (r.second != null) { cnt[r.second]++; wsc[r.second] += wi; }
+        if (r.third != null) { cnt[r.third]++; wsc[r.third] += wi; }
+      }
+      var ws = [];
+      for (var s = 1; s <= 91; s++) { var c = 0, w = 0; for (var k = 0; k < 10; k++) { c += cnt[s + k]; w += wsc[s + k]; } ws.push([s, c, w]); }
+      ws.sort(function (a, b) { return b[1] - a[1] || b[2] - a[2] || a[0] - b[0]; });
+      var picks = [];
+      for (var pi3 = 0; pi3 < ws.length && picks.length < 2; pi3++) {
+        var ps = ws[pi3][0], ok = true;
+        for (var qi = 0; qi < picks.length; qi++) if (Math.abs(ps - picks[qi]) < 10) { ok = false; break; }
+        if (ok) picks.push(ps);
+      }
+      return picks;
+    }
+    var predMap = {}, shortMap = {};
     for (var pi = 10; pi < asc.length; pi++) {
       var bb = _bandFast2(pi, 70), rr = asc[pi];
       var s1 = bb[0], s2 = bb.length > 1 ? bb[1] : null;
       predMap[rr.round] = { s: s1, e: s1 + 9, rank: _rankIn(rr, s1),
                             s2: s2, e2: s2 != null ? s2 + 9 : null, rank2: _rankIn(rr, s2) };
     }
+    for (var pj = 8; pj < asc.length; pj++) {
+      var sb = _shortBandsTbl(pj), r3 = asc[pj];
+      var ss1 = sb[0], ss2 = sb.length > 1 ? sb[1] : null;
+      shortMap[r3.round] = { s: ss1, e: ss1 + 9, rank: _rankIn(r3, ss1),
+                             s2: ss2, e2: ss2 != null ? ss2 + 9 : null, rank2: _rankIn(r3, ss2) };
+    }
     var roundsHtml = '<table class="rounds-table"><thead><tr>' +
-      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측구간</th><th>결과</th><th></th></tr></thead><tbody>';
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측구간</th><th>결과</th><th>단기구간</th><th>단기결과</th><th></th></tr></thead><tbody>';
     for (var n = 0; n < sorted.length; n++) {
       var row = sorted[n];
       var pm = predMap[row.round];
@@ -3326,6 +3364,19 @@ function render() {
         if (pm.rank2) parts.push('<span class="rt-res2">2순위 ' + rankLabel(pm.rank2, 'rt-rescol') + '</span>');
         res = parts.length ? parts.join('<br>') : '<span class="rt-miss">미적중</span>';
       }
+      // 단기 구간·결과
+      var sm = shortMap[row.round];
+      var sband = sm
+        ? '<span class="rt-sb1">' + sm.s + '~' + sm.e + '</span>' + (sm.s2 != null ? '<br><span class="rt-sb2">' + sm.s2 + '~' + sm.e2 + '</span>' : '')
+        : '<span class="rt-dim">-</span>';
+      var sres;
+      if (!sm) sres = '<span class="rt-dim">-</span>';
+      else {
+        var sp = [];
+        if (sm.rank) sp.push('<span class="rt-sres">1 ' + rankLabel(sm.rank, 'rt-rescol') + '</span>');
+        if (sm.rank2) sp.push('<span class="rt-sres">2 ' + rankLabel(sm.rank2, 'rt-rescol') + '</span>');
+        sres = sp.length ? sp.join('<br>') : '<span class="rt-miss">미적중</span>';
+      }
       roundsHtml += '<tr>' +
         '<td class="rt-round">' + row.round + '</td>' +
         '<td class="rt-n rt-1' + numCls(row.first) + '">' + row.first + '</td>' +
@@ -3333,6 +3384,8 @@ function render() {
         '<td class="rt-n rt-3' + numCls(row.third) + '">' + row.third + '</td>' +
         '<td class="rt-band">' + band + '</td>' +
         '<td class="rt-res">' + res + '</td>' +
+        '<td class="rt-band rt-sband">' + sband + '</td>' +
+        '<td class="rt-res">' + sres + '</td>' +
         '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +
         '</tr>';
     }

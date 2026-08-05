@@ -533,6 +533,13 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .bt-table .bt-round { color: var(--text-dim); font-weight: 700; }
 .bt-table .bt-band { color: #f5c542; font-weight: 700; }
 .bt-table td.bt-in { background: rgba(245,197,66,0.22); color: #f5c542; font-weight: 800; border-radius: 4px; }
+/* 밴드 적중 컬럼별 컬러 — 금(1등)·은(2등)·동(3등), 어느 컬럼이 맞았는지로 구분 */
+.bt-table td.bt-in-r1 { background: rgba(245,197,66,0.24); color: #f5c542; font-weight: 800; border-radius: 4px; }
+.bt-table td.bt-in-r2 { background: rgba(195,203,216,0.24); color: #c3cbd8; font-weight: 800; border-radius: 4px; }
+.bt-table td.bt-in-r3 { background: rgba(205,138,74,0.24); color: #cd8a4a; font-weight: 800; border-radius: 4px; }
+/* +8 추가분 적중 — 녹색 */
+.bt-table td.bt-ext-in { background: rgba(52,211,153,0.20); color: #6ee7b7; font-weight: 800; border-radius: 4px; }
+.bt-table .bt-ext-res { color: #6ee7b7; font-weight: 700; font-size: 11.5px; }
 .bt-table .bt-miss { color: var(--text-dim); }
 .bt-table .bt-band { color: #f5c542; font-weight: 700; }
 .bt-table .bt-res1 { color: #f5c542; font-weight: 700; font-size: 11.5px; }
@@ -1794,7 +1801,19 @@ function _predictHotRange(rounds, W) {
   var top1 = mk(picks[0]);
   return { start: top1.start, end: top1.end, count: top1.count, score: top1.score,
            count1: top1.count1, count2: top1.count2, count3: top1.count3, numbers: top1.numbers,
-           windowSize: win.length, second: mk(picks[1]), third: mk(picks[2]) };
+           windowSize: win.length, second: mk(picks[1]), third: mk(picks[2]), c1: c1 };
+}
+// 1순위 밴드 밖, 1등밀도 상위 K개 — c1(해당 시점 1등 카운트 배열)과 밴드를 받아 우선순위 리스트 반환
+function _extPriority(c1, bandStart, bandEnd, K) {
+  var ord = []; for (var n = 1; n <= 100; n++) ord.push(n);
+  ord.sort(function (a, b) { return c1[b] - c1[a] || a - b; });
+  var ext = [];
+  for (var o = 0; o < ord.length && ext.length < K; o++) {
+    var v = ord[o];
+    if (v >= bandStart && v <= bandEnd) continue;
+    ext.push(v);
+  }
+  return ext;
 }
 
 // 십의자리 고정(1~10,11~20...) 최다 구간 — 연속10칸과 대비 증거용
@@ -1835,8 +1854,15 @@ function _hotRangeAccuracy(rounds, W, evalN) {
     else if (rank === 2) hit2++;
     else if (rank === 3) hit3++;
     tot++;
+    // ▶ 그 시점 기준(walk-forward) +8 추가분 — 밴드 밖 1등밀도 상위 8개, 적중 여부
+    var extNums = _extPriority(pr.c1, pr.start, pr.end, 8);
+    var extRank = 0;
+    if (extNums.indexOf(row.first) >= 0) extRank = 1;
+    else if (extNums.indexOf(row.second) >= 0) extRank = 2;
+    else if (extNums.indexOf(row.third) >= 0) extRank = 3;
     recent.push({ round: row.round, first: row.first, second: row.second, third: row.third, hit: rank === 1, rank: rank,
-                  predStart: pr.start, predStart2: ps2, predEnd2: pe2, rank2band: rankB });
+                  predStart: pr.start, predStart2: ps2, predEnd2: pe2, rank2band: rankB,
+                  extNums: extNums, extRank: extRank });
   }
   return { hit: hit, hit2: hit2, hit3: hit3, tot: tot, recent: recent };
 }
@@ -3064,24 +3090,13 @@ function render() {
             '<span class="predict-rank">1순위</span>' + pr.start + ' ~ ' + pr.end +
             '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     html += '</div>';
-    // ▶ 추가분 우선순위 최대 8개 — 밴드 밖 1등밀도 순. 누적검증(406회): 10개 13.5/23.2 → 14개 17.5/29.6 → 18개 21.2/36.5
+    // ▶ 추가분 우선순위 최대 8개 — 밴드 밖 1등밀도 순 (_extPriority, 검증표와 동일 로직). 누적검증(406회): 10개 13.5/23.2 → 14개 17.5/29.6 → 18개 21.2/36.5
     (function () {
-      var ascP = rows.slice().sort(function (a, b) { return a.round - b.round; });
-      var winP = ascP.slice(Math.max(0, ascP.length - PW));
-      var cP = new Array(101).fill(0);
-      for (var jp = 0; jp < winP.length; jp++) { if (winP[jp].first != null) cP[winP[jp].first]++; }
-      var ordP = []; for (var np = 1; np <= 100; np++) ordP.push(np);
-      ordP.sort(function (a, b) { return cP[b] - cP[a] || a - b; });
-      var ext = [];
-      for (var op = 0; op < ordP.length && ext.length < 8; op++) {
-        var vp = ordP[op];
-        if (vp >= pr.start && vp <= pr.end) continue;           // 1순위 밴드 제외
-        ext.push(vp);                                            // 밀도 높은 순서 = 우선순위
-      }
+      var ext = _extPriority(pr.c1, pr.start, pr.end, 8);
       var chips = ext.map(function (n, ix) {
         return '<span class="ext-chip"><span class="ext-rank">' + (ix + 1) + '</span><b>' + n + '</b></span>';
       }).join('');
-      html += '<div class="ext-wrap"><div class="ext-title">▶ 추가 매수 우선순위 (최대 8개 · 왼쪽부터)</div>' +
+      html += '<div class="ext-wrap"><div class="ext-title">▶ 추가 매수 우선순위 (최대 8개 · 왼쪽부터) <span style="color:#6ee7b7;font-weight:600;">— 아래 검증표에서 적중 시 녹색</span></div>' +
               '<div class="ext-nums">' + chips + '</div>' +
               '<div class="ext-note">누적 검증: <b>10개 1등13.5%·1·2등23.2%</b> → 14개 17.5%·29.6% → 18개 21.2%·36.5% <span style="opacity:.7;">(효율 배수는 10개가 최고)</span></div></div>';
     })();
@@ -3133,14 +3148,23 @@ function render() {
       var mh = mrows[mdj];
       var b1s = mh.predStart, b1e = b1s + 9;
       var inb1 = function (x) { return x != null && x >= b1s && x <= b1e; };
-      var cel = function (x) { return inb1(x) ? ' class="bt-in"' : ''; };
+      var extNums = mh.extNums || [];
+      var inExt = function (x) { return x != null && extNums.indexOf(x) >= 0; };
+      // 컬럼별(1·2·3등) 셀 컬러: 밴드 적중 = 금/은/동(해당 등수색), +8 적중 = 녹색
+      var cel = function (x, rankCls) {
+        if (inb1(x)) return ' class="bt-in ' + rankCls + '"';
+        if (inExt(x)) return ' class="bt-ext-in"';
+        return '';
+      };
       var bandTxt = '<span class="bt-band">' + b1s + '~' + b1e + '</span>';
       var rn = function (r) { return r === 1 ? '1등' : r === 2 ? '2등' : r === 3 ? '3등' : ''; };
-      var resTxt = mh.rank ? '<span class="bt-res1">' + rn(mh.rank) + ' 적중</span>' : '<span class="bt-miss">미적중</span>';
+      var resTxt = mh.rank ? '<span class="bt-res1">' + rn(mh.rank) + ' 적중</span>' :
+                   mh.extRank ? '<span class="bt-ext-res">+8 ' + rn(mh.extRank) + ' 적중</span>' :
+                   '<span class="bt-miss">미적중</span>';
       html += '<tr><td class="bt-round">' + mh.round + '</td>' +
-              '<td' + cel(mh.first) + '>' + mh.first + '</td>' +
-              '<td' + cel(mh.second) + '>' + (mh.second == null ? '-' : mh.second) + '</td>' +
-              '<td' + cel(mh.third) + '>' + (mh.third == null ? '-' : mh.third) + '</td>' +
+              '<td' + cel(mh.first, 'bt-in-r1') + '>' + mh.first + '</td>' +
+              '<td' + cel(mh.second, 'bt-in-r2') + '>' + (mh.second == null ? '-' : mh.second) + '</td>' +
+              '<td' + cel(mh.third, 'bt-in-r3') + '>' + (mh.third == null ? '-' : mh.third) + '</td>' +
               '<td>' + bandTxt + '</td><td>' + resTxt + '</td></tr>';
     }
     html += '</tbody></table></div>';

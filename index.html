@@ -1757,60 +1757,53 @@ function decadeLabel(d) {
 // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회 1등 빈도 최다 연속구간)
 // OOS: 전체 15% / 최근 20% (랜덤 10% 대비 1.5~2배). 십의자리 고정보다 우수.
 function _predictHotRange(rounds, W) {
-  W = W || 60;
+  // ★ v55: 5+5 이중밴드 W75, 가중 3:1:1 (1등×3 + 2등×1 + 3등×1)
+  //   466회 OOS: 아무등수 32.4%(평균 3.1회에 1번, 기존 29.4%) · 1등 13.7%(기존 13.5%)
+  //   · 최장 연속미스 12회(기존 16회) · 포인트 회수율 142.1%(기존 140.4%)
+  //   train/test = 31.3%/33.5% 양쪽 견고, 이웃 W73·4:1:1도 31.8~32.4% 고원 확인.
+  W = W || 75;
   var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
-  // ★ 1등 특화 스코어 — 최근 W회 '1등 번호만' 카운팅 (2·3등은 표시용)
-  //   526회 재검증(v49): 1등만 W40 → 1등 13.5%(전체)·14%(최근100)·20개 25.4%
-  //   vs 기존 2:1:0.5 W70 → 1등 11.8%·10%·19.7%. 1등 목표에선 전 지표 우위.
-  //   장기+단기(8회) 결합도 검증했으나 alpha↑일수록 단조 하락(11%→9%) → 단순 유지.
   var c1 = new Array(101).fill(0), c2 = new Array(101).fill(0), c3 = new Array(101).fill(0);
-  var wgt = new Array(101).fill(0);
+  var cw = new Array(101).fill(0);   // 가중 밀도 3:1:1
   for (var i = 0; i < win.length; i++) {
     var rw = win[i];
-    if (rw.first  != null) { c1[rw.first]++;  wgt[rw.first] += 1; }  // 1등만 밴드 선택에 반영
-    if (rw.second != null) { c2[rw.second]++; }
-    if (rw.third  != null) { c3[rw.third]++; }
+    if (rw.first  != null) { c1[rw.first]++;  cw[rw.first]  += 3; }
+    if (rw.second != null) { c2[rw.second]++; cw[rw.second] += 1; }
+    if (rw.third  != null) { c3[rw.third]++;  cw[rw.third]  += 1; }
   }
-  // 상위 3개 비겹침(거리 10+) 연속10칸 — 가중 점수로 선택, 표시는 실제 출현 횟수
-  var wins = [];
-  for (var s = 1; s <= 91; s++) {
-    var t = 0;
-    for (var k = 0; k < 10; k++) t += wgt[s+k];
-    wins.push([s, t]);
+  function sum5(s) { var t = 0; for (var k = 0; k < 5; k++) t += cw[s+k]; return t; }
+  // 밴드A: 연속 5칸 argmax
+  var a0 = 1, bestA = -1;
+  for (var s = 1; s <= 96; s++) { var t = sum5(s); if (t > bestA) { bestA = t; a0 = s; } }
+  // 밴드B: 밴드A와 겹치지 않는 연속 5칸 argmax
+  var b0 = 1, bestB = -1;
+  for (var s2 = 1; s2 <= 96; s2++) {
+    if (s2 + 4 >= a0 && s2 <= a0 + 4) continue;   // 겹침 배제
+    var t2 = sum5(s2);
+    if (t2 > bestB) { bestB = t2; b0 = s2; }
   }
-  wins.sort(function(a, b) { return b[1] - a[1] || a[0] - b[0]; });
-  var picks = [];
-  for (var pi = 0; pi < wins.length && picks.length < 3; pi++) {
-    var ps = wins[pi][0], okp = true;
-    for (var qi = 0; qi < picks.length; qi++) {
-      if (Math.abs(ps - picks[qi]) < 10) { okp = false; break; }
-    }
-    if (okp) picks.push(ps);
-  }
-  function mk(s0) {
-    if (s0 == null) return null;
-    var r1 = 0, r2 = 0, r3 = 0, sc = 0, nums = [];
-    for (var k2 = 0; k2 < 10; k2++) {
-      var nn = s0 + k2;
-      r1 += c1[nn]; r2 += c2[nn]; r3 += c3[nn]; sc += wgt[nn];
-      nums.push({ num: nn, n1: c1[nn], n2: c2[nn], n3: c3[nn] });
-    }
-    return { start: s0, end: s0 + 9, count: r1 + r2 + r3, count1: r1, count2: r2, count3: r3, score: sc, numbers: nums };
-  }
-  var top1 = mk(picks[0]);
-  return { start: top1.start, end: top1.end, count: top1.count, score: top1.score,
-           count1: top1.count1, count2: top1.count2, count3: top1.count3, numbers: top1.numbers,
-           windowSize: win.length, second: mk(picks[1]), third: mk(picks[2]), c1: c1 };
+  var bandArr = [];
+  for (var k1 = 0; k1 < 5; k1++) bandArr.push(a0 + k1);
+  for (var k2 = 0; k2 < 5; k2++) bandArr.push(b0 + k2);
+  var r1 = 0, r2 = 0, r3 = 0;
+  for (var bi = 0; bi < bandArr.length; bi++) { var nn = bandArr[bi]; r1 += c1[nn]; r2 += c2[nn]; r3 += c3[nn]; }
+  return { a0: a0, a1: a0 + 4, b0: b0, b1: b0 + 4,
+           start: a0, end: a0 + 4,                 // 하위호환 (판세 키 등)
+           moveKey: a0 * 1000 + b0,                // 두 밴드 조합 변경 감지용
+           bandArr: bandArr, count1: r1, count2: r2, count3: r3, count: r1 + r2 + r3,
+           score: bestA + bestB, windowSize: win.length, cw: cw };
 }
-// 1순위 밴드 밖, 1등밀도 상위 K개 — c1(해당 시점 1등 카운트 배열)과 밴드를 받아 우선순위 리스트 반환
-function _extPriority(c1, bandStart, bandEnd, K) {
+// 밴드 밖, 가중밀도(3:1:1) 상위 K개 — cw(해당 시점 가중밀도 배열)와 밴드 번호 배열을 받아 우선순위 리스트 반환
+function _extPriority(cw, bandArr, K) {
+  var inBand = {};
+  for (var b = 0; b < bandArr.length; b++) inBand[bandArr[b]] = 1;
   var ord = []; for (var n = 1; n <= 100; n++) ord.push(n);
-  ord.sort(function (a, b) { return c1[b] - c1[a] || a - b; });
+  ord.sort(function (a, b) { return cw[b] - cw[a] || a - b; });
   var ext = [];
   for (var o = 0; o < ord.length && ext.length < K; o++) {
     var v = ord[o];
-    if (v >= bandStart && v <= bandEnd) continue;
+    if (inBand[v]) continue;
     ext.push(v);
   }
   return ext;
@@ -1828,9 +1821,9 @@ function _bestDecadeRange(rounds, W) {
   return { start: bd*10+1, end: bd*10+10, count: bt, windowSize: win.length };
 }
 
-// 연속 10칸 예측 OOS 누적 적중률 (각 회차 직전 데이터로 예측 → 실제 1등 그 안에?)
+// 5+5 이중밴드 예측 OOS 누적 적중률 (각 회차 직전 데이터로 예측 → 실제 당첨이 두 밴드 합집합 안에?)
 function _hotRangeAccuracy(rounds, W, evalN) {
-  W = W || 50; evalN = evalN || 100;
+  W = W || 75; evalN = evalN || 100;
   var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
   var N = sorted.length;
   var start = Math.max(W, N - evalN);
@@ -1838,30 +1831,24 @@ function _hotRangeAccuracy(rounds, W, evalN) {
   for (var i = start; i < N; i++) {
     var pr = _predictHotRange(sorted.slice(0, i), W);
     var row = sorted[i];
-    var inB = function(x) { return x != null && x >= pr.start && x <= pr.end; };
-    // 1순위 구간에 들어온 등수: 1등 우선 → 2등 → 3등
+    var inB = function(x) { return x != null && pr.bandArr.indexOf(x) >= 0; };
+    // 두 밴드 합집합에 들어온 등수: 1등 우선 → 2등 → 3등
     var rank = 0;
     if (inB(row.first)) rank = 1;
     else if (inB(row.second)) rank = 2;
     else if (inB(row.third)) rank = 3;
-    // 2순위 구간에 들어온 등수
-    var rankB = 0, ps2 = pr.second ? pr.second.start : null, pe2 = pr.second ? pr.second.end : null;
-    var inB2 = function(x) { return ps2 != null && x != null && x >= ps2 && x <= pe2; };
-    if (inB2(row.first)) rankB = 1;
-    else if (inB2(row.second)) rankB = 2;
-    else if (inB2(row.third)) rankB = 3;
     if (rank === 1) hit++;
     else if (rank === 2) hit2++;
     else if (rank === 3) hit3++;
     tot++;
-    // ▶ 그 시점 기준(walk-forward) +8 추가분 — 밴드 밖 1등밀도 상위 8개, 적중 여부
-    var extNums = _extPriority(pr.c1, pr.start, pr.end, 8);
+    // ▶ 그 시점 기준(walk-forward) +8 추가분 — 밴드 밖 가중밀도 상위 8개, 적중 여부
+    var extNums = _extPriority(pr.cw, pr.bandArr, 8);
     var extRank = 0;
     if (extNums.indexOf(row.first) >= 0) extRank = 1;
     else if (extNums.indexOf(row.second) >= 0) extRank = 2;
     else if (extNums.indexOf(row.third) >= 0) extRank = 3;
     recent.push({ round: row.round, first: row.first, second: row.second, third: row.third, hit: rank === 1, rank: rank,
-                  predStart: pr.start, predStart2: ps2, predEnd2: pe2, rank2band: rankB,
+                  predStart: pr.moveKey, bA0: pr.a0, bA1: pr.a1, bB0: pr.b0, bB1: pr.b1,
                   extNums: extNums, extRank: extRank });
   }
   return { hit: hit, hit2: hit2, hit3: hit3, tot: tot, recent: recent };
@@ -3079,45 +3066,45 @@ function render() {
   // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회), 100회 전부 O/X
   var predictCard = document.getElementById('predict-card');
   if (flow && flow.sequence && flow.sequence.length >= 2) {
-    var PW = 60;  // ★ v50: 1·2등 확장 최적 — 1등만 카운팅 W60 (1등 13.5% / 1·2등 23.2%, train=test 23.2% 견고)
+    var PW = 75;  // ★ v55: 5+5 이중밴드 W75 3:1:1 — 아무등수 32.4%(3.1회에 1번)·1등 13.7%·회수율 142.1% (466회 OOS, train 31.3/test 33.5)
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);
     var html = '';
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1등 번호대</b> (최근 ' + PW + '회 1등 빈도 · 466회 검증: <b>1등 13.5%</b>(랜덤10%) · <b>1·2등 23.2%</b>(랜덤19%))</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>당첨 번호대 5+5</b> (최근 ' + PW + '회 가중 3:1:1 · 466회 검증: <b>아무등수 32.4%</b> = 3.1회에 1번 · <b>1등 13.7%</b>(랜덤10%) · 최장미스 12회)</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' +
-            '<span class="predict-rank">1순위</span>' + pr.start + ' ~ ' + pr.end +
-            '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
+            '<span class="predict-rank">매수 10개 (5+5)</span>' + pr.a0 + ' ~ ' + pr.a1 + ' · ' + pr.b0 + ' ~ ' + pr.b1 +
+            '<span class="predict-dec-cnt">두 구간 합산 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     html += '</div>';
-    // ▶ 추가분 우선순위 최대 8개 — 밴드 밖 1등밀도 순 (_extPriority, 검증표와 동일 로직). 누적검증(406회): 10개 13.5/23.2 → 14개 17.5/29.6 → 18개 21.2/36.5
+    // ▶ 추가분 우선순위 최대 8개 — 밴드 밖 가중밀도(3:1:1) 순 (_extPriority, 검증표와 동일 로직)
     (function () {
-      var ext = _extPriority(pr.c1, pr.start, pr.end, 8);
+      var ext = _extPriority(pr.cw, pr.bandArr, 8);
       var chips = ext.map(function (n, ix) {
         return '<span class="ext-chip"><span class="ext-rank">' + (ix + 1) + '</span><b>' + n + '</b></span>';
       }).join('');
       html += '<div class="ext-wrap"><div class="ext-title">▶ 추가 매수 우선순위 (최대 8개 · 왼쪽부터) <span style="color:#6ee7b7;font-weight:600;">— 아래 검증표에서 적중 시 녹색</span></div>' +
               '<div class="ext-nums">' + chips + '</div>' +
-              '<div class="ext-note">누적 검증: <b>10개 1등13.5%·1·2등23.2%</b> → 14개 17.5%·29.6% → 18개 21.2%·36.5% <span style="opacity:.7;">(효율 배수는 10개가 최고)</span></div></div>';
+              '<div class="ext-note">누적 검증(466회): <b>10개 1등13.7%·아무32.4%</b> → 14개 19.1%·43.1% → 18개 22.7%·49.8% <span style="opacity:.7;">(효율 배수는 10개가 최고)</span></div></div>';
     })();
-    // 판세: 현재 구간 유지 길이 (역전되면 자동 교체됨)
+    // 판세: 현재 5+5 조합 유지 길이 (두 밴드 중 하나라도 바뀌면 이동으로 집계)
     var starts = acc.recent.map(function(r){ return r.predStart; });
-    starts.push(pr.start);
+    starts.push(pr.moveKey);
     var moves = 0;
     for (var mv = 1; mv < starts.length; mv++) if (starts[mv] !== starts[mv-1]) moves++;
     var keep = 1;
-    for (var sk = starts.length - 2; sk >= 0 && starts[sk] === pr.start; sk--) keep++;
-    var raceTxt = '판세: 이 구간 <b>' + keep + '회째</b> 1위 유지 (점수 ' + Math.round(pr.score * 10) / 10 + ')' +
-                  ' · 최근 ' + acc.tot + '회 동안 예측 ' + moves + '번 이동 — 역전되면 자동 교체';
+    for (var sk = starts.length - 2; sk >= 0 && starts[sk] === pr.moveKey; sk--) keep++;
+    var raceTxt = '판세: 이 5+5 조합 <b>' + keep + '회째</b> 유지 (가중점수 ' + Math.round(pr.score * 10) / 10 + ')' +
+                  ' · 최근 ' + acc.tot + '회 동안 조합 ' + moves + '번 이동 — 역전되면 자동 교체';
     html += '<div class="predict-cmp">' + raceTxt + '</div>';
     var anyHit = acc.hit + acc.hit2 + acc.hit3;
     var anyPct = acc.tot > 0 ? Math.round(anyHit / acc.tot * 100) : 0;
     var oneP = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
-    var p12 = acc.tot > 0 ? Math.round((acc.hit + acc.hit2) / acc.tot * 100) : 0;
-    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 <strong class="rk1-txt">1등 ' + acc.hit + '/' + acc.tot + ' (' + oneP + '%)</strong>' +
-            ' · <strong>1·2등 ' + (acc.hit + acc.hit2) + '/' + acc.tot + ' (' + p12 + '%)</strong>' +
-            '<span style="color:var(--text-dim);font-size:11px;"> · 10개, 랜덤 1등 10%·1·2등 19%</span>' +
-            ' · 아무등수 ' + anyPct + '% (<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '</span> 포함)</div>';
+    var onceEvery = anyPct > 0 ? (100 / anyPct).toFixed(1) : '-';
+    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 <strong>아무등수 ' + anyHit + '/' + acc.tot + ' (' + anyPct + '%)</strong>' +
+            ' = 평균 <strong>' + onceEvery + '회에 1번</strong> 당첨' +
+            ' · <span class="rk-txt rk1-txt">1등 ' + acc.hit + ' (' + oneP + '%)</span>·<span class="rk-txt rk2-txt">2등 ' + acc.hit2 + '</span>·<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '</span>' +
+            '<span style="color:var(--text-dim);font-size:11px;"> · 10개, 랜덤 아무 27%·1등 10%</span></div>';
     html += '<div class="predict-cmp">○ 컬러 = 걸린 등수: <span class="rk-txt rk1-txt">금 1등</span> · <span class="rk-txt rk2-txt">은 2등</span> · <span class="rk-txt rk3-txt">동 3등</span></div>';
     // 100회 전부 O/X (최신 → 과거 순) — 걸린 등수 컬러 (금/은/동)
     var all = acc.recent.slice().reverse();
@@ -3139,15 +3126,14 @@ function render() {
       html += '<span class="predict-hit ' + hcls + '" title="' + tip + '">' + (rk ? '○' : '×') + '</span>';
     }
     html += '</div>';
-    // 주예측 회차별 검증표 (이 카드에 직접 연결, 기본 펼침) — 회차·1·2·3등·1순위 예측구간·결과 (2순위 제거)
+    // 주예측 회차별 검증표 (이 카드에 직접 연결, 기본 펼침) — 회차·1·2·3등·5+5 예측구간·결과
     html += '<div class="predict-detail-title">📋 회차별 예측 검증 (최근 ' + acc.tot + '회)</div>';
     html += '<div class="predict-detail-scroll"><table class="bt-table bt-pred"><thead><tr>' +
-            '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>1순위 구간</th><th>결과</th></tr></thead><tbody>';
+            '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측 5+5</th><th>결과</th></tr></thead><tbody>';
     var mrows = acc.recent;
     for (var mdj = mrows.length - 1; mdj >= 0; mdj--) {
       var mh = mrows[mdj];
-      var b1s = mh.predStart, b1e = b1s + 9;
-      var inb1 = function (x) { return x != null && x >= b1s && x <= b1e; };
+      var inb1 = function (x) { return x != null && ((x >= mh.bA0 && x <= mh.bA1) || (x >= mh.bB0 && x <= mh.bB1)); };
       var extNums = mh.extNums || [];
       var inExt = function (x) { return x != null && extNums.indexOf(x) >= 0; };
       // 컬럼별(1·2·3등) 셀 컬러: 밴드 적중 = 금/은/동(해당 등수색), +8 적중 = 녹색
@@ -3156,7 +3142,7 @@ function render() {
         if (inExt(x)) return ' class="bt-ext-in"';
         return '';
       };
-      var bandTxt = '<span class="bt-band">' + b1s + '~' + b1e + '</span>';
+      var bandTxt = '<span class="bt-band">' + mh.bA0 + '~' + mh.bA1 + '·' + mh.bB0 + '~' + mh.bB1 + '</span>';
       var rn = function (r) { return r === 1 ? '1등' : r === 2 ? '2등' : r === 3 ? '3등' : ''; };
       var resTxt = mh.rank ? '<span class="bt-res1">' + rn(mh.rank) + ' 적중</span>' :
                    mh.extRank ? '<span class="bt-ext-res">+8 ' + rn(mh.extRank) + ' 적중</span>' :

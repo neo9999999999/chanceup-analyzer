@@ -3130,6 +3130,12 @@ function render() {
     for (var xm = 0; xm < all.length; xm++) { if (all[xm].rank === 0) { runMiss++; if (runMiss > maxMiss) maxMiss = runMiss; } else runMiss = 0; }
     html += '<div class="predict-cmp">📉 현재 <b>' + curMiss + '연속 미적중</b> · 최근 ' + acc.tot + '회 최장 ' + maxMiss +
             '연속 미적중 · 평균 ' + (anyPct>0?(100/anyPct).toFixed(1):'-') + '회에 1번꼴 (변동 큼)</div>';
+    // 🔥 가뭄 트리거 확장 정책 (466회 검증: 회수율 143.2% 전 정책 1위, 최장가뭄 12→8회)
+    if (curMiss >= 3) {
+      html += '<div class="predict-cmp" style="color:#fca5a5;font-weight:700;">🔥 가뭄 모드 (' + curMiss + '연속 미스): 이번 회차 <b>14개 권장</b> = 밴드 10개 + 1차 +4 — 가뭄3+ 확장 정책 (회수율 143.2% · 최장가뭄 12→8회)</div>';
+    } else {
+      html += '<div class="predict-cmp" style="opacity:.8;">💧 기본 모드: 10개(5+5)만 — <b>3연속 미스부터</b> 1차 +4 추가 권장 (가뭄3+ 확장 정책, 회수율 143.2%)</div>';
+    }
     html += '<div class="predict-hits">';
     for (var hj = 0; hj < all.length; hj++) {
       var hh = all[hj];

@@ -541,6 +541,15 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .bt-table .bt-res1 { color: #f5c542; font-weight: 700; font-size: 11.5px; }
 .bt-table .bt-res2 { color: #8fc0ff; font-weight: 700; font-size: 11.5px; }
 .predict-detail-title { font-size: 12px; font-weight: 700; color: var(--accent, #e0b352); margin: 12px 0 6px; }
+/* 추가 매수 우선순위 */
+.ext-wrap { margin: 12px 0; padding: 12px 14px; border: 1px solid rgba(52,211,153,0.35); background: rgba(52,211,153,0.07); border-radius: 12px; }
+.ext-title { font-size: 12px; font-weight: 800; color: #34d399; margin-bottom: 8px; }
+.ext-nums { display: flex; flex-wrap: wrap; gap: 6px; }
+.ext-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 8px;
+  background: rgba(52,211,153,0.14); border: 1px solid rgba(52,211,153,0.4); }
+.ext-chip b { font-size: 15px; font-weight: 800; color: #6ee7b7; }
+.ext-rank { font-size: 9.5px; font-weight: 700; color: var(--text-dim); background: rgba(0,0,0,0.3); border-radius: 4px; padding: 1px 4px; }
+.ext-note { margin-top: 8px; font-size: 11px; color: var(--text-dim); line-height: 1.5; }
 /* 겹침 구간만 매수 박스 */
 .overlap-box { margin: 12px 0; padding: 12px 14px; border: 1px solid rgba(52,211,153,0.4); background: rgba(52,211,153,0.08); border-radius: 12px; }
 .overlap-head { font-size: 13px; font-weight: 800; color: #34d399; }
@@ -3104,7 +3113,7 @@ function render() {
               '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.second.count1 + ' · 2등 ' + pr.second.count2 + ' · 3등 ' + pr.second.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     }
     html += '</div>';
-    // ▶ +4 추가분 (10+4 구조) — 밴드 밖 1등밀도 상위 4개. 검증: 10개 1등13.5%/1·2등23.2% → 14개 17.5%/29.6%
+    // ▶ 추가분 우선순위 최대 8개 — 밴드 밖 1등밀도 순. 누적검증(406회): 10개 13.5/23.2 → 14개 17.5/29.6 → 18개 21.2/36.5
     (function () {
       var ascP = rows.slice().sort(function (a, b) { return a.round - b.round; });
       var winP = ascP.slice(Math.max(0, ascP.length - PW));
@@ -3113,15 +3122,17 @@ function render() {
       var ordP = []; for (var np = 1; np <= 100; np++) ordP.push(np);
       ordP.sort(function (a, b) { return cP[b] - cP[a] || a - b; });
       var ext = [];
-      for (var op = 0; op < ordP.length && ext.length < 4; op++) {
+      for (var op = 0; op < ordP.length && ext.length < 8; op++) {
         var vp = ordP[op];
         if (vp >= pr.start && vp <= pr.end) continue;           // 1순위 밴드 제외
-        ext.push(vp);
+        ext.push(vp);                                            // 밀도 높은 순서 = 우선순위
       }
-      ext.sort(function (a, b) { return a - b; });
-      html += '<div class="predict-cmp">▶ <b>+4 추가분</b> (여유 있을 때): ' +
-              ext.map(function (n) { return '<b style="color:#6ee7b7;">' + n + '</b>'; }).join(' · ') +
-              ' <span style="opacity:.75;">— 10+4 = 1등 17.5% · 1·2등 29.6%</span></div>';
+      var chips = ext.map(function (n, ix) {
+        return '<span class="ext-chip"><span class="ext-rank">' + (ix + 1) + '</span><b>' + n + '</b></span>';
+      }).join('');
+      html += '<div class="ext-wrap"><div class="ext-title">▶ 추가 매수 우선순위 (최대 8개 · 왼쪽부터)</div>' +
+              '<div class="ext-nums">' + chips + '</div>' +
+              '<div class="ext-note">누적 검증: <b>10개 1등13.5%·1·2등23.2%</b> → 14개 17.5%·29.6% → 18개 21.2%·36.5% <span style="opacity:.7;">(효율 배수는 10개가 최고)</span></div></div>';
     })();
     // 판세: 현재 구간 유지 길이 + 2위 구간과 격차 (역전 시 예측 자동 교체)
     var starts = acc.recent.map(function(r){ return r.predStart; });

@@ -3104,7 +3104,25 @@ function render() {
               '<span class="predict-dec-cnt">이 구간에 1등 ' + pr.second.count1 + ' · 2등 ' + pr.second.count2 + ' · 3등 ' + pr.second.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
     }
     html += '</div>';
-    // (추가 추천 TOP 20 제거 — 사용자 요청)
+    // ▶ +4 추가분 (10+4 구조) — 밴드 밖 1등밀도 상위 4개. 검증: 10개 1등13.5%/1·2등23.2% → 14개 17.5%/29.6%
+    (function () {
+      var ascP = rows.slice().sort(function (a, b) { return a.round - b.round; });
+      var winP = ascP.slice(Math.max(0, ascP.length - PW));
+      var cP = new Array(101).fill(0);
+      for (var jp = 0; jp < winP.length; jp++) { if (winP[jp].first != null) cP[winP[jp].first]++; }
+      var ordP = []; for (var np = 1; np <= 100; np++) ordP.push(np);
+      ordP.sort(function (a, b) { return cP[b] - cP[a] || a - b; });
+      var ext = [];
+      for (var op = 0; op < ordP.length && ext.length < 4; op++) {
+        var vp = ordP[op];
+        if (vp >= pr.start && vp <= pr.end) continue;           // 1순위 밴드 제외
+        ext.push(vp);
+      }
+      ext.sort(function (a, b) { return a - b; });
+      html += '<div class="predict-cmp">▶ <b>+4 추가분</b> (여유 있을 때): ' +
+              ext.map(function (n) { return '<b style="color:#6ee7b7;">' + n + '</b>'; }).join(' · ') +
+              ' <span style="opacity:.75;">— 10+4 = 1등 17.5% · 1·2등 29.6%</span></div>';
+    })();
     // 판세: 현재 구간 유지 길이 + 2위 구간과 격차 (역전 시 예측 자동 교체)
     var starts = acc.recent.map(function(r){ return r.predStart; });
     starts.push(pr.start);

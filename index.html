@@ -3088,12 +3088,12 @@ function render() {
   // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회), 100회 전부 O/X
   var predictCard = document.getElementById('predict-card');
   if (flow && flow.sequence && flow.sequence.length >= 2) {
-    var PW = 40;  // ★ v49: 526회 재최적화 — 1등 특화(1등만 카운팅) W40이 1등 적중 최고
+    var PW = 60;  // ★ v50: 1·2등 확장 최적 — 1등만 카운팅 W60 (1등 13.5% / 1·2등 23.2%, train=test 23.2% 견고)
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);
     var html = '';
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1등 번호대</b> (최근 ' + PW + '회 1등 빈도 · 526회 검증: 1등 13.5% / 최근100회 14% / 랜덤 10%)</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1·2등 번호대</b> (최근 ' + PW + '회 1등 빈도 · 526회 검증: <b>1등 13.5%</b>(랜덤10) · <b>1·2등 23.2%</b>(랜덤19) · 20개 확장 39.9%)</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' +
             '<span class="predict-rank">1순위</span>' + pr.start + ' ~ ' + pr.end +
@@ -3163,9 +3163,11 @@ function render() {
     var anyHit = acc.hit + acc.hit2 + acc.hit3;
     var anyPct = acc.tot > 0 ? Math.round(anyHit / acc.tot * 100) : 0;
     var oneP = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
-    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 <strong class="rk1-txt">1등 적중: ' + acc.hit + '/' + acc.tot + ' (' + oneP + '%)</strong>' +
-            '<span style="color:var(--text-dim);font-size:11px;"> · 10개, 랜덤 10% 대비 ' + (oneP >= 10 ? (oneP / 10).toFixed(1) + '배' : '-') + '</span>' +
-            ' · 아무등수 ' + anyPct + '% (<span class="rk-txt rk2-txt">2등 ' + acc.hit2 + '</span>·<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '</span>)</div>';
+    var p12 = acc.tot > 0 ? Math.round((acc.hit + acc.hit2) / acc.tot * 100) : 0;
+    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 <strong class="rk1-txt">1등 ' + acc.hit + '/' + acc.tot + ' (' + oneP + '%)</strong>' +
+            ' · <strong>1·2등 ' + (acc.hit + acc.hit2) + '/' + acc.tot + ' (' + p12 + '%)</strong>' +
+            '<span style="color:var(--text-dim);font-size:11px;"> · 10개, 랜덤 1등 10%·1·2등 19%</span>' +
+            ' · 아무등수 ' + anyPct + '% (<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '</span> 포함)</div>';
     html += '<div class="predict-cmp">○ 컬러 = 걸린 등수: <span class="rk-txt rk1-txt">금 1등</span> · <span class="rk-txt rk2-txt">은 2등</span> · <span class="rk-txt rk3-txt">동 3등</span> · 1+2순위 20개 = 1등 25%</div>';
     // 100회 전부 O/X (최신 → 과거 순) — 걸린 등수 컬러 (금/은/동)
     var all = acc.recent.slice().reverse();

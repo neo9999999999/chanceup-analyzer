@@ -533,10 +533,11 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .bt-table .bt-round { color: var(--text-dim); font-weight: 700; }
 .bt-table .bt-band { color: #f5c542; font-weight: 700; }
 .bt-table td.bt-in { background: rgba(245,197,66,0.22); color: #f5c542; font-weight: 800; border-radius: 4px; }
-/* 밴드 적중 컬럼별 컬러 — 금(1등)·은(2등)·동(3등), 어느 컬럼이 맞았는지로 구분 */
-.bt-table td.bt-in-r1 { background: rgba(245,197,66,0.24); color: #f5c542; font-weight: 800; border-radius: 4px; }
-.bt-table td.bt-in-r2 { background: rgba(195,203,216,0.24); color: #c3cbd8; font-weight: 800; border-radius: 4px; }
-.bt-table td.bt-in-r3 { background: rgba(205,138,74,0.24); color: #cd8a4a; font-weight: 800; border-radius: 4px; }
+/* 존별 적중 컬러 — 주력존(금) · 최신존(청록) */
+.bt-table td.bt-zA { background: rgba(245,197,66,0.24); color: #f5c542; font-weight: 800; border-radius: 4px; }
+.bt-table td.bt-zB { background: rgba(125,211,252,0.22); color: #7dd3fc; font-weight: 800; border-radius: 4px; }
+.bt-zA-txt { color: #f5c542; font-weight: 700; }
+.bt-zB-txt { color: #7dd3fc; font-weight: 700; }
 .bt-table .bt-miss { color: var(--text-dim); }
 .bt-table .bt-band { color: #f5c542; font-weight: 700; }
 .bt-table .bt-res1 { color: #f5c542; font-weight: 700; font-size: 11.5px; }
@@ -3069,7 +3070,7 @@ function render() {
             ' = 평균 <strong>' + onceEvery + '회에 1번</strong> 당첨' +
             ' · <span class="rk-txt rk1-txt">1등 ' + acc.hit + ' (' + oneP + '%)</span>·<span class="rk-txt rk2-txt">2등 ' + acc.hit2 + '</span>·<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '</span>' +
             '<span style="color:var(--text-dim);font-size:11px;"> · 10개, 랜덤 아무 27%·1등 10%</span></div>';
-    html += '<div class="predict-cmp">○ 컬러 = 걸린 등수: <span class="rk-txt rk1-txt">금 1등</span> · <span class="rk-txt rk2-txt">은 2등</span> · <span class="rk-txt rk3-txt">동 3등</span></div>';
+    html += '<div class="predict-cmp">○ 그리드 컬러 = 걸린 등수(<span class="rk-txt rk1-txt">금1등</span>·<span class="rk-txt rk2-txt">은2등</span>·<span class="rk-txt rk3-txt">동3등</span>) · 표 셀 컬러 = 나온 존(<span class="bt-zA-txt">주력존</span>·<span class="bt-zB-txt">최신존</span>)</div>';
     // 100회 전부 O/X (최신 → 과거 순) — 걸린 등수 컬러 (금/은/동)
     var all = acc.recent.slice().reverse();
     // 연속 미적중 통계
@@ -3098,19 +3099,27 @@ function render() {
     var mrows = acc.recent;
     for (var mdj = mrows.length - 1; mdj >= 0; mdj--) {
       var mh = mrows[mdj];
-      var inb1 = function (x) { return x != null && ((x >= mh.bA0 && x <= mh.bA1) || (x >= mh.bB0 && x <= mh.bB1)); };
-      // 컬럼별(1·2·3등) 셀 컬러: 밴드 적중 = 금/은/동(해당 등수색)
-      var cel = function (x, rankCls) {
-        if (inb1(x)) return ' class="bt-in ' + rankCls + '"';
+      var inA = function (x) { return x != null && x >= mh.bA0 && x <= mh.bA1; };   // 주력존
+      var inB = function (x) { return x != null && x >= mh.bB0 && x <= mh.bB1; };   // 최신존
+      // 컬럼별(1·2·3등) 셀 컬러: 주력존 적중 = 금색, 최신존 적중 = 청록
+      var cel = function (x) {
+        if (inA(x)) return ' class="bt-zA"';
+        if (inB(x)) return ' class="bt-zB"';
         return '';
       };
-      var bandTxt = '<span class="bt-band">' + mh.bA0 + '~' + mh.bA1 + '·' + mh.bB0 + '~' + mh.bB1 + '</span>';
+      var bandTxt = '<span class="bt-zA-txt">' + mh.bA0 + '~' + mh.bA1 + '</span>·<span class="bt-zB-txt">' + mh.bB0 + '~' + mh.bB1 + '</span>';
       var rn = function (r) { return r === 1 ? '1등' : r === 2 ? '2등' : r === 3 ? '3등' : ''; };
-      var resTxt = mh.rank ? '<span class="bt-res1">' + rn(mh.rank) + ' 적중</span>' : '<span class="bt-miss">미적중</span>';
+      var zoneOf = function () {
+        var xs = [mh.first, mh.second, mh.third];
+        var x = mh.rank ? xs[mh.rank - 1] : null;
+        if (x == null) return '';
+        return inA(x) ? ' <span class="bt-zA-txt">주력</span>' : (inB(x) ? ' <span class="bt-zB-txt">최신</span>' : '');
+      };
+      var resTxt = mh.rank ? '<span class="bt-res1">' + rn(mh.rank) + ' 적중</span>' + zoneOf() : '<span class="bt-miss">미적중</span>';
       html += '<tr><td class="bt-round">' + mh.round + '</td>' +
-              '<td' + cel(mh.first, 'bt-in-r1') + '>' + mh.first + '</td>' +
-              '<td' + cel(mh.second, 'bt-in-r2') + '>' + (mh.second == null ? '-' : mh.second) + '</td>' +
-              '<td' + cel(mh.third, 'bt-in-r3') + '>' + (mh.third == null ? '-' : mh.third) + '</td>' +
+              '<td' + cel(mh.first) + '>' + mh.first + '</td>' +
+              '<td' + cel(mh.second) + '>' + (mh.second == null ? '-' : mh.second) + '</td>' +
+              '<td' + cel(mh.third) + '>' + (mh.third == null ? '-' : mh.third) + '</td>' +
               '<td>' + bandTxt + '</td><td>' + resTxt + '</td></tr>';
     }
     html += '</tbody></table></div>';

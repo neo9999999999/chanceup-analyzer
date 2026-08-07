@@ -1764,30 +1764,40 @@ function decadeLabel(d) {
 // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회 1등 빈도 최다 연속구간)
 // OOS: 전체 15% / 최근 20% (랜덤 10% 대비 1.5~2배). 십의자리 고정보다 우수.
 function _predictHotRange(rounds, W) {
-  // ★ v55: 5+5 이중밴드 W75, 가중 3:1:1 (1등×3 + 2등×1 + 3등×1)
-  //   466회 OOS: 아무등수 32.4%(평균 3.1회에 1번, 기존 29.4%) · 1등 13.7%(기존 13.5%)
-  //   · 최장 연속미스 12회(기존 16회) · 포인트 회수율 142.1%(기존 140.4%)
-  //   train/test = 31.3%/33.5% 양쪽 견고, 이웃 W73·4:1:1도 31.8~32.4% 고원 확인.
+  // ★ v59: 이중 시간축 5+5 — 안정존 5칸(최근 75회) + 추격존 5칸(최근 8회), 가중 3:1:1
+  //   466회 OOS: 1등 15.9%(전반16.3/후반15.5, 4분기 13.8~16.9 전부 현행 이상)
+  //   · 아무등수 30.5% · 최장가뭄 9회(기존 12회) · 포인트 회수율 150.8%(기존 142.1%)
+  //   · 이웃 고원 W6~10 = 15.0~15.9% (스파이크 아님). 추격존이 '뒷북' 보완:
+  //   단기밴드 단독은 8%대로 무의미하지만, 장기 안정존과 페어링하면 최신 핫존을 잡아냄.
   W = W || 75;
+  var SHORT_W = 8;
   var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
+  var winS = sorted.length >= SHORT_W ? sorted.slice(-SHORT_W) : sorted.slice();
   var c1 = new Array(101).fill(0), c2 = new Array(101).fill(0), c3 = new Array(101).fill(0);
-  var cw = new Array(101).fill(0);   // 가중 밀도 3:1:1
+  var cw = new Array(101).fill(0);    // 장기 가중 밀도 3:1:1 (안정존·+8 우선순위용)
+  var cs = new Array(101).fill(0);    // 단기(8회) 가중 밀도 3:1:1 (추격존용)
   for (var i = 0; i < win.length; i++) {
     var rw = win[i];
     if (rw.first  != null) { c1[rw.first]++;  cw[rw.first]  += 3; }
     if (rw.second != null) { c2[rw.second]++; cw[rw.second] += 1; }
     if (rw.third  != null) { c3[rw.third]++;  cw[rw.third]  += 1; }
   }
-  function sum5(s) { var t = 0; for (var k = 0; k < 5; k++) t += cw[s+k]; return t; }
-  // 밴드A: 연속 5칸 argmax
+  for (var i2 = 0; i2 < winS.length; i2++) {
+    var rs = winS[i2];
+    if (rs.first  != null) cs[rs.first]  += 3;
+    if (rs.second != null) cs[rs.second] += 1;
+    if (rs.third  != null) cs[rs.third]  += 1;
+  }
+  function sum5(arr, s) { var t = 0; for (var k = 0; k < 5; k++) t += arr[s+k]; return t; }
+  // 안정존: 장기밀도 연속 5칸 argmax
   var a0 = 1, bestA = -1;
-  for (var s = 1; s <= 96; s++) { var t = sum5(s); if (t > bestA) { bestA = t; a0 = s; } }
-  // 밴드B: 밴드A와 겹치지 않는 연속 5칸 argmax
+  for (var s = 1; s <= 96; s++) { var t = sum5(cw, s); if (t > bestA) { bestA = t; a0 = s; } }
+  // 추격존: 단기(8회)밀도 연속 5칸 argmax — 안정존과 겹침 배제
   var b0 = 1, bestB = -1;
   for (var s2 = 1; s2 <= 96; s2++) {
-    if (s2 + 4 >= a0 && s2 <= a0 + 4) continue;   // 겹침 배제
-    var t2 = sum5(s2);
+    if (s2 + 4 >= a0 && s2 <= a0 + 4) continue;
+    var t2 = sum5(cs, s2);
     if (t2 > bestB) { bestB = t2; b0 = s2; }
   }
   var bandArr = [];
@@ -3077,16 +3087,16 @@ function render() {
   // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회), 100회 전부 O/X
   var predictCard = document.getElementById('predict-card');
   if (flow && flow.sequence && flow.sequence.length >= 2) {
-    var PW = 75;  // ★ v55: 5+5 이중밴드 W75 3:1:1 — 아무등수 32.4%(3.1회에 1번)·1등 13.7%·회수율 142.1% (466회 OOS, train 31.3/test 33.5)
+    var PW = 75;  // ★ v59: 이중 시간축 — 안정존5(W75) + 추격존5(W8), 1등 15.9%·회수율 150.8%·최장가뭄 9회 (466회 OOS)
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);
     var html = '';
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>당첨 번호대 5+5</b> (최근 ' + PW + '회 가중 3:1:1 · 466회 검증: <b>아무등수 32.4%</b> = 3.1회에 1번 · <b>1등 13.7%</b>(랜덤10%) · 최장미스 12회)</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>당첨 번호대</b> — 안정존(75회) + 추격존(8회) · 466회 검증: <b>1등 15.9%</b>(랜덤10%) · 아무등수 30.5% · 회수율 150.8% · 최장가뭄 9회</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' +
-            '<span class="predict-rank">매수 10개 (5+5)</span>' + pr.a0 + ' ~ ' + pr.a1 + ' · ' + pr.b0 + ' ~ ' + pr.b1 +
-            '<span class="predict-dec-cnt">두 구간 합산 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
+            '<span class="predict-rank">매수 10개 = 안정존 5 + 추격존 5</span>' + pr.a0 + ' ~ ' + pr.a1 + ' · ' + pr.b0 + ' ~ ' + pr.b1 +
+            '<span class="predict-dec-cnt">안정존(최근 ' + pr.windowSize + '회 핫존) ' + pr.a0 + '~' + pr.a1 + ' · 추격존(최근 8회 열기) ' + pr.b0 + '~' + pr.b1 + ' — 합산 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 + '회</span></span>';
     html += '</div>';
     // ▶ 추가 매수: 1차 +4 / 2차 +4 — 밴드 밖 가중밀도(3:1:1) 순 (_extPriority, 검증표와 동일 로직)
     (function () {
@@ -3100,7 +3110,7 @@ function render() {
               '<div class="ext-title">▶ 추가 매수 우선순위 <span style="color:#6ee7b7;font-weight:600;">— 검증표: 1차 녹색 · 2차 청록</span></div>' +
               '<div class="ext-row"><span class="ext-row-label">1차 +4</span><div class="ext-nums">' + mkChips(ext.slice(0, 4), 0, '') + '</div></div>' +
               '<div class="ext-row"><span class="ext-row-label ext-row-label2">2차 +4</span><div class="ext-nums">' + mkChips(ext.slice(4, 8), 4, 'ext-chip2') + '</div></div>' +
-              '<div class="ext-note">누적 검증(466회): <b>10개 아무32.4%·1등13.7%</b> → +1차4 = 14개 43.1%·19.1% → +2차4 = 18개 49.8%·22.7%</div></div>';
+              '<div class="ext-note">누적 검증(466회): <b>10개 1등15.9%·아무30.5%</b> → +1차4 = 14개 19.5%·40.6% → +2차4 = 18개 24.9%·49.4%</div></div>';
     })();
     // 판세: 현재 5+5 조합 유지 길이 (두 밴드 중 하나라도 바뀌면 이동으로 집계)
     var starts = acc.recent.map(function(r){ return r.predStart; });

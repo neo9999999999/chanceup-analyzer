@@ -1745,30 +1745,36 @@ function decadeLabel(d) {
 // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회 1등 빈도 최다 연속구간)
 // OOS: 전체 15% / 최근 20% (랜덤 10% 대비 1.5~2배). 십의자리 고정보다 우수.
 function _predictHotRange(rounds, W) {
-  // ★ v60: 순수 5+5 이중밴드 W75 3:1:1 복귀 — 홀드아웃(1309~1327, 19회) 검증 결과
-  //   순수 5+5: 아무 6회·1등 3회 vs 이중시간축: 아무 5회·1등 1회 → 유일한 순수 OOS가 5+5 지지.
-  //   545회 전체: 아무등수 32.4%(3.1회에 1번)·1등 13.8% (랜덤 27.4%/10%).
-  //   과거1등조합 매수(최근10개 27.8%/빈도top10 28.9%/전체누적 25.6%)는 전부 랜덤 수준 기각.
+  // ★ v61: 1등 확률 최대화 — 주력존 5칸(최근 75회 '1등만') + 최신존 5칸(최근 10회 '1등만')
+  //   545회 OOS: 1등 15.3% (4분기 17.4/14.0/15.7/13.9, 3분기 우위) · 아무 29.5%
+  //   · 회수율 146.9%(+2,273만) vs 5+5 3:1:1 142.5% · 홀드아웃(1309~) 3회 동급
+  //   · 이웃 고원: W75+W9~11 = 14.8~15.3% (스파이크 아님). 2·3등 가중은 1등 목표에 노이즈 → 미사용.
   W = W || 75;
+  var SHORT_W = 10;
   var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
+  var winS = sorted.length >= SHORT_W ? sorted.slice(-SHORT_W) : sorted.slice();
   var c1 = new Array(101).fill(0), c2 = new Array(101).fill(0), c3 = new Array(101).fill(0);
-  var cw = new Array(101).fill(0);    // 가중 밀도 3:1:1
+  var cw = new Array(101).fill(0);    // 장기 1등 밀도 (주력존)
+  var cs = new Array(101).fill(0);    // 단기(10회) 1등 밀도 (최신존)
   for (var i = 0; i < win.length; i++) {
     var rw = win[i];
-    if (rw.first  != null) { c1[rw.first]++;  cw[rw.first]  += 3; }
-    if (rw.second != null) { c2[rw.second]++; cw[rw.second] += 1; }
-    if (rw.third  != null) { c3[rw.third]++;  cw[rw.third]  += 1; }
+    if (rw.first  != null) { c1[rw.first]++;  cw[rw.first] += 1; }
+    if (rw.second != null) { c2[rw.second]++; }
+    if (rw.third  != null) { c3[rw.third]++; }
+  }
+  for (var i2 = 0; i2 < winS.length; i2++) {
+    if (winS[i2].first != null) cs[winS[i2].first] += 1;
   }
   function sum5(arr, s) { var t = 0; for (var k = 0; k < 5; k++) t += arr[s+k]; return t; }
-  // 밴드A: 연속 5칸 argmax
+  // 주력존: 장기 1등밀도 연속 5칸 argmax
   var a0 = 1, bestA = -1;
   for (var s = 1; s <= 96; s++) { var t = sum5(cw, s); if (t > bestA) { bestA = t; a0 = s; } }
-  // 밴드B: 밴드A와 겹치지 않는 연속 5칸 argmax (동일 장기밀도)
+  // 최신존: 최근 10회 1등밀도 연속 5칸 argmax — 주력존과 겹침 배제
   var b0 = 1, bestB = -1;
   for (var s2 = 1; s2 <= 96; s2++) {
     if (s2 + 4 >= a0 && s2 <= a0 + 4) continue;
-    var t2 = sum5(cw, s2);
+    var t2 = sum5(cs, s2);
     if (t2 > bestB) { bestB = t2; b0 = s2; }
   }
   var bandArr = [];
@@ -3034,16 +3040,16 @@ function render() {
   // 🔮 다음 회차 예상 = 연속 10칸 TOP1 (최근 50회), 100회 전부 O/X
   var predictCard = document.getElementById('predict-card');
   if (flow && flow.sequence && flow.sequence.length >= 2) {
-    var PW = 75;  // ★ v60: 순수 5+5 W75 3:1:1 복귀 (홀드아웃 19회가 이중시간축보다 우위 확인) · 1차/2차 추가분 삭제
+    var PW = 75;  // ★ v61: 1등 최대화 — 주력존5(W75 1등만) + 최신존5(W10 1등만), 1등 15.3%·회수율 146.9% (545회 OOS)
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictHotRange(rows, PW);
     var acc = _hotRangeAccuracy(rows, PW, 100);
     var html = '';
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>당첨 번호대 5+5</b> (최근 ' + PW + '회 가중 3:1:1 · 545회 검증: <b>아무등수 32.4%</b> = 3.1회에 1번 · <b>1등 13.8%</b>(랜덤10%))</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1등 번호대</b> — 주력존(75회 1등) + 최신존(10회 1등) · 545회 검증: <b>1등 15.3%</b>(랜덤10%) · 아무등수 29.5% · 회수율 146.9%</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' +
-            '<span class="predict-rank">매수 10개 (5+5)</span>' + pr.a0 + ' ~ ' + pr.a1 + ' · ' + pr.b0 + ' ~ ' + pr.b1 +
-            '<span class="predict-dec-cnt">두 구간 합산 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 + '회 (최근 ' + pr.windowSize + '회)</span></span>';
+            '<span class="predict-rank">매수 10개 = 주력존 5 + 최신존 5</span>' + pr.a0 + ' ~ ' + pr.a1 + ' · ' + pr.b0 + ' ~ ' + pr.b1 +
+            '<span class="predict-dec-cnt">주력존(최근 ' + pr.windowSize + '회 1등 핫존) ' + pr.a0 + '~' + pr.a1 + ' · 최신존(최근 10회 1등) ' + pr.b0 + '~' + pr.b1 + ' — 합산 1등 ' + pr.count1 + ' · 2등 ' + pr.count2 + ' · 3등 ' + pr.count3 + '회</span></span>';
     html += '</div>';
     // 판세: 현재 5+5 조합 유지 길이 (두 밴드 중 하나라도 바뀌면 이동으로 집계)
     var starts = acc.recent.map(function(r){ return r.predStart; });

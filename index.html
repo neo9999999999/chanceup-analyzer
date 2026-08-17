@@ -532,6 +532,17 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .ovl-box { background: rgba(45,212,191,.08); border: 1px solid rgba(45,212,191,.4); border-radius: 8px; padding: 9px 11px; margin: 10px 0; font-size: 13.5px; }
 .ovl-box b.ovl-n { color: #2dd4bf; font-size: 16px; }
 .ovl-chip { display: inline-block; background: rgba(251,191,36,.18); border: 1px solid rgba(251,191,36,.55); color: #fbbf24; border-radius: 6px; padding: 1px 8px; margin: 2px 2px; font-weight: 700; font-size: 15px; }
+/* 열고 닫기 (details/summary) */
+details.fold { margin: 10px 0; }
+details.fold summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--accent, #e0b352);
+  padding: 8px 10px; background: rgba(224,179,82,0.08); border: 1px solid rgba(224,179,82,0.25); border-radius: 8px;
+  user-select: none; list-style: none; }
+details.fold summary::-webkit-details-marker { display: none; }
+details.fold summary::before { content: '▸ '; }
+details.fold[open] summary::before { content: '▾ '; }
+details.fold[open] summary { margin-bottom: 8px; }
+/* 통합표: 밴드 안에서 나온 당첨번호 = 금색 하이라이트 */
+.rounds-table td.rt-in { background: rgba(245,197,66,0.22); border-radius: 4px; font-weight: 800; }
 /* v64: 회차별 당첨번호 표의 W60 결과 컬럼 */
 .rounds-table .rt-band { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
 .rounds-table .w-r1 { color: #fbbf24; font-weight: 700; }
@@ -1339,7 +1350,7 @@ tr.topfreq-rank-top3 .col-num {
   <!-- 📋 회차별 당첨번호 -->
   <div class="card">
     <div class="flex-between">
-      <div class="card-title" style="margin-bottom:0;">📋 회차별 당첨번호</div>
+      <div class="card-title" style="margin-bottom:0;">📋 회차별 예측 검증 (전체)</div>
       <div class="muted" id="round-count">총 0회차</div>
     </div>
     <div class="rounds-list" id="rounds-list"></div>
@@ -3100,7 +3111,8 @@ function render() {
     var nextRoundNum = flow.sequence[flow.sequence.length - 1].round + 1;
     var pr = _predictW60Band(rows);
     var v61pr = _predictHotRange(rows, 75);   // 참고용 — v61과의 겹침 표시
-    var acc = _w60Accuracy(rows, 100);
+    var acc = _w60Accuracy(rows, rows.length);   // ★ 전체 이력 기준 (하단 통합표와 동일 데이터)
+    window.__w60AccAll = acc;                    // 하단 회차별 표에서 재사용 (중복 계산 방지)
     var html = '';
     html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1등 번호대</b> — 최근 60회 1등 최다 연속 10칸 · 462회 검증(중복제거): <b>1·2등 23.8%</b>(4.2회에 1번·랜덤19.1%) · 1등 13.6%(랜덤10%) · 아무등수 30.1% · 회수율 141.6%</div>';
     html += '<div class="predict-decs">';
@@ -3140,11 +3152,11 @@ function render() {
     var hit12 = acc.hit + acc.hit2;
     var pct12 = acc.tot > 0 ? hit12 / acc.tot * 100 : 0;
     var every12 = pct12 > 0 ? (100 / pct12).toFixed(1) : '-';
-    html += '<div class="predict-acc predict-acc-main">🏆 최근 ' + acc.tot + '회 <strong>1·2등 ' + hit12 + '/' + acc.tot +
+    html += '<div class="predict-acc predict-acc-main">🏆 전체 ' + acc.tot + '회 <strong>1·2등 ' + hit12 + '/' + acc.tot +
             ' (' + pct12.toFixed(1) + '%)</strong> = 평균 <strong>' + every12 + '회에 1번</strong>' +
             '<span style="color:var(--text-dim);font-size:11px;"> · 랜덤 기대 19.1%(5.2회에 1번) → 배수 ' +
             (pct12 > 0 ? (pct12 / 19.1).toFixed(2) : '-') + '×</span></div>';
-    html += '<div class="predict-acc">✅ 최근 ' + acc.tot + '회 <strong>아무등수 ' + anyHit + '/' + acc.tot + ' (' + anyPct + '%)</strong>' +
+    html += '<div class="predict-acc">✅ 전체 ' + acc.tot + '회 <strong>아무등수 ' + anyHit + '/' + acc.tot + ' (' + anyPct + '%)</strong>' +
             ' = 평균 <strong>' + onceEvery + '회에 1번</strong> 당첨' +
             ' · <span class="rk-txt rk1-txt">1등 ' + acc.hit + ' (' + oneP + '%)</span>·<span class="rk-txt rk2-txt">2등 ' + acc.hit2 + '</span>·<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '</span>' +
             '<span style="color:var(--text-dim);font-size:11px;"> · 10개, 랜덤 아무 27%·1등 10%</span></div>';
@@ -3167,12 +3179,13 @@ function render() {
     // 정상 가뭄 기대치: p=1·2등 확률일 때 tot회 중 기대 최장 미적중 ≈ ln(tot·p)/ln(1/(1-p))
     var pp = pct12 / 100, expGap = '-';
     if (pp > 0.01 && pp < 0.99 && acc.tot > 10) expGap = Math.round(Math.log(acc.tot * pp) / Math.log(1 / (1 - pp)));
-    html += '<div class="predict-cmp">📉 <b>1·2등 기준</b> 현재 <b>' + curMiss12 + '연속 미적중</b> · 최근 ' + acc.tot +
+    html += '<div class="predict-cmp">📉 <b>1·2등 기준</b> 현재 <b>' + curMiss12 + '연속 미적중</b> · 전체 ' + acc.tot +
             '회 최장 ' + maxMiss12 + '연속 · <span style="color:var(--text-dim)">정상 범위 기대 최장 ≈ ' + expGap +
             '연속 (이 안이면 전략 이상 아님)</span></div>';
-    html += '<div class="predict-cmp">📉 아무등수 기준 현재 <b>' + curMiss + '연속 미적중</b> · 최근 ' + acc.tot + '회 최장 ' + maxMiss +
+    html += '<div class="predict-cmp">📉 아무등수 기준 현재 <b>' + curMiss + '연속 미적중</b> · 전체 ' + acc.tot + '회 최장 ' + maxMiss +
             '연속 미적중 · 평균 ' + (anyPct>0?(100/anyPct).toFixed(1):'-') + '회에 1번꼴 (변동 큼)</div>';
-    // (가뭄 확장 권장 제거 — 사용자 매수 조건상 10개 고정)
+    // 전체 O/X 그리드 — 열고 닫기 (기본 접힘, 최신→과거)
+    html += '<details class="fold"><summary>○× 전체 그리드 펼치기 (' + acc.tot + '회 · 최신→과거)</summary>';
     html += '<div class="predict-hits">';
     for (var hj = 0; hj < all.length; hj++) {
       var hh = all[hj];
@@ -3183,26 +3196,8 @@ function render() {
       else if (rk === 3) tip += ' · 3등 ' + hh.third + ' 적중';
       html += '<span class="predict-hit ' + hcls + '" title="' + tip + '">' + (rk ? '○' : '×') + '</span>';
     }
-    html += '</div>';
-    // 주예측 회차별 검증표 (이 카드에 직접 연결, 기본 펼침) — 회차·1·2·3등·5+5 예측구간·결과
-    html += '<div class="predict-detail-title">📋 회차별 예측 검증 (최근 20회) <span style="color:var(--text-dim);font-size:11px;font-weight:400">· 전체 이력은 아래 회차별 당첨번호 표의 W60 컬럼 참조</span></div>';
-    html += '<div class="predict-detail-scroll"><table class="bt-table bt-pred"><thead><tr>' +
-            '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측 밴드</th><th>결과</th></tr></thead><tbody>';
-    var mrows = acc.recent.slice(-20);
-    for (var mdj = mrows.length - 1; mdj >= 0; mdj--) {
-      var mh = mrows[mdj];
-      var inA = function (x) { return x != null && x >= mh.s0 && x <= mh.s1; };
-      var cel = function (x) { return inA(x) ? ' class="bt-zA"' : ''; };
-      var bandTxt = '<span class="bt-zA-txt">' + mh.s0 + '~' + mh.s1 + '</span>';
-      var rn = function (r) { return r === 1 ? '1등' : r === 2 ? '2등' : r === 3 ? '3등' : ''; };
-      var resTxt = mh.rank ? '<span class="bt-res1">' + rn(mh.rank) + ' 적중</span>' : '<span class="bt-miss">미적중</span>';
-      html += '<tr><td class="bt-round">' + mh.round + '</td>' +
-              '<td' + cel(mh.first) + '>' + mh.first + '</td>' +
-              '<td' + cel(mh.second) + '>' + (mh.second == null ? '-' : mh.second) + '</td>' +
-              '<td' + cel(mh.third) + '>' + (mh.third == null ? '-' : mh.third) + '</td>' +
-              '<td>' + bandTxt + '</td><td>' + resTxt + '</td></tr>';
-    }
-    html += '</tbody></table></div>';
+    html += '</div></details>';
+    html += '<div class="predict-cmp" style="margin-top:8px;">📋 회차별 예측 검증 전체 이력은 <b>하단 표</b>에 통합 (열고 닫기 가능)</div>';
     document.getElementById('flow-predict').innerHTML = html;
     predictCard.style.display = 'block';
   } else {
@@ -3213,45 +3208,63 @@ function render() {
 
   // (1등 빈도 TOP 10 카드 제거됨 — 예측 카드와 기준이 달라 혼란 유발, 개별 번호 빈도는 검증상 노이즈)
 
-  // 회차별 테이블
+  // ★ 통합: 회차별 예측 검증 (전체) — 당첨번호 + walk-forward 밴드/결과 한 표. 열고 닫기 가능.
   var roundsList = document.getElementById('rounds-list');
   if (rows.length === 0) {
     roundsList.innerHTML = '<div class="empty-state">등록된 회차가 없습니다</div>';
   } else {
     var sorted = rows.slice();
     sorted.sort(function (a, b) { return b.round - a.round; });
-    // ★ v64: 전 회차 W60 walk-forward 결과 맵 (그 회차 직전까지 데이터로 계산한 밴드)
+    // 전 회차 W60 walk-forward 결과 맵 (예측 카드에서 계산한 것 재사용)
     var w60map = {};
     try {
-      var wAll = _w60Accuracy(rows, rows.length);
+      var wAll = window.__w60AccAll || _w60Accuracy(rows, rows.length);
       for (var wq = 0; wq < wAll.recent.length; wq++) {
         var wr = wAll.recent[wq];
         w60map[wr.round] = wr;
       }
     } catch (e) { console.error('W60 전이력 계산 실패:', e); }
-    var roundsHtml = '<table class="rounds-table"><thead><tr>' +
-      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>W60밴드</th><th>W60결과</th><th></th></tr></thead><tbody>';
+    // 요약 카운트 (접힌 상태에서도 보이게)
+    var s1 = 0, s2 = 0, s3 = 0, sm = 0, st = 0;
+    for (var kq = 0; kq < sorted.length; kq++) {
+      var km = w60map[sorted[kq].round];
+      if (!km) continue;
+      st++;
+      if (km.rank === 1) s1++;
+      else if (km.rank === 2) s2++;
+      else if (km.rank === 3) s3++;
+      else sm++;
+    }
+    var roundsHtml = '<details class="fold" open><summary>전체 ' + sorted.length + '회 펼치기/접기 — 검증 ' + st +
+      '회: <span class="w-r1">1등 ' + s1 + '</span> · <span class="w-r2">2등 ' + s2 + '</span> · <span class="w-r3">3등 ' + s3 +
+      '</span> · 미적중 ' + sm + '</summary>';
+    roundsHtml += '<table class="rounds-table"><thead><tr>' +
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측밴드</th><th>결과</th><th></th></tr></thead><tbody>';
     for (var n = 0; n < sorted.length; n++) {
       var row = sorted[n];
       var wm = w60map[row.round];
-      var wBand = wm ? wm.s0 + '~' + wm.s1 : '—';
+      var wBand = wm ? '<span class="bt-zA-txt">' + wm.s0 + '~' + wm.s1 + '</span>' : '—';
+      var inB = function (x) { return wm && x != null && x >= wm.s0 && x <= wm.s1; };
+      var cls1 = inB(row.first) ? ' rt-in' : '';
+      var cls2 = inB(row.second) ? ' rt-in' : '';
+      var cls3 = inB(row.third) ? ' rt-in' : '';
       var wRes;
       if (!wm) wRes = '<span class="w-miss">—</span>';
-      else if (wm.rank === 1) wRes = '<span class="w-r1">1등</span>';
-      else if (wm.rank === 2) wRes = '<span class="w-r2">2등</span>';
-      else if (wm.rank === 3) wRes = '<span class="w-r3">3등</span>';
+      else if (wm.rank === 1) wRes = '<span class="w-r1">1등 적중</span>';
+      else if (wm.rank === 2) wRes = '<span class="w-r2">2등 적중</span>';
+      else if (wm.rank === 3) wRes = '<span class="w-r3">3등 적중</span>';
       else wRes = '<span class="w-miss">×</span>';
       roundsHtml += '<tr>' +
         '<td class="rt-round">' + row.round + '</td>' +
-        '<td class="rt-n rt-1">' + row.first + '</td>' +
-        '<td class="rt-n rt-2">' + row.second + '</td>' +
-        '<td class="rt-n rt-3">' + row.third + '</td>' +
+        '<td class="rt-n rt-1' + cls1 + '">' + row.first + '</td>' +
+        '<td class="rt-n rt-2' + cls2 + '">' + row.second + '</td>' +
+        '<td class="rt-n rt-3' + cls3 + '">' + row.third + '</td>' +
         '<td class="rt-band">' + wBand + '</td>' +
         '<td>' + wRes + '</td>' +
         '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +
         '</tr>';
     }
-    roundsHtml += '</tbody></table>';
+    roundsHtml += '</tbody></table></details>';
     roundsList.innerHTML = roundsHtml;
 
     // 삭제 버튼

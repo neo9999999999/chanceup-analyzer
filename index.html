@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기</h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v67</span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1775,7 +1775,7 @@ function _predictHotRange(rounds, W) {
   //   · 이웃 고원: W75+W9~11 = 14.8~15.3% (스파이크 아님). 2·3등 가중은 1등 목표에 노이즈 → 미사용.
   W = W || 75;
   var SHORT_W = 10;
-  var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
+  var sorted = _cleanRows(rounds);   // 중복 정화본 사용
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
   var winS = sorted.length >= SHORT_W ? sorted.slice(-SHORT_W) : sorted.slice();
   var c1 = new Array(101).fill(0), c2 = new Array(101).fill(0), c3 = new Array(101).fill(0);
@@ -1829,7 +1829,7 @@ function _bestDecadeRange(rounds, W) {
 // 5+5 이중밴드 예측 OOS 누적 적중률 (각 회차 직전 데이터로 예측 → 실제 당첨이 두 밴드 합집합 안에?)
 function _hotRangeAccuracy(rounds, W, evalN) {
   W = W || 75; evalN = evalN || 100;
-  var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
+  var sorted = _cleanRows(rounds);   // 중복 정화본 사용
   var N = sorted.length;
   var start = Math.max(W, N - evalN);
   var hit = 0, hit2 = 0, hit3 = 0, tot = 0, recent = [];
@@ -1855,9 +1855,24 @@ function _hotRangeAccuracy(rounds, W, evalN) {
 // ★ v64: W60 단일밴드 — 최근 60회 '1등만' 카운팅, 연속 10칸 argmax
 //   W=1~120 전수 스윕 1위 (중복제거 462회: 1·2등 23.8% · 1등 13.6% · 회수율 141.6%)
 //   고원 확인: W58~62 나란히 상위 (스파이크 아님). 밴드 교체 462회 중 38번.
+// ⚠️ 중복 입력 자동 정화 — 연속 두 회차의 1·2·3등이 전부 동일하면 뒤 회차를 신호 계산에서 제외.
+//    (확률 1/970,200의 우연은 사실상 불가능 → 입력 오류. 948/949, 1128/1129, 1176/1177,
+//     1366/1367, 1372/1373 실측. 중복이 60회 창에 들어오면 밀도를 이중 카운트해서
+//     밴드를 엉뚱한 곳에 고정시킴 — 1385~1411 구간 13회 오염 밴드의 원인이었음.)
+//    데이터 자체는 건드리지 않고(표시·수정용 원본 유지) 신호 계산만 정화본을 쓴다.
+function _cleanRows(rounds) {
+  var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
+  var out = [];
+  for (var i = 0; i < sorted.length; i++) {
+    var r = sorted[i], p = out.length ? out[out.length-1] : null;
+    if (p && p.first === r.first && p.second === r.second && p.third === r.third) continue;
+    out.push(r);
+  }
+  return out;
+}
 function _predictW60Band(rounds) {
   var W = 60;
-  var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
+  var sorted = _cleanRows(rounds);
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
   var c = new Array(101).fill(0);
   for (var i = 0; i < win.length; i++) if (win[i].first != null) c[win[i].first]++;
@@ -1872,7 +1887,7 @@ function _predictW60Band(rounds) {
 
 function _w60Accuracy(rounds, evalN) {
   evalN = evalN || 100;
-  var sorted = rounds.slice().sort(function(a,b){return a.round-b.round;});
+  var sorted = _cleanRows(rounds);   // 중복 정화본으로 검증 (밴드 계산과 동일 기준)
   var N = sorted.length;
   // 시작점 1: 두 번째 회차부터는 (짧더라도) 과거 데이터만으로 밴드 계산 가능 — 전 구간 walk-forward OOS
   var start = Math.max(1, N - evalN);
@@ -3228,9 +3243,19 @@ function render() {
       ' <span style="font-weight:400;color:var(--text-dim)">(펼치기/접기)</span></summary>';
     roundsHtml += '<table class="rounds-table"><thead><tr>' +
       '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측밴드</th><th>결과</th><th></th></tr></thead><tbody>';
+    // 중복 행 감지 (오름차순 기준 직전 회차와 3개 동일 → 뒤 회차가 오류)
+    var dupSet = {};
+    (function () {
+      var ascD = rows.slice().sort(function (a, b) { return a.round - b.round; });
+      for (var di = 1; di < ascD.length; di++) {
+        var a = ascD[di - 1], b = ascD[di];
+        if (a.first === b.first && a.second === b.second && a.third === b.third) dupSet[b.round] = a.round;
+      }
+    })();
     for (var n = 0; n < sorted.length; n++) {
       var row = sorted[n];
       var wm = w60map[row.round];
+      var dupMark = dupSet[row.round] ? ' <span title="' + dupSet[row.round] + '회와 완전 동일 — 입력 오류 의심, 신호 계산에서 자동 제외됨" style="cursor:help;">⚠️</span>' : '';
       var wBand = wm ? '<span class="bt-zA-txt">' + wm.s0 + '~' + wm.s1 + '</span>' : '—';
       var inB = function (x) { return wm && x != null && x >= wm.s0 && x <= wm.s1; };
       var cls1 = inB(row.first) ? ' rt-in' : '';
@@ -3243,7 +3268,7 @@ function render() {
       else if (wm.rank === 3) wRes = '<span class="w-r3">3등 ' + row.third + '</span>';
       else wRes = '<span class="w-miss">×</span>';
       roundsHtml += '<tr>' +
-        '<td class="rt-round">' + row.round + '</td>' +
+        '<td class="rt-round">' + row.round + dupMark + '</td>' +
         '<td class="rt-n rt-1' + cls1 + '">' + row.first + '</td>' +
         '<td class="rt-n rt-2' + cls2 + '">' + row.second + '</td>' +
         '<td class="rt-n rt-3' + cls3 + '">' + row.third + '</td>' +
@@ -3292,6 +3317,14 @@ function handleAdd() {
   }
 
   var current = getCurrent();
+  // ⚠️ 중복 입력 가드: 직전 회차와 1·2·3등이 전부 동일하면 경고 (확률 1/970,200 — 사실상 입력 실수)
+  var prevRound = null;
+  for (var pi = 0; pi < current.length; pi++) {
+    if (current[pi].round < r && (!prevRound || current[pi].round > prevRound.round)) prevRound = current[pi];
+  }
+  if (prevRound && prevRound.first === f && prevRound.second === s && prevRound.third === t) {
+    if (!confirm('⚠️ 직전 ' + prevRound.round + '회와 1·2·3등이 전부 동일합니다 (' + f + '/' + s + '/' + t + ').\n입력 실수일 가능성이 매우 높습니다. 그래도 등록할까요?')) return;
+  }
   var existing = null;
   for (var i = 0; i < current.length; i++) {
     if (current[i].round === r) {

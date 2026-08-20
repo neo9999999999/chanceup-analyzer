@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v69</span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v70</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1569,9 +1569,10 @@ async function saveToSupabase() {
     try {
       var latest = await loadFromSupabase();
       if (latest) {
-        data.basic   = unionRounds(data.basic,   Array.isArray(latest.basic)   ? latest.basic   : [], true);
-        data.premium = unionRounds(data.premium, Array.isArray(latest.premium) ? latest.premium : [], true);
-        data.food    = unionRounds(data.food,    Array.isArray(latest.food)    ? latest.food    : [], true);
+        mergeTombs(latest.tombstones);
+        data.basic   = applyTombs('basic',   unionRounds(data.basic,   Array.isArray(latest.basic)   ? latest.basic   : [], true));
+        data.premium = applyTombs('premium', unionRounds(data.premium, Array.isArray(latest.premium) ? latest.premium : [], true));
+        data.food    = applyTombs('food',    unionRounds(data.food,    Array.isArray(latest.food)    ? latest.food    : [], true));
         try {
           localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));
           localStorage.setItem(STORAGE_KEY_PREMIUM, JSON.stringify(data.premium));
@@ -1582,7 +1583,8 @@ async function saveToSupabase() {
     var payload = {
       basic: data.basic,
       premium: data.premium,
-      food: data.food
+      food: data.food,
+      tombstones: tombstones
     };
     var body = {
       id: SUPABASE_ROW_ID,
@@ -1655,16 +1657,57 @@ function _validRound(x) {
   var r = x.round;
   return r >= 1 && r <= 5000;  // 정상 회차 범위. 그 밖은 오타로 간주
 }
+// ★ v70 결정적 병합 — 어느 기기에서 돌려도 같은 결과로 수렴:
+//   같은 회차 충돌 시 ① 둘 다 updatedAt 있으면 최신 승 ② 한쪽만 있으면 그쪽 승(신규 수정이 구형을 이김)
+//   ③ 둘 다 없으면(구형 데이터) b쪽(클라우드/파일) 승 — "서버가 진실". 한쪽에만 있는 회차는 보존.
+//   (기존 '로컬 우선' 규칙은 기기마다 자기 로컬이 이겨서 영원히 수렴 불가 → 모바일/PC 불일치의 구조적 원인)
 function unionRounds(a, b, preferA) {
   var byRound = {};
-  var src1 = preferA ? (b || []) : (a || []);
-  var src2 = preferA ? (a || []) : (b || []);
-  for (var i = 0; i < src1.length; i++) if (_validRound(src1[i])) byRound[src1[i].round] = src1[i];
-  for (var j = 0; j < src2.length; j++) if (_validRound(src2[j])) byRound[src2[j].round] = src2[j];
+  var arrA = a || [], arrB = b || [];
+  for (var i = 0; i < arrB.length; i++) if (_validRound(arrB[i])) byRound[arrB[i].round] = arrB[i];
+  for (var j = 0; j < arrA.length; j++) {
+    var ra = arrA[j];
+    if (!_validRound(ra)) continue;
+    var rb = byRound[ra.round];
+    if (!rb) { byRound[ra.round] = ra; continue; }
+    var ta = ra.updatedAt || 0, tb = rb.updatedAt || 0;
+    if (ta > tb) byRound[ra.round] = ra;          // 최신 수정 승 (동률·둘다0 → b 유지 = 서버 승)
+  }
   var merged = [];
   for (var k in byRound) merged.push(byRound[k]);
   merged.sort(function (x, y) { return x.round - y.round; });
   return merged;
+}
+// ★ v70 툼스톤 — 삭제 전파. 삭제 시 {round: 삭제시각} 기록, 클라우드 payload에 포함해 전 기기 공유.
+//   병합 후 툼스톤보다 오래된 행은 제거 → 삭제가 부활하지 않음. 같은 회차를 다시 등록하면
+//   (updatedAt > 툼스톤 시각) 행이 살아나므로 재등록도 자연스럽게 동작.
+var tombstones = { basic: {}, premium: {}, food: {} };
+var TOMB_KEY = 'chanceup_tombstones_v1';
+function loadTombs() {
+  try { var t = JSON.parse(localStorage.getItem(TOMB_KEY) || 'null'); if (t) tombstones = t; } catch (e) {}
+  if (!tombstones.basic) tombstones.basic = {};
+  if (!tombstones.premium) tombstones.premium = {};
+  if (!tombstones.food) tombstones.food = {};
+}
+function saveTombs() { try { localStorage.setItem(TOMB_KEY, JSON.stringify(tombstones)); } catch (e) {} }
+function mergeTombs(remoteT) {
+  if (!remoteT) return;
+  ['basic','premium','food'].forEach(function (tab) {
+    var rt = remoteT[tab] || {};
+    for (var r in rt) {
+      var cur = tombstones[tab][r] || 0;
+      if (rt[r] > cur) tombstones[tab][r] = rt[r];
+    }
+  });
+  saveTombs();
+}
+function applyTombs(tab, arr) {
+  var t = tombstones[tab] || {};
+  return (arr || []).filter(function (row) {
+    var ts = t[row.round];
+    if (!ts) return true;
+    return (row.updatedAt || 0) > ts;   // 삭제 이후 재등록된 행만 생존
+  });
 }
 
 // 🔧 추천 히스토리(실제 당첨번호 별도 저장)에서 회차 데이터 복구
@@ -3040,6 +3083,17 @@ function escapeHtml(s) {
 
 function render() {
   var rows = getCurrent();
+  // v70 데이터 지문 — 모바일/PC가 같은 데이터인지 즉시 비교 (같은 지문 = 같은 추천 보장)
+  (function () {
+    var el = document.getElementById('app-fp');
+    if (!el) return;
+    var asc = rows.slice().sort(function (a, b) { return a.round - b.round; });
+    var s = '';
+    for (var i = 0; i < asc.length; i++) s += asc[i].round + ':' + asc[i].first + '/' + asc[i].second + '/' + asc[i].third + ';';
+    var h = 0;
+    for (var c = 0; c < s.length; c++) { h = ((h << 5) - h + s.charCodeAt(c)) | 0; }
+    el.textContent = '· ' + asc.length + '회 #' + (h >>> 0).toString(16).slice(0, 6);
+  })();
 
   // ★ 자동 학습: 매 렌더 시 (탭 변경/회차 등록/페이지 로드 시 모두 트리거됨)
   // 최근 데이터로 가장 잘 맞는 (window, weights) 자동 선택
@@ -3376,8 +3430,9 @@ function handleAdd() {
     existing.first = f;
     existing.second = s;
     existing.third = t;
+    existing.updatedAt = Date.now();   // v70: 수정 시각 — 병합 시 최신본 승
   } else {
-    current.push({ round: r, first: f, second: s, third: t });
+    current.push({ round: r, first: f, second: s, third: t, updatedAt: Date.now() });
     current.sort(function (a, b) { return a.round - b.round; });
   }
 
@@ -3418,7 +3473,11 @@ function handleDelete(roundNum) {
     }
   }
   data[currentTab] = filtered;
+  // v70: 툼스톤 기록 → 클라우드로 전파되어 모든 기기에서 삭제 유지 (부활 버그 수정)
+  tombstones[currentTab][roundNum] = Date.now();
+  saveTombs();
   saveData();
+  if (supabaseReady) { saveToSupabase(); }
   render();
 }
 
@@ -3489,9 +3548,10 @@ async function autoResync(force) {
     var remote = await loadFromSupabase();
     if (!remote) return;
     var before = data.basic.length + data.premium.length + data.food.length;
-    data.basic   = unionRounds(data.basic,   Array.isArray(remote.basic)   ? remote.basic   : [], true);
-    data.premium = unionRounds(data.premium, Array.isArray(remote.premium) ? remote.premium : [], true);
-    data.food    = unionRounds(data.food,    Array.isArray(remote.food)    ? remote.food    : [], true);
+    mergeTombs(remote.tombstones);
+    data.basic   = applyTombs('basic',   unionRounds(data.basic,   Array.isArray(remote.basic)   ? remote.basic   : [], true));
+    data.premium = applyTombs('premium', unionRounds(data.premium, Array.isArray(remote.premium) ? remote.premium : [], true));
+    data.food    = applyTombs('food',    unionRounds(data.food,    Array.isArray(remote.food)    ? remote.food    : [], true));
     var after = data.basic.length + data.premium.length + data.food.length;
     try {
       localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));
@@ -3519,9 +3579,10 @@ async function manualRefresh() {
     if (supabaseReady || initSupabase()) {
       var remote = await loadFromSupabase();
       if (remote) {
-        data.basic   = unionRounds(data.basic,   Array.isArray(remote.basic)   ? remote.basic   : [], true);
-        data.premium = unionRounds(data.premium, Array.isArray(remote.premium) ? remote.premium : [], true);
-        data.food    = unionRounds(data.food,    Array.isArray(remote.food)    ? remote.food    : [], true);
+        mergeTombs(remote.tombstones);
+        data.basic   = applyTombs('basic',   unionRounds(data.basic,   Array.isArray(remote.basic)   ? remote.basic   : [], true));
+        data.premium = applyTombs('premium', unionRounds(data.premium, Array.isArray(remote.premium) ? remote.premium : [], true));
+        data.food    = applyTombs('food',    unionRounds(data.food,    Array.isArray(remote.food)    ? remote.food    : [], true));
       }
       try {
         localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));
@@ -3544,6 +3605,7 @@ async function manualRefresh() {
 
 async function init() {
   // 일단 localStorage에서 로드 (즉시 렌더)
+  loadTombs();   // v70: 삭제 툼스톤 먼저 로드
   loadData();
   // 🔧 추천 히스토리에서 유실 회차 복구 (동기화 사고 대비)
   recoverFromRecHistory();
@@ -3597,9 +3659,10 @@ async function init() {
       // ★ 데이터 손실 방지: 원격 무조건 덮어쓰기 → 로컬·원격 합집합(union)으로 변경.
       // 어느 한쪽도 버리지 않음 → 회차 많은 쪽 자동 보존. 동기화 충돌로 인한 롤백 방지.
       var beforeLen = data.basic.length + data.premium.length + data.food.length;
-      data.basic   = unionRounds(data.basic,   Array.isArray(remote.basic)   ? remote.basic   : [], true);
-      data.premium = unionRounds(data.premium, Array.isArray(remote.premium) ? remote.premium : [], true);
-      data.food    = unionRounds(data.food,    Array.isArray(remote.food)    ? remote.food    : [], true);
+      mergeTombs(remote.tombstones);
+      data.basic   = applyTombs('basic',   unionRounds(data.basic,   Array.isArray(remote.basic)   ? remote.basic   : [], true));
+      data.premium = applyTombs('premium', unionRounds(data.premium, Array.isArray(remote.premium) ? remote.premium : [], true));
+      data.food    = applyTombs('food',    unionRounds(data.food,    Array.isArray(remote.food)    ? remote.food    : [], true));
       var afterLen = data.basic.length + data.premium.length + data.food.length;
       try {
         localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));

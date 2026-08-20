@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v68</span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v69</span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3476,6 +3476,40 @@ function handleImport(e) {
 }
 
 // ============ 초기화 ============
+// 🔄 자동 재동기화 (v69): 탭이 다시 보이거나 포커스될 때 조용히 클라우드 pull + 재렌더.
+//    모바일/PC 추천 불일치의 원인 = 열려있던 탭은 초기 로드 이후 영영 재동기화 안 됨
+//    → 기기마다 다른 데이터 스냅샷으로 밴드 계산. 이제 탭을 다시 보는 순간 자동 최신화.
+var _lastAutoSync = 0;
+async function autoResync(force) {
+  var now = Date.now();
+  if (!force && now - _lastAutoSync < 60000) return;   // 60초 스로틀
+  _lastAutoSync = now;
+  try {
+    if (!(supabaseReady || initSupabase())) return;
+    var remote = await loadFromSupabase();
+    if (!remote) return;
+    var before = data.basic.length + data.premium.length + data.food.length;
+    data.basic   = unionRounds(data.basic,   Array.isArray(remote.basic)   ? remote.basic   : [], true);
+    data.premium = unionRounds(data.premium, Array.isArray(remote.premium) ? remote.premium : [], true);
+    data.food    = unionRounds(data.food,    Array.isArray(remote.food)    ? remote.food    : [], true);
+    var after = data.basic.length + data.premium.length + data.food.length;
+    try {
+      localStorage.setItem(STORAGE_KEY_BASIC, JSON.stringify(data.basic));
+      localStorage.setItem(STORAGE_KEY_PREMIUM, JSON.stringify(data.premium));
+      localStorage.setItem(STORAGE_KEY_FOOD, JSON.stringify(data.food));
+    } catch (e) {}
+    if (after !== before) { render(); fillNextRound(); }
+    var maxR = 0;
+    for (var i = 0; i < data[currentTab].length; i++) if (data[currentTab][i].round > maxR) maxR = data[currentTab][i].round;
+    setSyncStatus('synced', '최신 ' + maxR + '회 · 자동 동기화 ' + new Date().toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'}));
+  } catch (e) { /* 조용히 무시 — 다음 기회에 재시도 */ }
+}
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') autoResync(false);
+});
+window.addEventListener('focus', function () { autoResync(false); });
+// 열어둔 탭도 5분마다 백그라운드 pull (모바일 장시간 방치 대비)
+setInterval(function () { if (document.visibilityState === 'visible') autoResync(false); }, 300000);
 // 🔄 수동 새로고침: 로컬 히스토리 복구 + 클라우드 양방향 동기화 후 화면 갱신
 async function manualRefresh() {
   try {

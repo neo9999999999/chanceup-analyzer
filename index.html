@@ -1308,7 +1308,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v77</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v78</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1943,7 +1943,15 @@ function _predictW60Band(rounds) {
     for (var k = 0; k < 10; k++) t += c[s + k];
     if (t > best2) { best2 = t; s20 = s; }
   }
-  return { s0: s0, s1: s0 + 9, score: best, s2_0: s20, s2_1: s20 + 9, score2: best2, windowSize: win.length, moveKey: s0 };
+  // ★ v78: 5+5 헤지용 — 1순위 밴드 내 최밀 연속 5칸 (동률 시 왼쪽 우선, 파이썬 검증과 동일 규칙).
+  var bd = -1, d0 = s0;
+  for (var q = s0; q <= s0 + 5; q++) {
+    var td = 0;
+    for (var k = 0; k < 5; k++) td += c[q + k];
+    if (td > bd) { bd = td; d0 = q; }
+  }
+  return { s0: s0, s1: s0 + 9, score: best, s2_0: s20, s2_1: s20 + 9, score2: best2,
+           d5_0: d0, d5_1: d0 + 4, windowSize: win.length, moveKey: s0 };
 }
 
 function _w60Accuracy(rounds, evalN) {
@@ -3248,6 +3256,22 @@ function render() {
               '<div style="font-size:11px;font-weight:800;color:#cbd5e1;">🥈 2순위 10개 — ' + pr.s2_0 + '~' + pr.s2_1 + ' (구간 내 1등 ' + pr.score2 + '회)</div>' +
               '<div style="margin:3px 0 2px;">' + chips2 + '</div>' +
               '<div style="font-size:10.5px;color:var(--text-dim);">2순위 단독 571회 검증: 1등 9.5%(랜덤급) — 자체 엣지 없음, <b>추가 기회 있을 때 커버리지용</b> · 20개 합계 1등 24.0%·1·2등 39.6%·회수율 133%</div></div>';
+    })();
+    // ⚖️ v78: 5+5 헤지 (1순위 최밀 연속5칸 + 2순위 왼쪽 5칸) — 사용자 채택 결정.
+    //   25조합 그리드 1위. 571회: 1·2등 24.5%·회수율 146.4% — 전체는 현행과 동률
+    //   (널테스트: 랜덤우주 200개 중 84%가 이 격차 이상 생성 = 전체 기준 노이즈. 정직 기록).
+    //   단 국면 성격이 다름: 두 클러스터 스왑 국면(최근)에서 강세 — 최근50회 1등 22%·회수율 183.5%,
+    //   최근30회 1·2등 36.7%·195.3% (현행 10%/123%, 23.3%/135%). 단일 클러스터 국면(전반)은 현행 우위.
+    (function () {
+      var chipsH = '', kk;
+      for (kk = pr.d5_0; kk <= pr.d5_1; kk++) chipsH += '<span class="band-chip b1">' + kk + '</span>';
+      chipsH += '<span style="color:var(--text-dim);font-weight:800;margin:0 4px;">+</span>';
+      for (kk = pr.s2_0; kk <= pr.s2_0 + 4; kk++) chipsH += '<span class="band-chip b2">' + kk + '</span>';
+      html += '<div style="margin:-4px 0 10px;padding:10px 13px;border:1px solid rgba(196,181,253,0.45);background:rgba(196,181,253,0.07);border-radius:10px;">' +
+              '<div style="font-size:11px;font-weight:800;color:#c4b5fd;">⚖️ 5+5 헤지 — 1순위 최밀 5칸 + 2순위 5칸 (v78)</div>' +
+              '<div style="font-size:22px;font-weight:800;color:#c4b5fd;margin:2px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.s2_0 + '~' + (pr.s2_0 + 4) + '</div>' +
+              '<div style="margin:3px 0 2px;">' + chipsH + '</div>' +
+              '<div style="font-size:10.5px;color:var(--text-dim);">571회 검증: 1·2등 24.5%·회수율 146.4% (전체는 현행 동률·노이즈 범위) · <b>최근50회 1등 22%·회수율 183%</b>·최근30회 1·2등 36.7% — 두 밴드 스왑 국면 강세형, 단일 클러스터 국면은 현행 밴드가 위</div></div>';
     })();
     // 🔥 트렌드 밴드 (W25) — 최근 국면 공격용. 최근30회 1등 8방(W60 4방)으로 국면 우위,
     //    단 전체 571회 검증은 1등 10.9%(랜덤+0.9%p)로 장기 신뢰는 W60이 위. 선택은 사용자 몫.

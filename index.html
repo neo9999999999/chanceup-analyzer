@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v80</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v81</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1958,6 +1958,7 @@ function _w60Accuracy(rounds, evalN) {
   // 시작점 1: 두 번째 회차부터는 (짧더라도) 과거 데이터만으로 밴드 계산 가능 — 전 구간 walk-forward OOS
   var start = Math.max(1, N - evalN);
   var hit = 0, hit2 = 0, hit3 = 0, tot = 0, recent = [];
+  var hh1 = 0, hh2 = 0, hh3 = 0;   // ★ v81: 5+5 헤지 walk-forward 집계 (최밀5 + 2순위 왼쪽5)
   for (var i = start; i < N; i++) {
     var pr = _predictW60Band(sorted.slice(0, i));
     var row = sorted[i];
@@ -1969,11 +1970,20 @@ function _w60Accuracy(rounds, evalN) {
     if (rank === 1) hit++;
     else if (rank === 2) hit2++;
     else if (rank === 3) hit3++;
+    var inH = function(x) { return x != null && ((x >= pr.d5_0 && x <= pr.d5_1) || (x >= pr.s2_0 && x <= pr.s2_0 + 4)); };
+    var hrank = 0;
+    if (inH(row.first)) hrank = 1;
+    else if (inH(row.second)) hrank = 2;
+    else if (inH(row.third)) hrank = 3;
+    if (hrank === 1) hh1++;
+    else if (hrank === 2) hh2++;
+    else if (hrank === 3) hh3++;
     tot++;
     recent.push({ round: row.round, first: row.first, second: row.second, third: row.third,
-                  rank: rank, hit: rank === 1, s0: pr.s0, s1: pr.s1, predStart: pr.s0 });
+                  rank: rank, hit: rank === 1, s0: pr.s0, s1: pr.s1, predStart: pr.s0,
+                  hd0: pr.d5_0, hs2: pr.s2_0, hrank: hrank });
   }
-  return { hit: hit, hit2: hit2, hit3: hit3, tot: tot, recent: recent };
+  return { hit: hit, hit2: hit2, hit3: hit3, hh1: hh1, hh2: hh2, hh3: hh3, tot: tot, recent: recent };
 }
 
 function _topFrequencyNumbers(rounds, window, count) {
@@ -3268,8 +3278,8 @@ function render() {
         w60map[wr.round] = wr;
       }
     } catch (e) { console.error('W60 전이력 계산 실패:', e); }
-    // 요약 카운트 (접힌 상태에서도 보이게)
-    var s1 = 0, s2 = 0, s3 = 0, sm = 0, st = 0;
+    // 요약 카운트 (접힌 상태에서도 보이게) — v81: 5+5 헤지 집계 추가
+    var s1 = 0, s2 = 0, s3 = 0, sm = 0, st = 0, q1 = 0, q2 = 0, q3 = 0;
     for (var kq = 0; kq < sorted.length; kq++) {
       var km = w60map[sorted[kq].round];
       if (!km) continue;
@@ -3278,14 +3288,19 @@ function render() {
       else if (km.rank === 2) s2++;
       else if (km.rank === 3) s3++;
       else sm++;
+      if (km.hrank === 1) q1++;
+      else if (km.hrank === 2) q2++;
+      else if (km.hrank === 3) q3++;
     }
     var pctOf = function (x) { return st > 0 ? ' (' + (x / st * 100).toFixed(1) + '%)' : ''; };
     var roundsHtml = '<details class="fold" open><summary>총 ' + sorted.length + '회차 · 검증 ' + st +
-      '회 — <span class="w-r1">1등 ' + s1 + '회' + pctOf(s1) + '</span> · <span class="w-r2">2등 ' + s2 + '회' + pctOf(s2) +
+      '회 — 밴드: <span class="w-r1">1등 ' + s1 + '회' + pctOf(s1) + '</span> · <span class="w-r2">2등 ' + s2 + '회' + pctOf(s2) +
       '</span> · <span class="w-r3">3등 ' + s3 + '회' + pctOf(s3) + '</span> · 미적중 ' + sm + '회' + pctOf(sm) +
+      '<br><span style="color:#c4b5fd;font-weight:800;">⚖️ 5+5:</span> <span class="w-r1">1등 ' + q1 + '회' + pctOf(q1) + '</span> · <span class="w-r2">2등 ' + q2 + '회' + pctOf(q2) +
+      '</span> · <span class="w-r3">3등 ' + q3 + '회' + pctOf(q3) + '</span> · <span style="color:#c4b5fd;">1·2등 ' + (st > 0 ? ((q1 + q2) / st * 100).toFixed(1) : '-') + '%</span>' +
       ' <span style="font-weight:400;color:var(--text-dim)">(펼치기/접기)</span></summary>';
     roundsHtml += '<table class="rounds-table"><thead><tr>' +
-      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측밴드</th><th>결과</th><th></th></tr></thead><tbody>';
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>예측밴드</th><th>결과</th><th>5+5</th><th>5+5결과</th><th></th></tr></thead><tbody>';
     // 중복 행 감지 (오름차순 기준 직전 회차와 3개 동일 → 뒤 회차가 오류)
     var dupSet = {};
     (function () {
@@ -3310,6 +3325,14 @@ function render() {
       else if (wm.rank === 2) wRes = '<span class="w-r2">2등 ' + row.second + '</span>';
       else if (wm.rank === 3) wRes = '<span class="w-r3">3등 ' + row.third + '</span>';
       else wRes = '<span class="w-miss">×</span>';
+      // v81: 5+5 헤지 픽·결과
+      var hPick = (wm && wm.hd0 != null) ? '<span style="color:#c4b5fd;font-size:10.5px;white-space:nowrap;">' + wm.hd0 + '~' + (wm.hd0 + 4) + '+' + wm.hs2 + '~' + (wm.hs2 + 4) + '</span>' : '—';
+      var hRes;
+      if (!wm || wm.hd0 == null) hRes = '<span class="w-miss">—</span>';
+      else if (wm.hrank === 1) hRes = '<span class="w-r1">1등 ' + row.first + '</span>';
+      else if (wm.hrank === 2) hRes = '<span class="w-r2">2등 ' + row.second + '</span>';
+      else if (wm.hrank === 3) hRes = '<span class="w-r3">3등 ' + row.third + '</span>';
+      else hRes = '<span class="w-miss">×</span>';
       roundsHtml += '<tr>' +
         '<td class="rt-round">' + row.round + dupMark + '</td>' +
         '<td class="rt-n rt-1' + cls1 + '">' + row.first + '</td>' +
@@ -3317,6 +3340,8 @@ function render() {
         '<td class="rt-n rt-3' + cls3 + '">' + row.third + '</td>' +
         '<td class="rt-band">' + wBand + '</td>' +
         '<td>' + wRes + '</td>' +
+        '<td>' + hPick + '</td>' +
+        '<td>' + hRes + '</td>' +
         '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +
         '</tr>';
     }

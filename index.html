@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v79</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v80</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3204,38 +3204,8 @@ function render() {
     var acc = _w60Accuracy(rows, rows.length);   // ★ 전체 이력 기준 (하단 통합표와 동일 데이터)
     window.__w60AccAll = acc;                    // 하단 회차별 표에서 재사용 (중복 계산 방지)
     var html = '';
-    // 🩺 자가진단 (v71) — 회차 등록/동기화/삭제 시 render()가 돌 때마다 자동 실행되는 에러 체크.
-    //    검사: ①값 범위(1~100·정수) ②회차ID 중복 ③한 회차 안 번호 중복 ④연속회차 트리플 동일(입력오류)
-    (function () {
-      var ascQ = rows.slice().sort(function (a, b) { return a.round - b.round; });
-      var issues = [];
-      var seenR = {};
-      for (var qi = 0; qi < ascQ.length; qi++) {
-        var rr = ascQ[qi];
-        if (seenR[rr.round]) issues.push(rr.round + '회 ID중복');
-        seenR[rr.round] = 1;
-        var vals = [rr.first, rr.second, rr.third];
-        for (var vk = 0; vk < 3; vk++) {
-          var vv = vals[vk];
-          if (typeof vv !== 'number' || vv !== Math.floor(vv) || vv < 1 || vv > 100) { issues.push(rr.round + '회 이상값(' + vv + ')'); break; }
-        }
-        if (rr.first === rr.second || rr.first === rr.third || rr.second === rr.third) issues.push(rr.round + '회 번호중복');
-        if (qi > 0) {
-          var pa = ascQ[qi - 1];
-          if (pa.first === rr.first && pa.second === rr.second && pa.third === rr.third) issues.push(pa.round + '/' + rr.round + ' 트리플동일');
-        }
-      }
-      if (issues.length) {
-        var shown = issues.slice(0, 6).join(', ') + (issues.length > 6 ? ' 외 ' + (issues.length - 6) + '건' : '');
-        html += '<div style="margin-bottom:10px;padding:8px 12px;border:1px solid rgba(252,165,165,0.45);background:rgba(252,165,165,0.10);border-radius:9px;font-size:12px;color:#fca5a5;">' +
-                '🩺 <b>자가진단 ⚠️ ' + issues.length + '건</b> — ' + shown +
-                '<br><span style="opacity:.8">트리플동일 = 입력오류 의심(예측 계산에서 뒤 회차 자동 제외 중). 실제 번호 확인 후 해당 회차 수정 요망.</span></div>';
-      } else {
-        html += '<div style="margin-bottom:10px;padding:6px 12px;border:1px solid rgba(52,211,153,0.3);background:rgba(52,211,153,0.06);border-radius:9px;font-size:11.5px;color:#6ee7b7;">' +
-                '🩺 자가진단 통과 — ' + ascQ.length + '회 · 이상값/중복/입력오류 없음</div>';
-      }
-    })();
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1등 번호대</b> — 최근 37회 1등 최다 연속 10칸 (v77) · 571회 검증: <b>1·2등 24.0%</b>(랜덤19.1%) · 1등 14.5% · 회수율 144.9% · 전/후반 24.2/23.8 균형 (W 1단위 전수 스윕 1위)</div>';
+    // (v80: 자가진단 배너·상단 설명줄 표시 제거 — 사용자 지시. 중복 자동 제외(_cleanRows)와
+    //  하단 표의 ⚠️ 중복 표시는 유지되므로 데이터 무결성 보호는 그대로 동작한다.)
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' +
             '<span class="predict-rank">⚡ W37 밴드 (전수 스윕 1위 · v77)</span>' + pr.s0 + ' ~ ' + pr.s1 +
@@ -3270,56 +3240,8 @@ function render() {
               '<div style="font-size:10.5px;color:var(--text-dim);">571회 검증: 1·2등 24.5%·회수율 146.4% (전체는 현행 동률·노이즈 범위) · <b>최근50회 1등 22%·회수율 183%</b>·최근30회 1·2등 36.7% — 두 밴드 스왑 국면 강세형, 단일 클러스터 국면은 현행 밴드가 위</div></div>';
     })();
     // (v79: 트렌드 밴드 W25 박스·v61 겹침 박스 삭제 — 사용자 지시 "불필요한 정보")
-    // 판세: 현재 5+5 조합 유지 길이 (두 밴드 중 하나라도 바뀌면 이동으로 집계)
-    var starts = acc.recent.map(function(r){ return r.predStart; });
-    starts.push(pr.moveKey);
-    var moves = 0;
-    for (var mv = 1; mv < starts.length; mv++) if (starts[mv] !== starts[mv-1]) moves++;
-    var keep = 1;
-    for (var sk = starts.length - 2; sk >= 0 && starts[sk] === pr.moveKey; sk--) keep++;
-    var raceTxt = '판세: 이 밴드 <b>' + keep + '회째</b> 유지 (구간 내 1등 ' + pr.score + '회)' +
-                  ' · 최근 ' + acc.tot + '회 동안 밴드 ' + moves + '번 이동 — 역전되면 자동 교체';
-    html += '<div class="predict-cmp">' + raceTxt + '</div>';
-    var anyHit = acc.hit + acc.hit2 + acc.hit3;
-    var anyPct = acc.tot > 0 ? Math.round(anyHit / acc.tot * 100) : 0;
-    var oneP = acc.tot > 0 ? Math.round(acc.hit / acc.tot * 100) : 0;
-    var onceEvery = anyPct > 0 ? (100 / anyPct).toFixed(1) : '-';
-    // ★ 주지표: 1·2등 적중 (고액 등수). 10개 매수 랜덤 기대 19.1% = 5.2회에 1번
-    var hit12 = acc.hit + acc.hit2;
-    var pct12 = acc.tot > 0 ? hit12 / acc.tot * 100 : 0;
-    var every12 = pct12 > 0 ? (100 / pct12).toFixed(1) : '-';
-    html += '<div class="predict-acc predict-acc-main">🏆 전체 ' + acc.tot + '회 <strong>1·2등 ' + hit12 + '/' + acc.tot +
-            ' (' + pct12.toFixed(1) + '%)</strong> = 평균 <strong>' + every12 + '회에 1번</strong>' +
-            '<span style="color:var(--text-dim);font-size:11px;"> · 랜덤 기대 19.1%(5.2회에 1번) → 배수 ' +
-            (pct12 > 0 ? (pct12 / 19.1).toFixed(2) : '-') + '×</span></div>';
-    html += '<div class="predict-acc">✅ 전체 ' + acc.tot + '회 <strong>아무등수 ' + anyHit + '/' + acc.tot + ' (' + anyPct + '%)</strong>' +
-            ' = 평균 <strong>' + onceEvery + '회에 1번</strong> 당첨' +
-            ' · <span class="rk-txt rk1-txt">1등 ' + acc.hit + '회 (' + oneP + '%)</span>·<span class="rk-txt rk2-txt">2등 ' + acc.hit2 + '회 (' + (acc.tot>0?Math.round(acc.hit2/acc.tot*100):0) + '%)</span>·<span class="rk-txt rk3-txt">3등 ' + acc.hit3 + '회 (' + (acc.tot>0?Math.round(acc.hit3/acc.tot*100):0) + '%)</span> · 미적중 ' + (acc.tot-anyHit) + '회' +
-            '<span style="color:var(--text-dim);font-size:11px;"> · 10개, 랜덤 아무 27%·1등 10%</span></div>';
-    // 100회 전부 O/X (최신 → 과거 순) — 걸린 등수 컬러 (금/은/동)
-    var all = acc.recent.slice().reverse();
-    // 연속 미적중 통계
-    var curMiss = 0;
-    for (var cm = 0; cm < all.length; cm++) { if (all[cm].rank === 0) curMiss++; else break; }
-    var maxMiss = 0, runMiss = 0;
-    for (var xm = 0; xm < all.length; xm++) { if (all[xm].rank === 0) { runMiss++; if (runMiss > maxMiss) maxMiss = runMiss; } else runMiss = 0; }
-    // 1·2등 기준 연속 미적중 (주지표 기준 가뭄)
-    var curMiss12 = 0;
-    for (var cm2 = 0; cm2 < all.length; cm2++) { if (all[cm2].rank !== 1 && all[cm2].rank !== 2) curMiss12++; else break; }
-    var maxMiss12 = 0, runMiss12 = 0;
-    for (var xm2 = 0; xm2 < all.length; xm2++) {
-      if (all[xm2].rank !== 1 && all[xm2].rank !== 2) { runMiss12++; if (runMiss12 > maxMiss12) maxMiss12 = runMiss12; }
-      else runMiss12 = 0;
-    }
-    // 정상 가뭄 기대치: p=1·2등 확률일 때 tot회 중 기대 최장 미적중 ≈ ln(tot·p)/ln(1/(1-p))
-    var pp = pct12 / 100, expGap = '-';
-    if (pp > 0.01 && pp < 0.99 && acc.tot > 10) expGap = Math.round(Math.log(acc.tot * pp) / Math.log(1 / (1 - pp)));
-    html += '<div class="predict-cmp">📉 <b>1·2등 기준</b> 현재 <b>' + curMiss12 + '연속 미적중</b> · 전체 ' + acc.tot +
-            '회 최장 ' + maxMiss12 + '연속 · <span style="color:var(--text-dim)">정상 범위 기대 최장 ≈ ' + expGap +
-            '연속 (이 안이면 전략 이상 아님)</span></div>';
-    html += '<div class="predict-cmp">📉 아무등수 기준 현재 <b>' + curMiss + '연속 미적중</b> · 전체 ' + acc.tot + '회 최장 ' + maxMiss +
-            '연속 미적중 · 평균 ' + (anyPct>0?(100/anyPct).toFixed(1):'-') + '회에 1번꼴 (변동 큼)</div>';
-    html += '<div class="predict-cmp" style="margin-top:8px;">📋 회차별 예측 검증 전체 이력은 <b>하단 표</b>에 통합 (열고 닫기 가능) · <span class="bt-zA-txt">금색 셀</span> = 밴드 안에서 나온 번호</div>';
+    // (v80: 판세·🏆전체통계·✅아무등수·📉가뭄 2줄·📋안내줄 표시 제거 — 사용자 지시.
+    //  동일 수치는 하단 통합표 요약줄에서 계속 확인 가능. acc 계산은 하단 표가 재사용하므로 유지.)
     document.getElementById('flow-predict').innerHTML = html;
     predictCard.style.display = 'block';
   } else {

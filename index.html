@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v73</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v75</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1914,7 +1914,12 @@ function _cleanRows(rounds) {
   return out;
 }
 function _predictW60Band(rounds) {
-  var W = 60;
+  // ★ v75: 사용자 지시로 W60 → W35 교체 ("적당히 빠른 트렌드").
+  //   571회 walk-forward: 1·2등 23.6%(W60 23.3%) · 회수율 140.3%(141.2%) — 전체 동급,
+  //   최근100회 31%(24%)·최근30회 33%(13%)로 최근 국면 확실 우위, 밴드 이동 125회(48회).
+  //   주의(정직 기록): 전/후반 21.8/25.5로 후반 쏠림 — 문서 채택기준(양쪽 반절) 미달이나
+  //   사용자 명시 결정으로 교체. 고정 십의자리 정렬(21.4%)은 연속 10칸(23.6%)에 열세 확인.
+  var W = 35;
   var sorted = _cleanRows(rounds);
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
   var c = new Array(101).fill(0);
@@ -3213,11 +3218,11 @@ function render() {
                 '🩺 자가진단 통과 — ' + ascQ.length + '회 · 이상값/중복/입력오류 없음</div>';
       }
     })();
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1등 번호대</b> — 최근 60회 1등 최다 연속 10칸 · 462회 검증(중복제거): <b>1·2등 23.8%</b>(4.2회에 1번·랜덤19.1%) · 1등 13.6%(랜덤10%) · 아무등수 30.1% · 회수율 141.6%</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1등 번호대</b> — 최근 35회 1등 최다 연속 10칸 (v75) · 571회 검증: <b>1·2등 23.6%</b>(랜덤19.1%) · 1등 13.5% · 회수율 140.3% · <b>최근100회 31%·최근30회 33%</b> (밴드 이동 활발형)</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' +
-            '<span class="predict-rank">🛡 안정 밴드 W60 (장기 검증 1위)</span>' + pr.s0 + ' ~ ' + pr.s1 +
-            '<span class="predict-dec-cnt">최근 ' + pr.windowSize + '회 1등 최다 연속구간 (구간 내 1등 ' + pr.score + '회) · 전체 1등 13.7%·회수율 141%</span></span>';
+            '<span class="predict-rank">⚡ W35 밴드 (적당히 빠른 트렌드 · v75)</span>' + pr.s0 + ' ~ ' + pr.s1 +
+            '<span class="predict-dec-cnt">최근 ' + pr.windowSize + '회 1등 최다 연속구간 (구간 내 1등 ' + pr.score + '회) · 전체 1·2등 23.6%·회수율 140% · 최근30회 33%</span></span>';
     html += '</div>';
     // 🔥 트렌드 밴드 (W25) — 최근 국면 공격용. 최근30회 1등 8방(W60 4방)으로 국면 우위,
     //    단 전체 571회 검증은 1등 10.9%(랜덤+0.9%p)로 장기 신뢰는 W60이 위. 선택은 사용자 몫.

@@ -1308,7 +1308,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v76</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v77</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1917,12 +1917,12 @@ function _cleanRows(rounds) {
   return out;
 }
 function _predictW60Band(rounds) {
-  // ★ v75: 사용자 지시로 W60 → W35 교체 ("적당히 빠른 트렌드").
-  //   571회 walk-forward: 1·2등 23.6%(W60 23.3%) · 회수율 140.3%(141.2%) — 전체 동급,
-  //   최근100회 31%(24%)·최근30회 33%(13%)로 최근 국면 확실 우위, 밴드 이동 125회(48회).
-  //   주의(정직 기록): 전/후반 21.8/25.5로 후반 쏠림 — 문서 채택기준(양쪽 반절) 미달이나
-  //   사용자 명시 결정으로 교체. 고정 십의자리 정렬(21.4%)은 연속 10칸(23.6%)에 열세 확인.
-  var W = 35;
+  // ★ v77: 사용자 지시로 W35 → W37 교체. W10~100 1단위 전수 스윕(571회 walk-forward) 1위.
+  //   1·2등 24.0%(W35 23.6%) · 1등 14.5%(13.5%) · 회수율 144.9%(140.3%) · 전/후반 24.2/23.8 균형
+  //   (W35의 후반 쏠림 21.8/25.5 해소 — 문서 채택기준 통과) · 밴드 이동 98회.
+  //   주의(정직 기록): W35와 정면대결 시 갈린 125회에서 23:25로 통계적 동률(쌍둥이) —
+  //   전체 571회 중 2회 차이. 최근 국면(최근100 27%/최근30 23%)은 W35(31%/33%)가 위였음.
+  var W = 37;
   var sorted = _cleanRows(rounds);
   var win = sorted.length >= W ? sorted.slice(-W) : sorted.slice();
   var c = new Array(101).fill(0);
@@ -1934,8 +1934,8 @@ function _predictW60Band(rounds) {
     if (t > best) { best = t; s0 = s; }
   }
   // ★ v76: 2순위 밴드 = 1순위와 겹치지 않는 창 중 차상위 연속 10칸 (사용자 요청 표시용).
-  //   571회 walk-forward 정직 기록: 2순위 단독 1등 10.0%(랜덤 10%와 동일)·최근30회 3.3% — 자체 엣지 없음.
-  //   1+2순위 합계 20개: 1등 23.5%·1·2등 38.9%·회수율 131.1% (랜덤20개 1등 20% 대비 +3.5%p, 엣지는 전부 1순위 몫).
+  //   v77(W37) 571회 walk-forward 정직 기록: 2순위 단독 1등 9.5%(랜덤 10%급) — 자체 엣지 없음.
+  //   1+2순위 합계 20개: 1등 24.0%·1·2등 39.6%·회수율 133.1% (랜덤20개 1등 20% 대비 +4%p, 엣지는 전부 1순위 몫).
   var best2 = -1, s20 = 1;
   for (var s = 1; s <= 91; s++) {
     if (!(s <= s0 - 10 || s >= s0 + 10)) continue;
@@ -3231,11 +3231,11 @@ function render() {
                 '🩺 자가진단 통과 — ' + ascQ.length + '회 · 이상값/중복/입력오류 없음</div>';
       }
     })();
-    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1등 번호대</b> — 최근 35회 1등 최다 연속 10칸 (v75) · 571회 검증: <b>1·2등 23.6%</b>(랜덤19.1%) · 1등 13.5% · 회수율 140.3% · <b>최근100회 31%·최근30회 33%</b> (밴드 이동 활발형)</div>';
+    html += '<div class="predict-sub">' + nextRoundNum + '회 예상 <b>1등 번호대</b> — 최근 37회 1등 최다 연속 10칸 (v77) · 571회 검증: <b>1·2등 24.0%</b>(랜덤19.1%) · 1등 14.5% · 회수율 144.9% · 전/후반 24.2/23.8 균형 (W 1단위 전수 스윕 1위)</div>';
     html += '<div class="predict-decs">';
     html += '<span class="predict-dec predict-dec-big predict-rank1">' +
-            '<span class="predict-rank">⚡ W35 밴드 (적당히 빠른 트렌드 · v75)</span>' + pr.s0 + ' ~ ' + pr.s1 +
-            '<span class="predict-dec-cnt">최근 ' + pr.windowSize + '회 1등 최다 연속구간 (구간 내 1등 ' + pr.score + '회) · 전체 1·2등 23.6%·회수율 140% · 최근30회 33%</span></span>';
+            '<span class="predict-rank">⚡ W37 밴드 (전수 스윕 1위 · v77)</span>' + pr.s0 + ' ~ ' + pr.s1 +
+            '<span class="predict-dec-cnt">최근 ' + pr.windowSize + '회 1등 최다 연속구간 (구간 내 1등 ' + pr.score + '회) · 전체 1·2등 24.0%·회수율 144.9% · 1등 14.5%</span></span>';
     html += '</div>';
     // 🥇🥈 v76: 1순위·2순위 밴드 번호 10개씩 (사용자 요청). 2순위 산정·성적은 _predictW60Band 주석 참조.
     (function () {
@@ -3247,7 +3247,7 @@ function render() {
               '<div style="margin:3px 0 9px;">' + chips1 + '</div>' +
               '<div style="font-size:11px;font-weight:800;color:#cbd5e1;">🥈 2순위 10개 — ' + pr.s2_0 + '~' + pr.s2_1 + ' (구간 내 1등 ' + pr.score2 + '회)</div>' +
               '<div style="margin:3px 0 2px;">' + chips2 + '</div>' +
-              '<div style="font-size:10.5px;color:var(--text-dim);">2순위 단독 571회 검증: 1등 10.0%(랜덤급)·최근30회 3.3% — 자체 엣지 없음, <b>추가 기회 있을 때 커버리지용</b> · 20개 합계 1등 23.5%·1·2등 38.9%·회수율 131%</div></div>';
+              '<div style="font-size:10.5px;color:var(--text-dim);">2순위 단독 571회 검증: 1등 9.5%(랜덤급) — 자체 엣지 없음, <b>추가 기회 있을 때 커버리지용</b> · 20개 합계 1등 24.0%·1·2등 39.6%·회수율 133%</div></div>';
     })();
     // 🔥 트렌드 밴드 (W25) — 최근 국면 공격용. 최근30회 1등 8방(W60 4방)으로 국면 우위,
     //    단 전체 571회 검증은 1등 10.9%(랜덤+0.9%p)로 장기 신뢰는 W60이 위. 선택은 사용자 몫.

@@ -532,6 +532,9 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .ovl-box { background: rgba(45,212,191,.08); border: 1px solid rgba(45,212,191,.4); border-radius: 8px; padding: 9px 11px; margin: 10px 0; font-size: 13.5px; }
 .ovl-box b.ovl-n { color: #2dd4bf; font-size: 16px; }
 .ovl-chip { display: inline-block; background: rgba(251,191,36,.18); border: 1px solid rgba(251,191,36,.55); color: #fbbf24; border-radius: 6px; padding: 1px 8px; margin: 2px 2px; font-weight: 700; font-size: 15px; }
+.band-chip { display: inline-block; border-radius: 6px; padding: 1px 7px; margin: 2px 2px; font-weight: 700; font-size: 14px; }
+.band-chip.b1 { background: rgba(245,197,66,.16); border: 1px solid rgba(245,197,66,.55); color: #f5c542; }
+.band-chip.b2 { background: rgba(148,163,184,.14); border: 1px solid rgba(148,163,184,.5); color: #cbd5e1; }
 /* 열고 닫기 (details/summary) */
 details.fold { margin: 10px 0; }
 details.fold summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--accent, #e0b352);
@@ -1305,7 +1308,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v75</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v76</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1930,7 +1933,17 @@ function _predictW60Band(rounds) {
     for (var k = 0; k < 10; k++) t += c[s + k];
     if (t > best) { best = t; s0 = s; }
   }
-  return { s0: s0, s1: s0 + 9, score: best, windowSize: win.length, moveKey: s0 };
+  // ★ v76: 2순위 밴드 = 1순위와 겹치지 않는 창 중 차상위 연속 10칸 (사용자 요청 표시용).
+  //   571회 walk-forward 정직 기록: 2순위 단독 1등 10.0%(랜덤 10%와 동일)·최근30회 3.3% — 자체 엣지 없음.
+  //   1+2순위 합계 20개: 1등 23.5%·1·2등 38.9%·회수율 131.1% (랜덤20개 1등 20% 대비 +3.5%p, 엣지는 전부 1순위 몫).
+  var best2 = -1, s20 = 1;
+  for (var s = 1; s <= 91; s++) {
+    if (!(s <= s0 - 10 || s >= s0 + 10)) continue;
+    var t = 0;
+    for (var k = 0; k < 10; k++) t += c[s + k];
+    if (t > best2) { best2 = t; s20 = s; }
+  }
+  return { s0: s0, s1: s0 + 9, score: best, s2_0: s20, s2_1: s20 + 9, score2: best2, windowSize: win.length, moveKey: s0 };
 }
 
 function _w60Accuracy(rounds, evalN) {
@@ -3224,6 +3237,18 @@ function render() {
             '<span class="predict-rank">⚡ W35 밴드 (적당히 빠른 트렌드 · v75)</span>' + pr.s0 + ' ~ ' + pr.s1 +
             '<span class="predict-dec-cnt">최근 ' + pr.windowSize + '회 1등 최다 연속구간 (구간 내 1등 ' + pr.score + '회) · 전체 1·2등 23.6%·회수율 140% · 최근30회 33%</span></span>';
     html += '</div>';
+    // 🥇🥈 v76: 1순위·2순위 밴드 번호 10개씩 (사용자 요청). 2순위 산정·성적은 _predictW60Band 주석 참조.
+    (function () {
+      var chips1 = '', chips2 = '', kk;
+      for (kk = pr.s0; kk <= pr.s1; kk++) chips1 += '<span class="band-chip b1">' + kk + '</span>';
+      for (kk = pr.s2_0; kk <= pr.s2_1; kk++) chips2 += '<span class="band-chip b2">' + kk + '</span>';
+      html += '<div style="margin:-4px 0 10px;padding:10px 13px;border:1px solid rgba(148,163,184,0.35);background:rgba(148,163,184,0.05);border-radius:10px;">' +
+              '<div style="font-size:11px;font-weight:800;color:#f5c542;">🥇 1순위 10개 — ' + pr.s0 + '~' + pr.s1 + ' (메인 매수, 위 밴드와 동일)</div>' +
+              '<div style="margin:3px 0 9px;">' + chips1 + '</div>' +
+              '<div style="font-size:11px;font-weight:800;color:#cbd5e1;">🥈 2순위 10개 — ' + pr.s2_0 + '~' + pr.s2_1 + ' (구간 내 1등 ' + pr.score2 + '회)</div>' +
+              '<div style="margin:3px 0 2px;">' + chips2 + '</div>' +
+              '<div style="font-size:10.5px;color:var(--text-dim);">2순위 단독 571회 검증: 1등 10.0%(랜덤급)·최근30회 3.3% — 자체 엣지 없음, <b>추가 기회 있을 때 커버리지용</b> · 20개 합계 1등 23.5%·1·2등 38.9%·회수율 131%</div></div>';
+    })();
     // 🔥 트렌드 밴드 (W25) — 최근 국면 공격용. 최근30회 1등 8방(W60 4방)으로 국면 우위,
     //    단 전체 571회 검증은 1등 10.9%(랜덤+0.9%p)로 장기 신뢰는 W60이 위. 선택은 사용자 몫.
     (function () {

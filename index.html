@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v72</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v73</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3134,22 +3134,21 @@ function render() {
     function renderActualRow(sequence) {
       if (!sequence || sequence.length === 0) return '';
       var rec = sequence.slice(-50);
-      // 연속10칸 핫윈도우 라벨(seqStart~seqEnd) 카운트 — 같은 시퀀스 반복 강조용
+      // ★ v73: 고정 10단위 번호대(1~10, 11~20, …, 91~100)로 라벨·컬러·반복 카운트 통일
+      //    (기존 슬라이딩 핫윈도우 라벨(예: 69~78)은 혼란 유발 — 사용자 요청으로 제거)
+      function decOf(n) { return n === 100 ? 9 : Math.floor((n - 1) / 10); }
+      function decLbl(n) { var d = decOf(n); return (d * 10 + 1) + '~' + (d * 10 + 10); }
       var groupCount = {};
       for (var fc = 0; fc < rec.length; fc++) {
-        var lbl = (rec[fc].seqStart != null) ? (rec[fc].seqStart + '~' + rec[fc].seqEnd)
-                  : ((Math.floor((rec[fc].num - 1) / 10) * 10 + 1) + '~' + (Math.floor((rec[fc].num - 1) / 10) * 10 + 10));
+        var lbl = decLbl(rec[fc].num);
         groupCount[lbl] = (groupCount[lbl] || 0) + 1;
       }
       var html = '';
       for (var fi = 0; fi < rec.length; fi++) {
         if (fi > 0) html += '<span class="flow-arrow">→</span>';
         var num = rec[fi].num;
-        // 그 1등 번호를 감싸는 연속10칸 핫윈도우 (fallback: 십의자리)
-        var hs = (rec[fi].seqStart != null) ? rec[fi].seqStart : (Math.floor((num - 1) / 10) * 10 + 1);
-        var he = (rec[fi].seqEnd != null) ? rec[fi].seqEnd : (hs + 9);
-        var groupLabel = hs + '~' + he;
-        var dec = Math.floor((num - 1) / 10); // ★ 실제 1등 번호대 기준 컬러 0~9 (범례와 일치)
+        var groupLabel = decLbl(num);
+        var dec = decOf(num); // 번호대 컬러 (범례와 일치)
         var gCount = groupCount[groupLabel];
         var cls = 'flow-step seq-box';
         if (gCount >= 2) cls += ' repeat-2';

@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v73</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v74</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3219,22 +3219,35 @@ function render() {
             '<span class="predict-rank">🛡 안정 밴드 W60 (장기 검증 1위)</span>' + pr.s0 + ' ~ ' + pr.s1 +
             '<span class="predict-dec-cnt">최근 ' + pr.windowSize + '회 1등 최다 연속구간 (구간 내 1등 ' + pr.score + '회) · 전체 1등 13.7%·회수율 141%</span></span>';
     html += '</div>';
-    // 🔥 트렌드 밴드 (W25) — 최근 국면 공격용. 최근30회 1등 8방(W60 4방)으로 국면 우위,
-    //    단 전체 571회 검증은 1등 10.9%(랜덤+0.9%p)로 장기 신뢰는 W60이 위. 선택은 사용자 몫.
+    // 🔥 트렌드 밴드 v74 — W60 비의존 독립 산식: 최근 25회 1등 밀도 + (최근 10회 2회이상 반복수 ×3 강가중)
+    //    반복 신호(같은 수 2번+)가 뜨면 그 수가 밴드를 직접 끌고 감. 전체 571회 검증 1등 10.0%(랜덤급)
+    //    — 국면 공격용으로 정직 표기. 반복 신호 존재 시 박스 강조 + 신호 수 명시.
     (function () {
-      var c25 = new Array(101).fill(0);
-      var asc25 = rows.slice().sort(function (a, b) { return a.round - b.round; });
-      var win25 = asc25.slice(Math.max(0, asc25.length - 25));
-      // 정화본 기준 (중복 제외)
-      var cl = _cleanRows(rows); var w25 = cl.slice(Math.max(0, cl.length - 25));
+      var cl = _cleanRows(rows);
+      var c25 = new Array(101).fill(0), c10 = new Array(101).fill(0);
+      var w25 = cl.slice(Math.max(0, cl.length - 25));
+      var w10 = cl.slice(Math.max(0, cl.length - 10));
       for (var q = 0; q < w25.length; q++) if (w25[q].first != null) c25[w25[q].first]++;
+      for (var q2 = 0; q2 < w10.length; q2++) if (w10[q2].first != null) c10[w10[q2].first]++;
+      var sc = new Array(101).fill(0);
+      for (var n = 1; n <= 100; n++) sc[n] = c25[n] + 3 * Math.max(0, c10[n] - 1);
       var b25 = 1, t25 = -1;
-      for (var s = 1; s <= 91; s++) { var tt = 0; for (var k = 0; k < 10; k++) tt += c25[s + k]; if (tt > t25) { t25 = tt; b25 = s; } }
+      for (var s = 1; s <= 91; s++) { var tt = 0; for (var k = 0; k < 10; k++) tt += sc[s + k]; if (tt > t25) { t25 = tt; b25 = s; } }
+      var reps = [];
+      for (var rn2 = 1; rn2 <= 100; rn2++) if (c10[rn2] >= 2) reps.push(rn2 + '(×' + c10[rn2] + ')');
+      var repsIn = [];
+      for (var rn3 = b25; rn3 <= b25 + 9; rn3++) if (c10[rn3] >= 2) repsIn.push(rn3);
+      var strong = repsIn.length > 0;
       var same = (b25 === pr.s0);
-      html += '<div style="margin:-4px 0 10px;padding:9px 13px;border:1px solid rgba(251,146,60,0.45);background:rgba(251,146,60,0.08);border-radius:10px;">' +
-              '<div style="font-size:11px;font-weight:800;color:#fdba74;">🔥 트렌드 밴드 W25 (최근 국면 공격용)</div>' +
+      var border = strong ? 'rgba(251,146,60,0.9)' : 'rgba(251,146,60,0.45)';
+      var bg = strong ? 'rgba(251,146,60,0.16)' : 'rgba(251,146,60,0.08)';
+      html += '<div style="margin:-4px 0 10px;padding:9px 13px;border:2px solid ' + border + ';background:' + bg + ';border-radius:10px;">' +
+              '<div style="font-size:11px;font-weight:800;color:#fdba74;">🔥 트렌드 밴드 (독립 산식: 최근25회 밀도 + 반복수 ×3)' +
+              (strong ? ' <span style="color:#fb923c;font-weight:800;">⚡ 강력 신호</span>' : '') + '</div>' +
               '<div style="font-size:22px;font-weight:800;color:#fdba74;margin:2px 0;">' + b25 + ' ~ ' + (b25 + 9) + (same ? ' <span style="font-size:11px;">(안정 밴드와 동일)</span>' : '') + '</div>' +
-              '<div style="font-size:10.5px;color:var(--text-dim);">최근 25회 1등 ' + t25 + '회 · 최근30회 검증 1등 8방(안정밴드 4방) · <b>단 전체 571회 검증은 10.9%(랜덤급)</b> — 국면 공격용, 장기 신뢰는 안정 밴드</div></div>';
+              '<div style="font-size:10.5px;color:var(--text-dim);">' +
+              (reps.length ? '반복 신호: <b style="color:#fb923c;">' + reps.join(', ') + '</b>' + (strong ? ' — 밴드 안에 반복수 포함 (⚡)' : ' — 밴드 밖') + ' · ' : '반복 신호 없음 · ') +
+              '<b>전체 571회 검증 1등 10.0% (랜덤급)</b> — 국면 공격용, 장기 신뢰는 안정 밴드</div></div>';
     })();
     // v61(주력5+최신5)과의 겹침 — 두 전략 동시 지목 번호는 픽당 효율 최고 구간(1.57x)
     (function () {

@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v82</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v83</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1947,8 +1947,21 @@ function _predictW60Band(rounds) {
     for (var k = 0; k < 5; k++) td += c[q + k];
     if (td > bd) { bd = td; d0 = q; }
   }
+  // ★ v83: C2 표시용 — 2순위를 최근 15회 카운트로 잡은 "타이트 헤지" 후보 (1순위와 비겹침).
+  //   593회 1·2등 26.3%(현행 헤지 25.0%)·OOS(1419~40) 12/22 — 단 14종 그리드 사후선택이라
+  //   페어 46:38 비유의·4분할 1분위 열세. 표시만 하고 채점은 현행 헤지 기준 유지, 1441부터 홀드아웃 추적.
+  var c15 = new Array(101).fill(0);
+  var win15 = sorted.length >= 15 ? sorted.slice(-15) : sorted.slice();
+  for (var i15 = 0; i15 < win15.length; i15++) if (win15[i15].first != null) c15[win15[i15].first]++;
+  var bf2 = -1, f20 = 1;
+  for (var s = 1; s <= 91; s++) {
+    if (!(s <= s0 - 10 || s >= s0 + 10)) continue;
+    var t = 0;
+    for (var k = 0; k < 10; k++) t += c15[s + k];
+    if (t > bf2) { bf2 = t; f20 = s; }
+  }
   return { s0: s0, s1: s0 + 9, score: best, s2_0: s20, s2_1: s20 + 9, score2: best2,
-           d5_0: d0, d5_1: d0 + 4, windowSize: win.length, moveKey: s0 };
+           d5_0: d0, d5_1: d0 + 4, c2f_0: f20, windowSize: win.length, moveKey: s0 };
 }
 
 function _w60Accuracy(rounds, evalN) {
@@ -3249,6 +3262,12 @@ function render() {
               '<div style="margin:4px 0 3px;">' + chipsH + '</div>' +
               '<div style="font-size:10.5px;color:var(--text-dim);">571회 검증: 1·2등 24.5%·회수율 146.4% (전체는 현행 동률·노이즈 범위) · <b>최근50회 1등 22%·회수율 183%</b>·최근30회 1·2등 36.7% — 두 밴드 스왑 국면 강세형, 단일 클러스터 국면은 현행 밴드가 위</div></div>';
     })();
+    // 🌀 v83: C2 타이트 헤지 (2순위만 W15) — 표시 전용, 채점·하단표는 현행 헤지 유지 (사용자 지시 "보여지만해")
+    html += '<div style="margin:-4px 0 10px;padding:9px 13px;border:1px solid rgba(94,234,212,0.4);background:rgba(94,234,212,0.06);border-radius:10px;">' +
+            '<div style="font-size:11px;font-weight:800;color:#5eead4;">🌀 C2 타이트 헤지 — 최밀 5칸 + W15 2순위 5칸 (표시만 · 홀드아웃 추적 중)</div>' +
+            '<div style="font-size:20px;font-weight:800;color:#5eead4;margin:2px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.c2f_0 + '~' + (pr.c2f_0 + 4) +
+            (pr.c2f_0 === pr.s2_0 ? ' <span style="font-size:11px;">(현행 헤지와 동일)</span>' : '') + '</div>' +
+            '<div style="font-size:10.5px;color:var(--text-dim);">593회 1·2등 26.3%(현행 헤지 25.0%)·OOS 22회 12적중 — <b>단 사후선택 후보라 아직 미승격</b>, 1441부터 실전 채점으로 판단</div></div>';
     // (v79: 트렌드 밴드 W25 박스·v61 겹침 박스 삭제 — 사용자 지시 "불필요한 정보")
     // (v80: 판세·🏆전체통계·✅아무등수·📉가뭄 2줄·📋안내줄 표시 제거 — 사용자 지시.
     //  동일 수치는 하단 통합표 요약줄에서 계속 확인 가능. acc 계산은 하단 표가 재사용하므로 유지.)

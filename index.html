@@ -1017,6 +1017,7 @@ tr.topfreq-rank-top3 .col-num {
 .rounds-table .rt-2 { color: #c3cbd8; }
 .rounds-table .rt-3 { color: #fb923c; }
 .rounds-table td.rt-eq { background: rgba(94,234,212,0.10); }  /* v87: C2·W9 픽 동일 회차 면 표시 */
+.rounds-table td.rt-inb { background: rgba(125,211,252,0.20); border-radius: 4px; font-weight: 800; }  /* v88: 뒷단(빠른창 5칸) 적중 — 앞단(rt-in 금색)과 구분 */
 .rounds-table .rt-del { width: 34px; }
 .rounds-table .delete-btn { width: 22px; height: 22px; line-height: 20px; }
 .rounds-table .rt-band { color: #f5c542; font-weight: 700; font-size: 12.5px; font-variant-numeric: tabular-nums; }
@@ -1306,7 +1307,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v87</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v88</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3315,7 +3316,7 @@ function render() {
       ' · <span style="color:#f5c542;">1·2등 ' + (st > 0 ? ((q1 + q2) / st * 100).toFixed(1) : '-') + '%</span>' +
       '<br><span style="color:#5eead4;font-weight:800;">🌀 W9:</span> <span class="w-r1">1등 ' + x1 + '회' + pctOf(x1) + '</span> · <span class="w-r2">2등 ' + x2 + '회' + pctOf(x2) +
       '</span> · <span class="w-r3">3등 ' + x3 + '회' + pctOf(x3) + '</span> · <span style="color:#5eead4;">1·2등 ' + (st > 0 ? ((x1 + x2) / st * 100).toFixed(1) : '-') + '%</span>' +
-      ' <span style="font-weight:400;color:var(--text-dim)">(펼치기/접기)</span></summary>';
+      ' <span style="font-weight:400;color:var(--text-dim)">· 금색면=앞단(최밀5) · 하늘면=뒷단(W15) · 청록면=C2·W9 동일픽 (펼치기/접기)</span></summary>';
     roundsHtml += '<table class="rounds-table"><thead><tr>' +
       '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>C2</th><th>결과</th><th>W9</th><th>결과</th><th></th></tr></thead><tbody>';
     // 중복 행 감지 (오름차순 기준 직전 회차와 3개 동일 → 뒤 회차가 오류)
@@ -3331,11 +3332,13 @@ function render() {
       var row = sorted[n];
       var wm = w60map[row.round];
       var dupMark = dupSet[row.round] ? ' <span title="' + dupSet[row.round] + '회와 완전 동일 — 입력 오류 의심, 신호 계산에서 자동 제외됨" style="cursor:help;">⚠️</span>' : '';
-      // v85: C2(메인)·W9(참고) 표시 (금색 셀 = C2 픽 안에서 나온 번호)
-      var inC = function (x) { return wm && wm.c2f != null && x != null && ((x >= wm.hd0 && x <= wm.hd0 + 4) || (x >= wm.c2f && x <= wm.c2f + 4)); };
-      var cls1 = inC(row.first) ? ' rt-in' : '';
-      var cls2 = inC(row.second) ? ' rt-in' : '';
-      var cls3 = inC(row.third) ? ' rt-in' : '';
+      // v85: C2(메인)·W9(참고) 표시 / v88: 앞단(최밀5)=금색면 · 뒷단(W15 5칸)=하늘색면 구분 (C2 기준)
+      var inF = function (x) { return wm && wm.hd0 != null && x != null && x >= wm.hd0 && x <= wm.hd0 + 4; };
+      var inB2 = function (x) { return wm && wm.c2f != null && x != null && x >= wm.c2f && x <= wm.c2f + 4; };
+      var cellCls = function (x) { return inF(x) ? ' rt-in' : (inB2(x) ? ' rt-inb' : ''); };
+      var cls1 = cellCls(row.first);
+      var cls2 = cellCls(row.second);
+      var cls3 = cellCls(row.third);
       var cPick = (wm && wm.c2f != null) ? '<span style="color:#f5c542;font-size:10.5px;white-space:nowrap;">' + wm.hd0 + '~' + (wm.hd0 + 4) + '+' + wm.c2f + '~' + (wm.c2f + 4) + '</span>' : '—';
       var cRes;
       if (!wm || wm.c2f == null) cRes = '<span class="w-miss">—</span>';

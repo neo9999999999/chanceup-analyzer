@@ -1017,6 +1017,7 @@ tr.topfreq-rank-top3 .col-num {
 .rounds-table .rt-2 { color: #c3cbd8; }
 .rounds-table .rt-3 { color: #fb923c; }
 /* (v89: 배경면 표시 계열 제거 — 사용자 지시. rt-in/rt-inb/rt-eq 미사용) */
+.rounds-table tr.rt-chg td { background: rgba(196,181,253,0.08); }  /* v90: C2 픽이 직전 회차와 달라진 시작 회차 — 은은한 보라 */
 .rounds-table .rt-del { width: 34px; }
 .rounds-table .delete-btn { width: 22px; height: 22px; line-height: 20px; }
 .rounds-table .rt-band { color: #f5c542; font-weight: 700; font-size: 12.5px; font-variant-numeric: tabular-nums; }
@@ -1306,7 +1307,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v89</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v90</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3287,11 +3288,17 @@ function render() {
     sorted.sort(function (a, b) { return b.round - a.round; });
     // 전 회차 W60 walk-forward 결과 맵 (예측 카드에서 계산한 것 재사용)
     var w60map = {};
+    var chgSet = {};   // v90: 픽 변경 시작 회차
     try {
       var wAll = window.__w60AccAll || _w60Accuracy(rows, rows.length);
       for (var wq = 0; wq < wAll.recent.length; wq++) {
         var wr = wAll.recent[wq];
         w60map[wr.round] = wr;
+      }
+      // v90: C2 픽(앞단 시작+뒷단 시작)이 직전 회차와 달라진 "새 넘버 시작" 회차 집합
+      for (var cq = 1; cq < wAll.recent.length; cq++) {
+        var pa2 = wAll.recent[cq - 1], pb2 = wAll.recent[cq];
+        if (pa2.hd0 !== pb2.hd0 || pa2.c2f !== pb2.c2f) chgSet[pb2.round] = 1;
       }
     } catch (e) { console.error('W60 전이력 계산 실패:', e); }
     // 요약 카운트 (접힌 상태에서도 보이게) — v85: C2(메인) + W9(참고) (사용자 지시)
@@ -3346,7 +3353,7 @@ function render() {
       else if (wm.wrank === 2) wRes9 = '<span class="w-r2">2등 ' + row.second + '</span>';
       else if (wm.wrank === 3) wRes9 = '<span class="w-r3">3등 ' + row.third + '</span>';
       else wRes9 = '<span class="w-miss">×</span>';
-      roundsHtml += '<tr>' +
+      roundsHtml += '<tr' + (chgSet[row.round] ? ' class="rt-chg"' : '') + '>' +
         '<td class="rt-round">' + row.round + dupMark + '</td>' +
         '<td class="rt-n rt-1">' + row.first + '</td>' +
         '<td class="rt-n rt-2">' + row.second + '</td>' +

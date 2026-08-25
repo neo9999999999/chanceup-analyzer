@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v83</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v84</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1991,10 +1991,16 @@ function _w60Accuracy(rounds, evalN) {
     if (hrank === 1) hh1++;
     else if (hrank === 2) hh2++;
     else if (hrank === 3) hh3++;
+    // ★ v84: C2 (최밀5 + W15 2순위) walk-forward 채점 — 하단 표 병기용
+    var inC = function(x) { return x != null && ((x >= pr.d5_0 && x <= pr.d5_1) || (x >= pr.c2f_0 && x <= pr.c2f_0 + 4)); };
+    var crank = 0;
+    if (inC(row.first)) crank = 1;
+    else if (inC(row.second)) crank = 2;
+    else if (inC(row.third)) crank = 3;
     tot++;
     recent.push({ round: row.round, first: row.first, second: row.second, third: row.third,
                   rank: rank, hit: rank === 1, s0: pr.s0, s1: pr.s1, predStart: pr.s0,
-                  hd0: pr.d5_0, hs2: pr.s2_0, hrank: hrank });
+                  hd0: pr.d5_0, hs2: pr.s2_0, hrank: hrank, c2f: pr.c2f_0, crank: crank });
   }
   return { hit: hit, hit2: hit2, hit3: hit3, hh1: hh1, hh2: hh2, hh3: hh3, tot: tot, recent: recent };
 }
@@ -3297,8 +3303,8 @@ function render() {
         w60map[wr.round] = wr;
       }
     } catch (e) { console.error('W60 전이력 계산 실패:', e); }
-    // 요약 카운트 (접힌 상태에서도 보이게) — v82: 5+5 헤지만 표시 (사용자 지시)
-    var q1 = 0, q2 = 0, q3 = 0, qm = 0, st = 0;
+    // 요약 카운트 (접힌 상태에서도 보이게) — v82: 5+5 헤지 / v84: C2 병기 (사용자 지시)
+    var q1 = 0, q2 = 0, q3 = 0, qm = 0, st = 0, x1 = 0, x2 = 0, x3 = 0;
     for (var kq = 0; kq < sorted.length; kq++) {
       var km = w60map[sorted[kq].round];
       if (!km) continue;
@@ -3307,15 +3313,20 @@ function render() {
       else if (km.hrank === 2) q2++;
       else if (km.hrank === 3) q3++;
       else qm++;
+      if (km.crank === 1) x1++;
+      else if (km.crank === 2) x2++;
+      else if (km.crank === 3) x3++;
     }
     var pctOf = function (x) { return st > 0 ? ' (' + (x / st * 100).toFixed(1) + '%)' : ''; };
     var roundsHtml = '<details class="fold" open><summary>총 ' + sorted.length + '회차 · 검증 ' + st +
       '회 — <span style="color:#c4b5fd;font-weight:800;">⚖️ 5+5:</span> <span class="w-r1">1등 ' + q1 + '회' + pctOf(q1) + '</span> · <span class="w-r2">2등 ' + q2 + '회' + pctOf(q2) +
       '</span> · <span class="w-r3">3등 ' + q3 + '회' + pctOf(q3) + '</span> · 미적중 ' + qm + '회' + pctOf(qm) +
       ' · <span style="color:#c4b5fd;">1·2등 ' + (st > 0 ? ((q1 + q2) / st * 100).toFixed(1) : '-') + '%</span>' +
+      '<br><span style="color:#5eead4;font-weight:800;">🌀 C2:</span> <span class="w-r1">1등 ' + x1 + '회' + pctOf(x1) + '</span> · <span class="w-r2">2등 ' + x2 + '회' + pctOf(x2) +
+      '</span> · <span class="w-r3">3등 ' + x3 + '회' + pctOf(x3) + '</span> · <span style="color:#5eead4;">1·2등 ' + (st > 0 ? ((x1 + x2) / st * 100).toFixed(1) : '-') + '%</span>' +
       ' <span style="font-weight:400;color:var(--text-dim)">(펼치기/접기)</span></summary>';
     roundsHtml += '<table class="rounds-table"><thead><tr>' +
-      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>5+5</th><th>결과</th><th></th></tr></thead><tbody>';
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>5+5</th><th>결과</th><th>C2</th><th>결과</th><th></th></tr></thead><tbody>';
     // 중복 행 감지 (오름차순 기준 직전 회차와 3개 동일 → 뒤 회차가 오류)
     var dupSet = {};
     (function () {
@@ -3341,6 +3352,14 @@ function render() {
       else if (wm.hrank === 2) hRes = '<span class="w-r2">2등 ' + row.second + '</span>';
       else if (wm.hrank === 3) hRes = '<span class="w-r3">3등 ' + row.third + '</span>';
       else hRes = '<span class="w-miss">×</span>';
+      // v84: C2 픽·결과
+      var cPick = (wm && wm.c2f != null) ? '<span style="color:#5eead4;font-size:10.5px;white-space:nowrap;">' + wm.hd0 + '~' + (wm.hd0 + 4) + '+' + wm.c2f + '~' + (wm.c2f + 4) + '</span>' : '—';
+      var cRes;
+      if (!wm || wm.c2f == null) cRes = '<span class="w-miss">—</span>';
+      else if (wm.crank === 1) cRes = '<span class="w-r1">1등 ' + row.first + '</span>';
+      else if (wm.crank === 2) cRes = '<span class="w-r2">2등 ' + row.second + '</span>';
+      else if (wm.crank === 3) cRes = '<span class="w-r3">3등 ' + row.third + '</span>';
+      else cRes = '<span class="w-miss">×</span>';
       roundsHtml += '<tr>' +
         '<td class="rt-round">' + row.round + dupMark + '</td>' +
         '<td class="rt-n rt-1' + cls1 + '">' + row.first + '</td>' +
@@ -3348,6 +3367,8 @@ function render() {
         '<td class="rt-n rt-3' + cls3 + '">' + row.third + '</td>' +
         '<td>' + hPick + '</td>' +
         '<td>' + hRes + '</td>' +
+        '<td>' + cPick + '</td>' +
+        '<td>' + cRes + '</td>' +
         '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +
         '</tr>';
     }

@@ -1305,7 +1305,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v84</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v85</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1960,8 +1960,19 @@ function _predictW60Band(rounds) {
     for (var k = 0; k < 10; k++) t += c15[s + k];
     if (t > bf2) { bf2 = t; f20 = s; }
   }
+  // ★ v85: W9 변형용 — 2순위를 최근 9회 카운트로 (빠른 고원 W8~15의 다른 끝점, 병행 채점 참고용).
+  var c9 = new Array(101).fill(0);
+  var win9 = sorted.length >= 9 ? sorted.slice(-9) : sorted.slice();
+  for (var i9 = 0; i9 < win9.length; i9++) if (win9[i9].first != null) c9[win9[i9].first]++;
+  var bw9 = -1, w90 = 1;
+  for (var s = 1; s <= 91; s++) {
+    if (!(s <= s0 - 10 || s >= s0 + 10)) continue;
+    var t = 0;
+    for (var k = 0; k < 10; k++) t += c9[s + k];
+    if (t > bw9) { bw9 = t; w90 = s; }
+  }
   return { s0: s0, s1: s0 + 9, score: best, s2_0: s20, s2_1: s20 + 9, score2: best2,
-           d5_0: d0, d5_1: d0 + 4, c2f_0: f20, windowSize: win.length, moveKey: s0 };
+           d5_0: d0, d5_1: d0 + 4, c2f_0: f20, w9_0: w90, windowSize: win.length, moveKey: s0 };
 }
 
 function _w60Accuracy(rounds, evalN) {
@@ -1971,7 +1982,6 @@ function _w60Accuracy(rounds, evalN) {
   // 시작점 1: 두 번째 회차부터는 (짧더라도) 과거 데이터만으로 밴드 계산 가능 — 전 구간 walk-forward OOS
   var start = Math.max(1, N - evalN);
   var hit = 0, hit2 = 0, hit3 = 0, tot = 0, recent = [];
-  var hh1 = 0, hh2 = 0, hh3 = 0;   // ★ v81: 5+5 헤지 walk-forward 집계 (최밀5 + 2순위 왼쪽5)
   for (var i = start; i < N; i++) {
     var pr = _predictW60Band(sorted.slice(0, i));
     var row = sorted[i];
@@ -1983,26 +1993,23 @@ function _w60Accuracy(rounds, evalN) {
     if (rank === 1) hit++;
     else if (rank === 2) hit2++;
     else if (rank === 3) hit3++;
-    var inH = function(x) { return x != null && ((x >= pr.d5_0 && x <= pr.d5_1) || (x >= pr.s2_0 && x <= pr.s2_0 + 4)); };
-    var hrank = 0;
-    if (inH(row.first)) hrank = 1;
-    else if (inH(row.second)) hrank = 2;
-    else if (inH(row.third)) hrank = 3;
-    if (hrank === 1) hh1++;
-    else if (hrank === 2) hh2++;
-    else if (hrank === 3) hh3++;
-    // ★ v84: C2 (최밀5 + W15 2순위) walk-forward 채점 — 하단 표 병기용
+    // ★ v85: C2(메인, 최밀5+W15 2순위)·W9(참고) walk-forward 채점 — 하단 표 기준
     var inC = function(x) { return x != null && ((x >= pr.d5_0 && x <= pr.d5_1) || (x >= pr.c2f_0 && x <= pr.c2f_0 + 4)); };
     var crank = 0;
     if (inC(row.first)) crank = 1;
     else if (inC(row.second)) crank = 2;
     else if (inC(row.third)) crank = 3;
+    var inW = function(x) { return x != null && ((x >= pr.d5_0 && x <= pr.d5_1) || (x >= pr.w9_0 && x <= pr.w9_0 + 4)); };
+    var wrank = 0;
+    if (inW(row.first)) wrank = 1;
+    else if (inW(row.second)) wrank = 2;
+    else if (inW(row.third)) wrank = 3;
     tot++;
     recent.push({ round: row.round, first: row.first, second: row.second, third: row.third,
                   rank: rank, hit: rank === 1, s0: pr.s0, s1: pr.s1, predStart: pr.s0,
-                  hd0: pr.d5_0, hs2: pr.s2_0, hrank: hrank, c2f: pr.c2f_0, crank: crank });
+                  hd0: pr.d5_0, c2f: pr.c2f_0, crank: crank, w9: pr.w9_0, wrank: wrank });
   }
-  return { hit: hit, hit2: hit2, hit3: hit3, hh1: hh1, hh2: hh2, hh3: hh3, tot: tot, recent: recent };
+  return { hit: hit, hit2: hit2, hit3: hit3, tot: tot, recent: recent };
 }
 
 function _topFrequencyNumbers(rounds, window, count) {
@@ -3235,45 +3242,28 @@ function render() {
     var html = '';
     // (v80: 자가진단 배너·상단 설명줄 표시 제거 — 사용자 지시. 중복 자동 제외(_cleanRows)와
     //  하단 표의 ⚠️ 중복 표시는 유지되므로 데이터 무결성 보호는 그대로 동작한다.)
-    html += '<div class="predict-decs">';
-    html += '<span class="predict-dec predict-dec-big predict-rank1">' +
-            '<span class="predict-rank">⚡ W37 밴드 (전수 스윕 1위 · v77)</span>' + pr.s0 + ' ~ ' + pr.s1 +
-            '<span class="predict-dec-cnt">최근 ' + pr.windowSize + '회 1등 최다 연속구간 (구간 내 1등 ' + pr.score + '회) · 전체 1·2등 24.0%·회수율 144.9% · 1등 14.5%</span></span>';
-    html += '</div>';
-    // 🥇🥈 v76: 1순위·2순위 밴드 번호 10개씩 (사용자 요청). 2순위 산정·성적은 _predictW60Band 주석 참조.
+    // ⚡ v85: C2 메인 승격 (사용자 지시). W37 10개 밴드 박스·1·2순위 칩 박스·W37 헤지 박스 삭제.
+    //   C2 = 최밀 연속 5칸(W37 밴드 내) + W15 2순위 왼쪽 5칸. 승격 근거(595회, ~1442):
+    //   전체 1·2등 26.4%·회수율 149% · 3분할 25.3/26.3/27.6 — 유일한 전 구간 25%+ & 최근 공동 1위 & 상승 추세.
+    //   (W37 헤지는 중간 구간 19.7% 붕괴 전과 · W9은 합계 1위지만 우위가 중간 몰빵, 최근은 C2가 위)
     (function () {
-      var chips1 = '', chips2 = '', kk;
-      for (kk = pr.s0; kk <= pr.s1; kk++) chips1 += '<span class="band-chip b1">' + kk + '</span>';
-      for (kk = pr.s2_0; kk <= pr.s2_1; kk++) chips2 += '<span class="band-chip b2">' + kk + '</span>';
-      html += '<div style="margin:-4px 0 10px;padding:10px 13px;border:1px solid rgba(148,163,184,0.35);background:rgba(148,163,184,0.05);border-radius:10px;">' +
-              '<div style="font-size:11px;font-weight:800;color:#f5c542;">🥇 1순위 10개 — ' + pr.s0 + '~' + pr.s1 + ' (메인 매수, 위 밴드와 동일)</div>' +
-              '<div style="margin:3px 0 9px;">' + chips1 + '</div>' +
-              '<div style="font-size:11px;font-weight:800;color:#cbd5e1;">🥈 2순위 10개 — ' + pr.s2_0 + '~' + pr.s2_1 + ' (구간 내 1등 ' + pr.score2 + '회)</div>' +
-              '<div style="margin:3px 0 2px;">' + chips2 + '</div>' +
-              '<div style="font-size:10.5px;color:var(--text-dim);">2순위 단독 571회 검증: 1등 9.5%(랜덤급) — 자체 엣지 없음, <b>추가 기회 있을 때 커버리지용</b> · 20개 합계 1등 24.0%·1·2등 39.6%·회수율 133%</div></div>';
+      var chipsM = '', kk;
+      for (kk = pr.d5_0; kk <= pr.d5_1; kk++) chipsM += '<span class="band-chip b1">' + kk + '</span>';
+      chipsM += '<span style="color:var(--text-dim);font-weight:800;margin:0 4px;">+</span>';
+      for (kk = pr.c2f_0; kk <= pr.c2f_0 + 4; kk++) chipsM += '<span class="band-chip b2">' + kk + '</span>';
+      html += '<div style="margin:0 0 10px;padding:14px 16px;border:2px solid rgba(245,197,66,0.75);background:rgba(245,197,66,0.10);border-radius:12px;box-shadow:0 0 14px rgba(245,197,66,0.15);">' +
+              '<div style="font-size:12px;font-weight:800;color:#f5c542;letter-spacing:0.5px;">⚡ C2 메인 — 최밀 5칸 + W15 2순위 5칸 (v85 승격)</div>' +
+              '<div style="font-size:28px;font-weight:800;color:#ffe9a8;margin:3px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.c2f_0 + '~' + (pr.c2f_0 + 4) + '</div>' +
+              '<div style="margin:4px 0 3px;">' + chipsM + '</div>' +
+              '<div style="font-size:10.5px;color:var(--text-dim);">595회 검증: <b>1·2등 26.4%</b>(랜덤 19.1%) · 1등 15.0% · 회수율 149% · 3분할 25.3/26.3/<b>27.6</b> — 전 구간 25%+ 유일·최근 1위·상승 추세</div></div>';
+      // 🌀 W9 변형 — 병행 채점 (참고)
+      var same9 = (pr.w9_0 === pr.c2f_0);
+      html += '<div style="margin:-4px 0 10px;padding:9px 13px;border:1px solid rgba(94,234,212,0.4);background:rgba(94,234,212,0.06);border-radius:10px;">' +
+              '<div style="font-size:11px;font-weight:800;color:#5eead4;">🌀 W9 변형 — 최밀 5칸 + W9 2순위 5칸 (참고 · 병행 채점)</div>' +
+              '<div style="font-size:20px;font-weight:800;color:#5eead4;margin:2px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.w9_0 + '~' + (pr.w9_0 + 4) +
+              (same9 ? ' <span style="font-size:11px;">(C2와 동일)</span>' : '') + '</div>' +
+              '<div style="font-size:10.5px;color:var(--text-dim);">전체 1·2등 27.1%·회수율 154%로 합계 1위지만 우위가 중간 구간(29.3%) 몰빵 — <b>최근 구간은 C2(27.6%)가 위</b>, 페어 36:32 동전던지기. 하단 표에서 병행 추적</div></div>';
     })();
-    // ⚖️ v78: 5+5 헤지 (1순위 최밀 연속5칸 + 2순위 왼쪽 5칸) — 사용자 채택 결정.
-    //   25조합 그리드 1위. 571회: 1·2등 24.5%·회수율 146.4% — 전체는 현행과 동률
-    //   (널테스트: 랜덤우주 200개 중 84%가 이 격차 이상 생성 = 전체 기준 노이즈. 정직 기록).
-    //   단 국면 성격이 다름: 두 클러스터 스왑 국면(최근)에서 강세 — 최근50회 1등 22%·회수율 183.5%,
-    //   최근30회 1·2등 36.7%·195.3% (현행 10%/123%, 23.3%/135%). 단일 클러스터 국면(전반)은 현행 우위.
-    (function () {
-      var chipsH = '', kk;
-      for (kk = pr.d5_0; kk <= pr.d5_1; kk++) chipsH += '<span class="band-chip b1">' + kk + '</span>';
-      chipsH += '<span style="color:var(--text-dim);font-weight:800;margin:0 4px;">+</span>';
-      for (kk = pr.s2_0; kk <= pr.s2_0 + 4; kk++) chipsH += '<span class="band-chip b2">' + kk + '</span>';
-      html += '<div style="margin:-4px 0 10px;padding:14px 16px;border:2px solid rgba(196,181,253,0.7);background:rgba(196,181,253,0.13);border-radius:12px;box-shadow:0 0 14px rgba(196,181,253,0.18);">' +
-              '<div style="font-size:12px;font-weight:800;color:#c4b5fd;letter-spacing:0.5px;">⚖️ 5+5 헤지 — 1순위 최밀 5칸 + 2순위 5칸</div>' +
-              '<div style="font-size:28px;font-weight:800;color:#e9e2ff;margin:3px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.s2_0 + '~' + (pr.s2_0 + 4) + '</div>' +
-              '<div style="margin:4px 0 3px;">' + chipsH + '</div>' +
-              '<div style="font-size:10.5px;color:var(--text-dim);">571회 검증: 1·2등 24.5%·회수율 146.4% (전체는 현행 동률·노이즈 범위) · <b>최근50회 1등 22%·회수율 183%</b>·최근30회 1·2등 36.7% — 두 밴드 스왑 국면 강세형, 단일 클러스터 국면은 현행 밴드가 위</div></div>';
-    })();
-    // 🌀 v83: C2 타이트 헤지 (2순위만 W15) — 표시 전용, 채점·하단표는 현행 헤지 유지 (사용자 지시 "보여지만해")
-    html += '<div style="margin:-4px 0 10px;padding:9px 13px;border:1px solid rgba(94,234,212,0.4);background:rgba(94,234,212,0.06);border-radius:10px;">' +
-            '<div style="font-size:11px;font-weight:800;color:#5eead4;">🌀 C2 타이트 헤지 — 최밀 5칸 + W15 2순위 5칸 (표시만 · 홀드아웃 추적 중)</div>' +
-            '<div style="font-size:20px;font-weight:800;color:#5eead4;margin:2px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.c2f_0 + '~' + (pr.c2f_0 + 4) +
-            (pr.c2f_0 === pr.s2_0 ? ' <span style="font-size:11px;">(현행 헤지와 동일)</span>' : '') + '</div>' +
-            '<div style="font-size:10.5px;color:var(--text-dim);">593회 1·2등 26.3%(현행 헤지 25.0%)·OOS 22회 12적중 — <b>단 사후선택 후보라 아직 미승격</b>, 1441부터 실전 채점으로 판단</div></div>';
     // (v79: 트렌드 밴드 W25 박스·v61 겹침 박스 삭제 — 사용자 지시 "불필요한 정보")
     // (v80: 판세·🏆전체통계·✅아무등수·📉가뭄 2줄·📋안내줄 표시 제거 — 사용자 지시.
     //  동일 수치는 하단 통합표 요약줄에서 계속 확인 가능. acc 계산은 하단 표가 재사용하므로 유지.)
@@ -3303,30 +3293,30 @@ function render() {
         w60map[wr.round] = wr;
       }
     } catch (e) { console.error('W60 전이력 계산 실패:', e); }
-    // 요약 카운트 (접힌 상태에서도 보이게) — v82: 5+5 헤지 / v84: C2 병기 (사용자 지시)
+    // 요약 카운트 (접힌 상태에서도 보이게) — v85: C2(메인) + W9(참고) (사용자 지시)
     var q1 = 0, q2 = 0, q3 = 0, qm = 0, st = 0, x1 = 0, x2 = 0, x3 = 0;
     for (var kq = 0; kq < sorted.length; kq++) {
       var km = w60map[sorted[kq].round];
       if (!km) continue;
       st++;
-      if (km.hrank === 1) q1++;
-      else if (km.hrank === 2) q2++;
-      else if (km.hrank === 3) q3++;
+      if (km.crank === 1) q1++;
+      else if (km.crank === 2) q2++;
+      else if (km.crank === 3) q3++;
       else qm++;
-      if (km.crank === 1) x1++;
-      else if (km.crank === 2) x2++;
-      else if (km.crank === 3) x3++;
+      if (km.wrank === 1) x1++;
+      else if (km.wrank === 2) x2++;
+      else if (km.wrank === 3) x3++;
     }
     var pctOf = function (x) { return st > 0 ? ' (' + (x / st * 100).toFixed(1) + '%)' : ''; };
     var roundsHtml = '<details class="fold" open><summary>총 ' + sorted.length + '회차 · 검증 ' + st +
-      '회 — <span style="color:#c4b5fd;font-weight:800;">⚖️ 5+5:</span> <span class="w-r1">1등 ' + q1 + '회' + pctOf(q1) + '</span> · <span class="w-r2">2등 ' + q2 + '회' + pctOf(q2) +
+      '회 — <span style="color:#f5c542;font-weight:800;">⚡ C2:</span> <span class="w-r1">1등 ' + q1 + '회' + pctOf(q1) + '</span> · <span class="w-r2">2등 ' + q2 + '회' + pctOf(q2) +
       '</span> · <span class="w-r3">3등 ' + q3 + '회' + pctOf(q3) + '</span> · 미적중 ' + qm + '회' + pctOf(qm) +
-      ' · <span style="color:#c4b5fd;">1·2등 ' + (st > 0 ? ((q1 + q2) / st * 100).toFixed(1) : '-') + '%</span>' +
-      '<br><span style="color:#5eead4;font-weight:800;">🌀 C2:</span> <span class="w-r1">1등 ' + x1 + '회' + pctOf(x1) + '</span> · <span class="w-r2">2등 ' + x2 + '회' + pctOf(x2) +
+      ' · <span style="color:#f5c542;">1·2등 ' + (st > 0 ? ((q1 + q2) / st * 100).toFixed(1) : '-') + '%</span>' +
+      '<br><span style="color:#5eead4;font-weight:800;">🌀 W9:</span> <span class="w-r1">1등 ' + x1 + '회' + pctOf(x1) + '</span> · <span class="w-r2">2등 ' + x2 + '회' + pctOf(x2) +
       '</span> · <span class="w-r3">3등 ' + x3 + '회' + pctOf(x3) + '</span> · <span style="color:#5eead4;">1·2등 ' + (st > 0 ? ((x1 + x2) / st * 100).toFixed(1) : '-') + '%</span>' +
       ' <span style="font-weight:400;color:var(--text-dim)">(펼치기/접기)</span></summary>';
     roundsHtml += '<table class="rounds-table"><thead><tr>' +
-      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>5+5</th><th>결과</th><th>C2</th><th>결과</th><th></th></tr></thead><tbody>';
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>C2</th><th>결과</th><th>W9</th><th>결과</th><th></th></tr></thead><tbody>';
     // 중복 행 감지 (오름차순 기준 직전 회차와 3개 동일 → 뒤 회차가 오류)
     var dupSet = {};
     (function () {
@@ -3340,35 +3330,34 @@ function render() {
       var row = sorted[n];
       var wm = w60map[row.round];
       var dupMark = dupSet[row.round] ? ' <span title="' + dupSet[row.round] + '회와 완전 동일 — 입력 오류 의심, 신호 계산에서 자동 제외됨" style="cursor:help;">⚠️</span>' : '';
-      // v82: 5+5 헤지만 표시 (금색 셀 = 5+5 픽 안에서 나온 번호)
-      var inH = function (x) { return wm && wm.hd0 != null && x != null && ((x >= wm.hd0 && x <= wm.hd0 + 4) || (x >= wm.hs2 && x <= wm.hs2 + 4)); };
-      var cls1 = inH(row.first) ? ' rt-in' : '';
-      var cls2 = inH(row.second) ? ' rt-in' : '';
-      var cls3 = inH(row.third) ? ' rt-in' : '';
-      var hPick = (wm && wm.hd0 != null) ? '<span style="color:#c4b5fd;font-size:10.5px;white-space:nowrap;">' + wm.hd0 + '~' + (wm.hd0 + 4) + '+' + wm.hs2 + '~' + (wm.hs2 + 4) + '</span>' : '—';
-      var hRes;
-      if (!wm || wm.hd0 == null) hRes = '<span class="w-miss">—</span>';
-      else if (wm.hrank === 1) hRes = '<span class="w-r1">1등 ' + row.first + '</span>';
-      else if (wm.hrank === 2) hRes = '<span class="w-r2">2등 ' + row.second + '</span>';
-      else if (wm.hrank === 3) hRes = '<span class="w-r3">3등 ' + row.third + '</span>';
-      else hRes = '<span class="w-miss">×</span>';
-      // v84: C2 픽·결과
-      var cPick = (wm && wm.c2f != null) ? '<span style="color:#5eead4;font-size:10.5px;white-space:nowrap;">' + wm.hd0 + '~' + (wm.hd0 + 4) + '+' + wm.c2f + '~' + (wm.c2f + 4) + '</span>' : '—';
+      // v85: C2(메인)·W9(참고) 표시 (금색 셀 = C2 픽 안에서 나온 번호)
+      var inC = function (x) { return wm && wm.c2f != null && x != null && ((x >= wm.hd0 && x <= wm.hd0 + 4) || (x >= wm.c2f && x <= wm.c2f + 4)); };
+      var cls1 = inC(row.first) ? ' rt-in' : '';
+      var cls2 = inC(row.second) ? ' rt-in' : '';
+      var cls3 = inC(row.third) ? ' rt-in' : '';
+      var cPick = (wm && wm.c2f != null) ? '<span style="color:#f5c542;font-size:10.5px;white-space:nowrap;">' + wm.hd0 + '~' + (wm.hd0 + 4) + '+' + wm.c2f + '~' + (wm.c2f + 4) + '</span>' : '—';
       var cRes;
       if (!wm || wm.c2f == null) cRes = '<span class="w-miss">—</span>';
       else if (wm.crank === 1) cRes = '<span class="w-r1">1등 ' + row.first + '</span>';
       else if (wm.crank === 2) cRes = '<span class="w-r2">2등 ' + row.second + '</span>';
       else if (wm.crank === 3) cRes = '<span class="w-r3">3등 ' + row.third + '</span>';
       else cRes = '<span class="w-miss">×</span>';
+      var wPick = (wm && wm.w9 != null) ? '<span style="color:#5eead4;font-size:10.5px;white-space:nowrap;">' + wm.hd0 + '~' + (wm.hd0 + 4) + '+' + wm.w9 + '~' + (wm.w9 + 4) + '</span>' : '—';
+      var wRes9;
+      if (!wm || wm.w9 == null) wRes9 = '<span class="w-miss">—</span>';
+      else if (wm.wrank === 1) wRes9 = '<span class="w-r1">1등 ' + row.first + '</span>';
+      else if (wm.wrank === 2) wRes9 = '<span class="w-r2">2등 ' + row.second + '</span>';
+      else if (wm.wrank === 3) wRes9 = '<span class="w-r3">3등 ' + row.third + '</span>';
+      else wRes9 = '<span class="w-miss">×</span>';
       roundsHtml += '<tr>' +
         '<td class="rt-round">' + row.round + dupMark + '</td>' +
         '<td class="rt-n rt-1' + cls1 + '">' + row.first + '</td>' +
         '<td class="rt-n rt-2' + cls2 + '">' + row.second + '</td>' +
         '<td class="rt-n rt-3' + cls3 + '">' + row.third + '</td>' +
-        '<td>' + hPick + '</td>' +
-        '<td>' + hRes + '</td>' +
         '<td>' + cPick + '</td>' +
         '<td>' + cRes + '</td>' +
+        '<td>' + wPick + '</td>' +
+        '<td>' + wRes9 + '</td>' +
         '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +
         '</tr>';
     }

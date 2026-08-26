@@ -1306,7 +1306,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v93</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v94</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3267,7 +3267,7 @@ function render() {
           }
           if (sb == null) break;
           var nums = [];
-          for (var q3 = 0; q3 < list.length; q3++) {
+          for (var q3 = list.length - 1; q3 >= 0; q3--) {   // v94: 최근 당첨수부터 앞에 (사용자 지시)
             var fv = list[q3].first;
             if (fv != null && fv >= sb && fv <= sb + 9) nums.push(fv);
           }

@@ -1306,7 +1306,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v92</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v93</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3248,33 +3248,14 @@ function render() {
     //   전체 1·2등 26.4%·회수율 149% · 3분할 25.3/26.3/27.6 — 유일한 전 구간 25%+ & 최근 공동 1위 & 상승 추세.
     //   (W37 헤지는 중간 구간 19.7% 붕괴 전과 · W9은 합계 1위지만 우위가 중간 몰빵, 최근은 C2가 위)
     (function () {
-      var chipsM = '', kk;
-      for (kk = pr.d5_0; kk <= pr.d5_1; kk++) chipsM += '<span class="band-chip b1">' + kk + '</span>';
-      chipsM += '<span style="color:var(--text-dim);font-weight:800;margin:0 4px;">+</span>';
-      for (kk = pr.c2f_0; kk <= pr.c2f_0 + 4; kk++) chipsM += '<span class="band-chip b2">' + kk + '</span>';
-      html += '<div style="margin:0 0 10px;padding:14px 16px;border:2px solid rgba(245,197,66,0.75);background:rgba(245,197,66,0.10);border-radius:12px;box-shadow:0 0 14px rgba(245,197,66,0.15);">' +
-              '<div style="font-size:12px;font-weight:800;color:#f5c542;letter-spacing:0.5px;">⚡ C2 메인 — 최밀 5칸 + W15 2순위 5칸 (v85 승격)</div>' +
-              '<div style="font-size:28px;font-weight:800;color:#ffe9a8;margin:3px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.c2f_0 + '~' + (pr.c2f_0 + 4) + '</div>' +
-              '<div style="margin:4px 0 3px;">' + chipsM + '</div>' +
-              '<div style="font-size:10.5px;color:var(--text-dim);">595회 검증: <b>1·2등 26.4%</b>(랜덤 19.1%) · 1등 15.0% · 회수율 149% · 3분할 25.3/26.3/<b>27.6</b> — 전 구간 25%+ 유일·최근 1위·상승 추세</div></div>';
-      // 🌀 W9 변형 — 병행 채점 (참고)
-      var same9 = (pr.w9_0 === pr.c2f_0);
-      html += '<div style="margin:-4px 0 10px;padding:9px 13px;border:1px solid rgba(94,234,212,0.4);background:rgba(94,234,212,0.06);border-radius:10px;">' +
-              '<div style="font-size:11px;font-weight:800;color:#5eead4;">🌀 W9 변형 — 최밀 5칸 + W9 2순위 5칸 (참고 · 병행 채점)</div>' +
-              '<div style="font-size:20px;font-weight:800;color:#5eead4;margin:2px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.w9_0 + '~' + (pr.w9_0 + 4) +
-              (same9 ? ' <span style="font-size:11px;">(C2와 동일)</span>' : '') + '</div>' +
-              '<div style="font-size:10.5px;color:var(--text-dim);">전체 1·2등 27.1%·회수율 154%로 합계 1위지만 우위가 중간 구간(29.3%) 몰빵 — <b>최근 구간은 C2(27.6%)가 위</b>, 페어 36:32 동전던지기. 하단 표에서 병행 추적</div></div>';
-      // 📊 v92: 두 시계 구간 점수판 TOP3 (사용자 요청) — 앞단(W37)·뒷단(W15)이 어느 구간에서 나오는지 투명화
+      // v93: 시계별 1·2위 구간 + 실제 1등 번호 나열 (카드 안 표시, 사용자 지시)
       var cl2 = _cleanRows(rows);
-      var mkc = function (list) {
+      var zoneTop2 = function (list, excl) {
         var c = new Array(101).fill(0);
         for (var q2 = 0; q2 < list.length; q2++) if (list[q2].first != null) c[list[q2].first]++;
-        return c;
-      };
-      var top3 = function (c, excl) {
         var used = (excl != null) ? [excl] : [];
         var out = [];
-        for (var r3 = 0; r3 < 3; r3++) {
+        for (var r3 = 0; r3 < 2; r3++) {
           var b = -1, sb = null;
           for (var s = 1; s <= 91; s++) {
             var ok = true;
@@ -3285,25 +3266,46 @@ function render() {
             if (t > b) { b = t; sb = s; }
           }
           if (sb == null) break;
-          out.push([sb, b]);
+          var nums = [];
+          for (var q3 = 0; q3 < list.length; q3++) {
+            var fv = list[q3].first;
+            if (fv != null && fv >= sb && fv <= sb + 9) nums.push(fv);
+          }
+          out.push({ s: sb, n: b, nums: nums });
           used.push(sb);
         }
         return out;
       };
-      var fmt = function (arr, hi) {
-        var parts = [];
+      var zline = function (arr, col) {
+        var ps = [];
         for (var z = 0; z < arr.length; z++) {
-          var lab = (z + 1) + '위 ' + arr[z][0] + '~' + (arr[z][0] + 9) + ' (' + arr[z][1] + '개)';
-          parts.push(z === 0 ? '<b style="color:' + hi + ';">' + lab + '</b>' : lab);
+          var e = arr[z];
+          ps.push((z === 0 ? '<b style="color:' + col + '">1위 ' + e.s + '~' + (e.s + 9) + '</b>' : '<span style="color:var(--text-dim)">2위 ' + e.s + '~' + (e.s + 9) + '</span>') +
+                  ' <b style="color:var(--text);font-size:12.5px;">' + (e.nums.length ? e.nums.join('·') : '없음') + '</b> <span style="color:var(--text-dim)">(' + e.n + '개)</span>');
         }
-        return parts.join(' · ');
+        return ps.join('<br>');
       };
-      var t37 = top3(mkc(cl2.slice(-37)), null);
-      var t15 = top3(mkc(cl2.slice(-15)), pr.s0);
-      html += '<div style="margin:-4px 0 10px;padding:9px 13px;border:1px solid rgba(148,163,184,0.3);background:rgba(148,163,184,0.04);border-radius:10px;font-size:11.5px;color:var(--text-dim);line-height:1.8;">' +
-              '<b style="color:var(--text);">📊 구간 점수판</b><br>' +
-              '느린시계 W37 (앞단 담당): ' + fmt(t37, '#f5c542') + '<br>' +
-              '빠른시계 W15 (뒷단 담당·앵커 겹침 제외): ' + fmt(t15, '#5eead4') + '</div>';
+      var scC2 = '<div style="margin-top:9px;padding-top:8px;border-top:1px dashed rgba(245,197,66,0.35);font-size:11.5px;line-height:1.9;">' +
+                 '<div><span style="color:#f5c542;font-weight:800;">앞단 · 느린시계 W37</span><br>' + zline(zoneTop2(cl2.slice(-37), null), '#f5c542') + '</div>' +
+                 '<div style="margin-top:6px;"><span style="color:#5eead4;font-weight:800;">뒷단 · 빠른시계 W15</span> <span style="color:var(--text-dim);font-size:10px;">(앵커 겹침 제외)</span><br>' + zline(zoneTop2(cl2.slice(-15), pr.s0), '#5eead4') + '</div></div>';
+      var scW9 = '<div style="margin-top:8px;padding-top:7px;border-top:1px dashed rgba(94,234,212,0.35);font-size:11.5px;line-height:1.9;">' +
+                 '<span style="color:#5eead4;font-weight:800;">뒷단 · 빠른시계 W9</span> <span style="color:var(--text-dim);font-size:10px;">(앞단 W37은 위 카드와 동일)</span><br>' + zline(zoneTop2(cl2.slice(-9), pr.s0), '#5eead4') + '</div>';
+      var chipsM = '', kk;
+      for (kk = pr.d5_0; kk <= pr.d5_1; kk++) chipsM += '<span class="band-chip b1">' + kk + '</span>';
+      chipsM += '<span style="color:var(--text-dim);font-weight:800;margin:0 4px;">+</span>';
+      for (kk = pr.c2f_0; kk <= pr.c2f_0 + 4; kk++) chipsM += '<span class="band-chip b2">' + kk + '</span>';
+      html += '<div style="margin:0 0 10px;padding:14px 16px;border:2px solid rgba(245,197,66,0.75);background:rgba(245,197,66,0.10);border-radius:12px;box-shadow:0 0 14px rgba(245,197,66,0.15);">' +
+              '<div style="font-size:12px;font-weight:800;color:#f5c542;letter-spacing:0.5px;">⚡ C2 메인 — 최밀 5칸 + W15 2순위 5칸 (v85 승격)</div>' +
+              '<div style="font-size:28px;font-weight:800;color:#ffe9a8;margin:3px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.c2f_0 + '~' + (pr.c2f_0 + 4) + '</div>' +
+              '<div style="margin:4px 0 3px;">' + chipsM + '</div>' +
+              '<div style="font-size:10.5px;color:var(--text-dim);">595회 검증: <b>1·2등 26.4%</b>(랜덤 19.1%) · 1등 15.0% · 회수율 149% · 3분할 25.3/26.3/<b>27.6</b> — 전 구간 25%+ 유일·최근 1위·상승 추세</div>' + scC2 + '</div>';
+      // 🌀 W9 변형 — 병행 채점 (참고)
+      var same9 = (pr.w9_0 === pr.c2f_0);
+      html += '<div style="margin:-4px 0 10px;padding:9px 13px;border:1px solid rgba(94,234,212,0.4);background:rgba(94,234,212,0.06);border-radius:10px;">' +
+              '<div style="font-size:11px;font-weight:800;color:#5eead4;">🌀 W9 변형 — 최밀 5칸 + W9 2순위 5칸 (참고 · 병행 채점)</div>' +
+              '<div style="font-size:20px;font-weight:800;color:#5eead4;margin:2px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.w9_0 + '~' + (pr.w9_0 + 4) +
+              (same9 ? ' <span style="font-size:11px;">(C2와 동일)</span>' : '') + '</div>' +
+              '<div style="font-size:10.5px;color:var(--text-dim);">전체 1·2등 27.1%·회수율 154%로 합계 1위지만 우위가 중간 구간(29.3%) 몰빵 — <b>최근 구간은 C2(27.6%)가 위</b>, 페어 36:32 동전던지기. 하단 표에서 병행 추적</div>' + scW9 + '</div>';
     })();
     // (v79: 트렌드 밴드 W25 박스·v61 겹침 박스 삭제 — 사용자 지시 "불필요한 정보")
     // (v80: 판세·🏆전체통계·✅아무등수·📉가뭄 2줄·📋안내줄 표시 제거 — 사용자 지시.

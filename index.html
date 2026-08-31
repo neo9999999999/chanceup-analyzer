@@ -1307,7 +1307,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v99</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v100</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -1962,6 +1962,15 @@ function _predictW60Band(rounds) {
     for (var k = 0; k < 10; k++) t += c15[s + k];
     if (t > bf2) { bf2 = t; f20 = s; }
   }
+  // ★ v100: W15 차순위 존 (밴드·1위존과 비겹침) — 합의 회차의 뒷커버4 소스
+  var bf3 = -1, f22 = 1;
+  for (var s = 1; s <= 91; s++) {
+    if (!(s <= s0 - 10 || s >= s0 + 10)) continue;
+    if (!(s <= f20 - 10 || s >= f20 + 10)) continue;
+    var t = 0;
+    for (var k = 0; k < 10; k++) t += c15[s + k];
+    if (t > bf3) { bf3 = t; f22 = s; }
+  }
   // ★ v85: W9 변형용 — 2순위를 최근 9회 카운트로 (빠른 고원 W8~15의 다른 끝점, 병행 채점 참고용).
   var c9 = new Array(101).fill(0);
   var win9 = sorted.length >= 9 ? sorted.slice(-9) : sorted.slice();
@@ -1974,7 +1983,7 @@ function _predictW60Band(rounds) {
     if (t > bw9) { bw9 = t; w90 = s; }
   }
   return { s0: s0, s1: s0 + 9, score: best, s2_0: s20, s2_1: s20 + 9, score2: best2,
-           d5_0: d0, d5_1: d0 + 4, c2f_0: f20, w9_0: w90, windowSize: win.length, moveKey: s0 };
+           d5_0: d0, d5_1: d0 + 4, c2f_0: f20, c2f2_0: f22, w9_0: w90, windowSize: win.length, moveKey: s0 };
 }
 
 function _w60Accuracy(rounds, evalN) {
@@ -2017,29 +2026,34 @@ function _w60Accuracy(rounds, evalN) {
     var selrank = (selPick === 'C') ? crank : wrank;
     var c12 = (crank === 1 || crank === 2), w12 = (wrank === 1 || wrank === 2);
     if (pr.c2f_0 !== pr.w9_0 && c12 !== w12) duel.push(c12 ? 'C' : 'W');
-    // ★ v98 커버4 (사용자 지시 "커버는 4개"): 갈릴 땐 W9 뒷단 왼쪽4, 합의 시 밴드 반대쪽 앞 4칸.
-    //   640회 검증 상시14(10+커버4): 1·2등 34.1%·1등 19.4%·아무 41.9%·회수율 144.3%·회당 +6.13만.
-    var cov = [];
+    // ★ v100 커버 (사용자 지시 "앞단 뒷단 각 4개"): 앞커버4 = 밴드 반대쪽 앞 4칸(상시),
+    //   뒷커버4 = 갈릴 땐 W9 뒷단 왼쪽4 / 합의 시 W15 차순위 존 왼쪽4.
+    //   640회 검증 상시18(10+앞4+뒷4): 1·2등 40.5%·1등 23.8%·아무 48.8%·회수율 140.0%·회당 +7.12만
+    //   (한계기여: 앞커버 +1.06만/회 · 뒷커버 +1.31만/회 — 둘 다 확실한 플러스).
+    var covF = [];
+    for (var cv2 = pr.s0; cv2 <= pr.s1 && covF.length < 4; cv2++) if (cv2 < pr.d5_0 || cv2 > pr.d5_1) covF.push(cv2);
+    var covB = [];
     if (pr.c2f_0 !== pr.w9_0) {
-      for (var cv = pr.w9_0; cv <= pr.w9_0 + 3; cv++) cov.push(cv);
+      for (var cv = pr.w9_0; cv <= pr.w9_0 + 3; cv++) covB.push(cv);
     } else {
-      for (var cv2 = pr.s0; cv2 <= pr.s1 && cov.length < 4; cv2++) if (cv2 < pr.d5_0 || cv2 > pr.d5_1) cov.push(cv2);
+      for (var cv3 = pr.c2f2_0; cv3 <= pr.c2f2_0 + 3; cv3++) covB.push(cv3);
     }
-    var inCov = function(x) { return x != null && cov.indexOf(x) >= 0; };
+    var inCov = function(x) { return x != null && (covF.indexOf(x) >= 0 || covB.indexOf(x) >= 0); };
     var covrank = 0;
     if (inCov(row.first)) covrank = 1;
     else if (inCov(row.second)) covrank = 2;
     else if (inCov(row.third)) covrank = 3;
-    var in14 = function(x) { return inC(x) || inCov(x); };
+    var in18 = function(x) { return inC(x) || inCov(x); };
     var rank14 = 0;
-    if (in14(row.first)) rank14 = 1;
-    else if (in14(row.second)) rank14 = 2;
-    else if (in14(row.third)) rank14 = 3;
+    if (in18(row.first)) rank14 = 1;
+    else if (in18(row.second)) rank14 = 2;
+    else if (in18(row.third)) rank14 = 3;
     tot++;
     recent.push({ round: row.round, first: row.first, second: row.second, third: row.third,
                   rank: rank, hit: rank === 1, s0: pr.s0, s1: pr.s1, predStart: pr.s0,
                   hd0: pr.d5_0, c2f: pr.c2f_0, crank: crank, w9: pr.w9_0, wrank: wrank,
-                  sel: selPick, selrank: selrank, cov: cov.join('·'), covrank: covrank, rank14: rank14 });
+                  sel: selPick, selrank: selrank,
+                  cov: '앞' + covF.join('·') + ' 뒤' + covB.join('·'), covrank: covrank, rank14: rank14 });
   }
   return { hit: hit, hit2: hit2, hit3: hit3, tot: tot, recent: recent };
 }
@@ -3297,19 +3311,22 @@ function render() {
       // 🧩 v97: 커버 +5 (사용자 지시) — 갈릴 땐 상대 뒷단, 합의 시엔 밴드 반대쪽 5칸.
       //   640회 검증 "10개+커버5 상시 15": 1·2등 35.6%·1등 20.5%·아무 43.4%·회수율 143.2%·회당 +6.37만
       //   (10개 +4.75만, 유니온 +5.63만) — 기대순익까지 최고라 커버 정의로 채택.
-      var coverC2 = [], coverW9 = [], kc;
+      // v100: 앞커버4(밴드 반대쪽, 공통) + 뒷커버4(갈릴 땐 상대 뒷단, 합의 시 W15 차순위 존)
+      var covFront = [], covBackC2 = [], covBackW9 = [], kc;
+      for (kc = pr.s0; kc <= pr.s1 && covFront.length < 4; kc++) if (kc < pr.d5_0 || kc > pr.d5_1) covFront.push(kc);
       if (pr.c2f_0 !== pr.w9_0) {
-        for (kc = pr.w9_0; kc <= pr.w9_0 + 3; kc++) coverC2.push(kc);
-        for (kc = pr.c2f_0; kc <= pr.c2f_0 + 3; kc++) coverW9.push(kc);
+        for (kc = pr.w9_0; kc <= pr.w9_0 + 3; kc++) covBackC2.push(kc);
+        for (kc = pr.c2f_0; kc <= pr.c2f_0 + 3; kc++) covBackW9.push(kc);
       } else {
-        for (kc = pr.s0; kc <= pr.s1 && coverC2.length < 4; kc++) if (kc < pr.d5_0 || kc > pr.d5_1) coverC2.push(kc);
-        coverW9 = coverC2.slice();
+        for (kc = pr.c2f2_0; kc <= pr.c2f2_0 + 3; kc++) covBackC2.push(kc);
+        covBackW9 = covBackC2.slice();
       }
-      var coverChips = function (arr) {
-        var s = '<span style="font-size:10px;color:var(--text-dim);font-weight:700;margin-right:4px;">커버 +4</span>';
+      var coverChips = function (label, arr) {
+        var s = '<span style="font-size:10px;color:var(--text-dim);font-weight:700;margin-right:4px;">' + label + '</span>';
         for (var q4 = 0; q4 < arr.length; q4++) s += '<span class="band-chip b3">' + arr[q4] + '</span>';
         return s;
       };
+      var coverC2 = covFront.concat(covBackC2);   // 🛡️ 박스용 합본
       // v93: 시계별 1·2위 구간 + 실제 1등 번호 나열 (카드 안 표시, 사용자 지시)
       var cl2 = _cleanRows(rows);
       var zoneTop2 = function (list, excl) {
@@ -3360,7 +3377,8 @@ function render() {
               '<div style="font-size:12px;font-weight:800;color:#f5c542;letter-spacing:0.5px;">⚡ C2 메인 — 최밀 5칸 + W15 2순위 5칸' + (selC ? badge : '') + '</div>' +
               '<div style="font-size:28px;font-weight:800;color:#ffe9a8;margin:3px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.c2f_0 + '~' + (pr.c2f_0 + 4) + '</div>' +
               '<div style="margin:4px 0 3px;">' + chipsM + '</div>' +
-              '<div style="margin:2px 0 4px;">' + coverChips(coverC2) + '</div>' +
+              '<div style="margin:2px 0 2px;">' + coverChips('앞커버 +4', covFront) + '</div>' +
+              '<div style="margin:0 0 4px;">' + coverChips('뒷커버 +4', covBackC2) + '</div>' +
               '<div style="font-size:10.5px;color:var(--text-dim);">595회 검증: <b>1·2등 26.4%</b>(랜덤 19.1%) · 1등 15.0% · 회수율 149% · 3분할 25.3/26.3/<b>27.6</b> — 전 구간 25%+ 유일·최근 1위·상승 추세</div>' + scC2 + '</div>';
       // 🌀 W9 변형 — 병행 채점 (참고)
       var same9 = (pr.w9_0 === pr.c2f_0);
@@ -3368,7 +3386,8 @@ function render() {
               '<div style="font-size:11px;font-weight:800;color:#5eead4;">🌀 W9 변형 — 최밀 5칸 + W9 2순위 5칸' + (selC ? ' (참고 · 병행 채점)' : badge) + '</div>' +
               '<div style="font-size:20px;font-weight:800;color:#5eead4;margin:2px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.w9_0 + '~' + (pr.w9_0 + 4) +
               (same9 ? ' <span style="font-size:11px;">(C2와 동일)</span>' : '') + '</div>' +
-              '<div style="margin:2px 0 4px;">' + coverChips(coverW9) + '</div>' +
+              '<div style="margin:2px 0 2px;">' + coverChips('앞커버 +4', covFront) + '</div>' +
+              '<div style="margin:0 0 4px;">' + coverChips('뒷커버 +4', covBackW9) + '</div>' +
               '<div style="font-size:10.5px;color:var(--text-dim);">전체 1·2등 27.1%·회수율 154%로 합계 1위지만 우위가 중간 구간(29.3%) 몰빵 — <b>최근 구간은 C2(27.6%)가 위</b>, 페어 36:32 동전던지기. 하단 표에서 병행 추적</div>' + scW9 + '</div>';
       // 🛡️ v96: 미발생 저감 15개 (유니온 C2∪W9) — 640회 검증 채택기준 전 지표 통과로 자율 반영 (2026-08-26 사용자 위임).
       //   1·2등 31.9%(C2 26.1)·아무 39.4%(32.7)·1등 17.8%(14.5)·전/후반 32.2/31.6·회수율 144.2%.
@@ -3384,13 +3403,9 @@ function render() {
         var chipsU = '';
         for (kk = 0; kk < arr.length; kk++) chipsU += '<span class="band-chip ' + (arr[kk] >= pr.d5_0 && arr[kk] <= pr.d5_1 ? 'b1' : (coverC2.indexOf(arr[kk]) >= 0 ? 'b3' : 'b2')) + '">' + arr[kk] + '</span>';
         html += '<div style="margin:-4px 0 10px;padding:11px 14px;border:1px solid rgba(226,232,240,0.35);background:rgba(226,232,240,0.05);border-radius:10px;">' +
-                '<div style="font-size:11px;font-weight:800;color:#e2e8f0;">🛡️ 미발생 저감 모드 — 상시 ' + arr.length + '개 (10개 + 커버4)</div>' +
+                '<div style="font-size:11px;font-weight:800;color:#e2e8f0;">🛡️ 미발생 저감 모드 — 상시 ' + arr.length + '개 (10 + 앞커버4 + 뒷커버4)</div>' +
                 '<div style="margin:4px 0 3px;">' + chipsU + '</div>' +
-                '<div style="font-size:10.5px;color:var(--text-dim);">640회 검증: <b>1·2등 34.1%</b>(10개 26.1%) · 1등 19.4% · 회수율 144.3% · 회당 +6.1만 — ' +
-                (pr.c2f_0 === pr.w9_0 ?
-                 '<b style="color:#6ee7b7;">이번 회차는 합의 회차: +4 기여 +1.4만/회로 확실한 이득 — 여유 있으면 14개 강추</b>' :
-                 '<b>이번 회차는 갈린 회차: +4 기여 +0.2만/회로 미미 — 예산 없으면 🎯 배지 10개로 충분</b>') +
-                '</div></div>';
+                '<div style="font-size:10.5px;color:var(--text-dim);">640회 검증: <b>1·2등 40.5%</b>(10개 26.1%) · 1등 23.8% · 아무등수 48.8% · 회수율 140.0% · <b>회당 기대순익 +7.1만 (최고)</b> — 한계기여 앞커버 +1.1만·뒷커버 +1.3만, 둘 다 플러스. 예산 순: 10개(배지) → 18개(이 박스)</div></div>';
       })();
     })();
     // (v79: 트렌드 밴드 W25 박스·v61 겹침 박스 삭제 — 사용자 지시 "불필요한 정보")
@@ -3451,7 +3466,7 @@ function render() {
       ' · <span style="color:#e2e8f0;font-weight:800;">🛡️ 상시14: 1등 ' + cv1 + '회 · 1·2등 ' + (st > 0 ? (cv12 / st * 100).toFixed(1) : '-') + '%</span>' +
       ' <span style="font-weight:400;color:var(--text-dim)">(펼치기/접기)</span></summary>';
     roundsHtml += '<table class="rounds-table"><thead><tr>' +
-      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>C2</th><th>결과</th><th>W9</th><th>결과</th><th>🎯셀렉터</th><th>커버4</th><th>결과</th><th></th></tr></thead><tbody>';
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>C2</th><th>결과</th><th>W9</th><th>결과</th><th>🎯셀렉터</th><th>커버(앞+뒤)</th><th>결과</th><th></th></tr></thead><tbody>';
     // 중복 행 감지 (오름차순 기준 직전 회차와 3개 동일 → 뒤 회차가 오류)
     var dupSet = {};
     (function () {

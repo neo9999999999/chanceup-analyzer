@@ -1306,7 +1306,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v95</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v96</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3333,6 +3333,27 @@ function render() {
               '<div style="font-size:20px;font-weight:800;color:#5eead4;margin:2px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.w9_0 + '~' + (pr.w9_0 + 4) +
               (same9 ? ' <span style="font-size:11px;">(C2와 동일)</span>' : '') + '</div>' +
               '<div style="font-size:10.5px;color:var(--text-dim);">전체 1·2등 27.1%·회수율 154%로 합계 1위지만 우위가 중간 구간(29.3%) 몰빵 — <b>최근 구간은 C2(27.6%)가 위</b>, 페어 36:32 동전던지기. 하단 표에서 병행 추적</div>' + scW9 + '</div>';
+      // 🛡️ v96: 미발생 저감 15개 (유니온 C2∪W9) — 640회 검증 채택기준 전 지표 통과로 자율 반영 (2026-08-26 사용자 위임).
+      //   1·2등 31.9%(C2 26.1)·아무 39.4%(32.7)·1등 17.8%(14.5)·전/후반 32.2/31.6·회수율 144.2%.
+      //   회당 기대순익 +5.7만으로 10개와 동일 — 지출(15만)로 적중 빈도를 사는 구조. 두 시계 합의 시엔 10개=15개.
+      (function () {
+        var uni = {};
+        var kk;
+        for (kk = pr.d5_0; kk <= pr.d5_1; kk++) uni[kk] = 1;
+        for (kk = pr.c2f_0; kk <= pr.c2f_0 + 4; kk++) uni[kk] = 1;
+        for (kk = pr.w9_0; kk <= pr.w9_0 + 4; kk++) uni[kk] = 1;
+        var arr = Object.keys(uni).map(Number).sort(function (a, b) { return a - b; });
+        var chipsU = '';
+        for (kk = 0; kk < arr.length; kk++) chipsU += '<span class="band-chip ' + (arr[kk] >= pr.d5_0 && arr[kk] <= pr.d5_1 ? 'b1' : 'b2') + '">' + arr[kk] + '</span>';
+        var sameAll = (pr.c2f_0 === pr.w9_0);
+        html += '<div style="margin:-4px 0 10px;padding:11px 14px;border:1px solid rgba(226,232,240,0.35);background:rgba(226,232,240,0.05);border-radius:10px;">' +
+                '<div style="font-size:11px;font-weight:800;color:#e2e8f0;">🛡️ 미발생 저감 모드 — ' + arr.length + '개 매수 (C2∪W9)</div>' +
+                '<div style="margin:4px 0 3px;">' + chipsU + '</div>' +
+                '<div style="font-size:10.5px;color:var(--text-dim);">' +
+                (sameAll ? '이번 회차는 두 시계 합의 — <b>10개가 곧 15개 효과</b>, 추가 매수 불필요' :
+                 '640회 검증: <b>1·2등 31.9%</b>(10개 26.1%)·아무등수 39.4%·1등 17.8%·회수율 144% — 회당 15만으로 기대순익은 10개와 동일(+5.7만), <b>미발생 빈도만 60.6%로 감소</b>. 예산 되는 회차에 사용') +
+                '</div></div>';
+      })();
     })();
     // (v79: 트렌드 밴드 W25 박스·v61 겹침 박스 삭제 — 사용자 지시 "불필요한 정보")
     // (v80: 판세·🏆전체통계·✅아무등수·📉가뭄 2줄·📋안내줄 표시 제거 — 사용자 지시.

@@ -532,6 +532,7 @@ body.food .flow-step.repeat-3    { background: rgba(52, 211, 153, 0.1); }
 .band-chip { display: inline-block; border-radius: 6px; padding: 1px 7px; margin: 2px 2px; font-weight: 700; font-size: 14px; }
 .band-chip.b1 { background: rgba(245,197,66,.16); border: 1px solid rgba(245,197,66,.55); color: #f5c542; }
 .band-chip.b2 { background: rgba(148,163,184,.14); border: 1px solid rgba(148,163,184,.5); color: #cbd5e1; }
+.band-chip.b3 { background: rgba(148,163,184,.08); border: 1px dashed rgba(148,163,184,.45); color: #94a3b8; }  /* v97: 커버 +5 */
 /* 열고 닫기 (details/summary) */
 details.fold { margin: 10px 0; }
 details.fold summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--accent, #e0b352);
@@ -1306,7 +1307,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v96</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v97</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3275,6 +3276,22 @@ function render() {
         selC = selCw >= selWw;
       })();
       var badge = '<span style="background:' + (selC ? '#f5c542' : '#5eead4') + ';color:#0a0a0b;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:800;margin-left:6px;vertical-align:middle;">🎯 강력추천 (갈린 최근5회 ' + (selC ? selCw + ':' + selWw : selWw + ':' + selCw) + ')</span>';
+      // 🧩 v97: 커버 +5 (사용자 지시) — 갈릴 땐 상대 뒷단, 합의 시엔 밴드 반대쪽 5칸.
+      //   640회 검증 "10개+커버5 상시 15": 1·2등 35.6%·1등 20.5%·아무 43.4%·회수율 143.2%·회당 +6.37만
+      //   (10개 +4.75만, 유니온 +5.63만) — 기대순익까지 최고라 커버 정의로 채택.
+      var coverC2 = [], coverW9 = [], kc;
+      if (pr.c2f_0 !== pr.w9_0) {
+        for (kc = pr.w9_0; kc <= pr.w9_0 + 4; kc++) coverC2.push(kc);
+        for (kc = pr.c2f_0; kc <= pr.c2f_0 + 4; kc++) coverW9.push(kc);
+      } else {
+        for (kc = pr.s0; kc <= pr.s1; kc++) if (kc < pr.d5_0 || kc > pr.d5_1) coverC2.push(kc);
+        coverW9 = coverC2.slice();
+      }
+      var coverChips = function (arr) {
+        var s = '<span style="font-size:10px;color:var(--text-dim);font-weight:700;margin-right:4px;">커버 +5</span>';
+        for (var q4 = 0; q4 < arr.length; q4++) s += '<span class="band-chip b3">' + arr[q4] + '</span>';
+        return s;
+      };
       // v93: 시계별 1·2위 구간 + 실제 1등 번호 나열 (카드 안 표시, 사용자 지시)
       var cl2 = _cleanRows(rows);
       var zoneTop2 = function (list, excl) {
@@ -3325,6 +3342,7 @@ function render() {
               '<div style="font-size:12px;font-weight:800;color:#f5c542;letter-spacing:0.5px;">⚡ C2 메인 — 최밀 5칸 + W15 2순위 5칸' + (selC ? badge : '') + '</div>' +
               '<div style="font-size:28px;font-weight:800;color:#ffe9a8;margin:3px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.c2f_0 + '~' + (pr.c2f_0 + 4) + '</div>' +
               '<div style="margin:4px 0 3px;">' + chipsM + '</div>' +
+              '<div style="margin:2px 0 4px;">' + coverChips(coverC2) + '</div>' +
               '<div style="font-size:10.5px;color:var(--text-dim);">595회 검증: <b>1·2등 26.4%</b>(랜덤 19.1%) · 1등 15.0% · 회수율 149% · 3분할 25.3/26.3/<b>27.6</b> — 전 구간 25%+ 유일·최근 1위·상승 추세</div>' + scC2 + '</div>';
       // 🌀 W9 변형 — 병행 채점 (참고)
       var same9 = (pr.w9_0 === pr.c2f_0);
@@ -3332,27 +3350,25 @@ function render() {
               '<div style="font-size:11px;font-weight:800;color:#5eead4;">🌀 W9 변형 — 최밀 5칸 + W9 2순위 5칸' + (selC ? ' (참고 · 병행 채점)' : badge) + '</div>' +
               '<div style="font-size:20px;font-weight:800;color:#5eead4;margin:2px 0;">' + pr.d5_0 + '~' + pr.d5_1 + ' + ' + pr.w9_0 + '~' + (pr.w9_0 + 4) +
               (same9 ? ' <span style="font-size:11px;">(C2와 동일)</span>' : '') + '</div>' +
+              '<div style="margin:2px 0 4px;">' + coverChips(coverW9) + '</div>' +
               '<div style="font-size:10.5px;color:var(--text-dim);">전체 1·2등 27.1%·회수율 154%로 합계 1위지만 우위가 중간 구간(29.3%) 몰빵 — <b>최근 구간은 C2(27.6%)가 위</b>, 페어 36:32 동전던지기. 하단 표에서 병행 추적</div>' + scW9 + '</div>';
       // 🛡️ v96: 미발생 저감 15개 (유니온 C2∪W9) — 640회 검증 채택기준 전 지표 통과로 자율 반영 (2026-08-26 사용자 위임).
       //   1·2등 31.9%(C2 26.1)·아무 39.4%(32.7)·1등 17.8%(14.5)·전/후반 32.2/31.6·회수율 144.2%.
       //   회당 기대순익 +5.7만으로 10개와 동일 — 지출(15만)로 적중 빈도를 사는 구조. 두 시계 합의 시엔 10개=15개.
       (function () {
+        // v97: 상시 15 = C2 10개 + 커버5 (갈릴 땐 W9 뒷단, 합의 시 밴드 반대쪽) — 640회 검증 전 지표 1위
         var uni = {};
         var kk;
         for (kk = pr.d5_0; kk <= pr.d5_1; kk++) uni[kk] = 1;
         for (kk = pr.c2f_0; kk <= pr.c2f_0 + 4; kk++) uni[kk] = 1;
-        for (kk = pr.w9_0; kk <= pr.w9_0 + 4; kk++) uni[kk] = 1;
+        for (kk = 0; kk < coverC2.length; kk++) uni[coverC2[kk]] = 1;
         var arr = Object.keys(uni).map(Number).sort(function (a, b) { return a - b; });
         var chipsU = '';
-        for (kk = 0; kk < arr.length; kk++) chipsU += '<span class="band-chip ' + (arr[kk] >= pr.d5_0 && arr[kk] <= pr.d5_1 ? 'b1' : 'b2') + '">' + arr[kk] + '</span>';
-        var sameAll = (pr.c2f_0 === pr.w9_0);
+        for (kk = 0; kk < arr.length; kk++) chipsU += '<span class="band-chip ' + (arr[kk] >= pr.d5_0 && arr[kk] <= pr.d5_1 ? 'b1' : (coverC2.indexOf(arr[kk]) >= 0 ? 'b3' : 'b2')) + '">' + arr[kk] + '</span>';
         html += '<div style="margin:-4px 0 10px;padding:11px 14px;border:1px solid rgba(226,232,240,0.35);background:rgba(226,232,240,0.05);border-radius:10px;">' +
-                '<div style="font-size:11px;font-weight:800;color:#e2e8f0;">🛡️ 미발생 저감 모드 — ' + arr.length + '개 매수 (C2∪W9)</div>' +
+                '<div style="font-size:11px;font-weight:800;color:#e2e8f0;">🛡️ 미발생 저감 모드 — 상시 ' + arr.length + '개 (10개 + 커버5)</div>' +
                 '<div style="margin:4px 0 3px;">' + chipsU + '</div>' +
-                '<div style="font-size:10.5px;color:var(--text-dim);">' +
-                (sameAll ? '이번 회차는 두 시계 합의 — <b>10개가 곧 15개 효과</b>, 추가 매수 불필요' :
-                 '640회 검증: <b>1·2등 31.9%</b>(10개 26.1%)·아무등수 39.4%·1등 17.8%·회수율 144% — 회당 15만으로 기대순익은 10개와 동일(+5.7만), <b>미발생 빈도만 60.6%로 감소</b>. 예산 되는 회차에 사용') +
-                '</div></div>';
+                '<div style="font-size:10.5px;color:var(--text-dim);">640회 검증: <b>1·2등 35.6%</b>(10개 26.1%) · 1등 20.5% · 아무등수 43.4% · 회수율 143.2% · <b>회당 기대순익 +6.4만 — 10개(+4.8만)보다 높음</b>. 예산 되는 회차엔 이 15개가 최선</div></div>';
       })();
     })();
     // (v79: 트렌드 밴드 W25 박스·v61 겹침 박스 삭제 — 사용자 지시 "불필요한 정보")

@@ -1307,7 +1307,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v98</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v99</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -3386,7 +3386,11 @@ function render() {
         html += '<div style="margin:-4px 0 10px;padding:11px 14px;border:1px solid rgba(226,232,240,0.35);background:rgba(226,232,240,0.05);border-radius:10px;">' +
                 '<div style="font-size:11px;font-weight:800;color:#e2e8f0;">🛡️ 미발생 저감 모드 — 상시 ' + arr.length + '개 (10개 + 커버4)</div>' +
                 '<div style="margin:4px 0 3px;">' + chipsU + '</div>' +
-                '<div style="font-size:10.5px;color:var(--text-dim);">640회 검증: <b>1·2등 34.1%</b>(10개 26.1%) · 1등 19.4% · 아무등수 41.9% · 회수율 144.3% · <b>회당 기대순익 +6.1만 — 10개(+4.8만)보다 높음</b>. 예산 되는 회차엔 이 구성이 최선</div></div>';
+                '<div style="font-size:10.5px;color:var(--text-dim);">640회 검증: <b>1·2등 34.1%</b>(10개 26.1%) · 1등 19.4% · 회수율 144.3% · 회당 +6.1만 — ' +
+                (pr.c2f_0 === pr.w9_0 ?
+                 '<b style="color:#6ee7b7;">이번 회차는 합의 회차: +4 기여 +1.4만/회로 확실한 이득 — 여유 있으면 14개 강추</b>' :
+                 '<b>이번 회차는 갈린 회차: +4 기여 +0.2만/회로 미미 — 예산 없으면 🎯 배지 10개로 충분</b>') +
+                '</div></div>';
       })();
     })();
     // (v79: 트렌드 밴드 W25 박스·v61 겹침 박스 삭제 — 사용자 지시 "불필요한 정보")

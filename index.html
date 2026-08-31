@@ -1307,7 +1307,7 @@ tr.topfreq-rank-top3 .col-num {
 <div class="container" id="main-content">
   <div class="header">
     <div class="eyebrow">CHANCEUP ANALYZER</div>
-    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v97</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
+    <h1>찬스업 당첨 분석기 <span id="app-ver" style="font-size:11px;font-weight:600;color:var(--text-dim);vertical-align:middle;">v98</span> <span id="app-fp" style="font-size:11px;font-weight:600;color:#7dd3fc;vertical-align:middle;"></span></h1>
     <div class="sync-status" id="sync-status">
       <span class="sync-dot"></span>
       <span class="sync-text">연결 중...</span>
@@ -2017,11 +2017,29 @@ function _w60Accuracy(rounds, evalN) {
     var selrank = (selPick === 'C') ? crank : wrank;
     var c12 = (crank === 1 || crank === 2), w12 = (wrank === 1 || wrank === 2);
     if (pr.c2f_0 !== pr.w9_0 && c12 !== w12) duel.push(c12 ? 'C' : 'W');
+    // ★ v98 커버4 (사용자 지시 "커버는 4개"): 갈릴 땐 W9 뒷단 왼쪽4, 합의 시 밴드 반대쪽 앞 4칸.
+    //   640회 검증 상시14(10+커버4): 1·2등 34.1%·1등 19.4%·아무 41.9%·회수율 144.3%·회당 +6.13만.
+    var cov = [];
+    if (pr.c2f_0 !== pr.w9_0) {
+      for (var cv = pr.w9_0; cv <= pr.w9_0 + 3; cv++) cov.push(cv);
+    } else {
+      for (var cv2 = pr.s0; cv2 <= pr.s1 && cov.length < 4; cv2++) if (cv2 < pr.d5_0 || cv2 > pr.d5_1) cov.push(cv2);
+    }
+    var inCov = function(x) { return x != null && cov.indexOf(x) >= 0; };
+    var covrank = 0;
+    if (inCov(row.first)) covrank = 1;
+    else if (inCov(row.second)) covrank = 2;
+    else if (inCov(row.third)) covrank = 3;
+    var in14 = function(x) { return inC(x) || inCov(x); };
+    var rank14 = 0;
+    if (in14(row.first)) rank14 = 1;
+    else if (in14(row.second)) rank14 = 2;
+    else if (in14(row.third)) rank14 = 3;
     tot++;
     recent.push({ round: row.round, first: row.first, second: row.second, third: row.third,
                   rank: rank, hit: rank === 1, s0: pr.s0, s1: pr.s1, predStart: pr.s0,
                   hd0: pr.d5_0, c2f: pr.c2f_0, crank: crank, w9: pr.w9_0, wrank: wrank,
-                  sel: selPick, selrank: selrank });
+                  sel: selPick, selrank: selrank, cov: cov.join('·'), covrank: covrank, rank14: rank14 });
   }
   return { hit: hit, hit2: hit2, hit3: hit3, tot: tot, recent: recent };
 }
@@ -3281,14 +3299,14 @@ function render() {
       //   (10개 +4.75만, 유니온 +5.63만) — 기대순익까지 최고라 커버 정의로 채택.
       var coverC2 = [], coverW9 = [], kc;
       if (pr.c2f_0 !== pr.w9_0) {
-        for (kc = pr.w9_0; kc <= pr.w9_0 + 4; kc++) coverC2.push(kc);
-        for (kc = pr.c2f_0; kc <= pr.c2f_0 + 4; kc++) coverW9.push(kc);
+        for (kc = pr.w9_0; kc <= pr.w9_0 + 3; kc++) coverC2.push(kc);
+        for (kc = pr.c2f_0; kc <= pr.c2f_0 + 3; kc++) coverW9.push(kc);
       } else {
-        for (kc = pr.s0; kc <= pr.s1; kc++) if (kc < pr.d5_0 || kc > pr.d5_1) coverC2.push(kc);
+        for (kc = pr.s0; kc <= pr.s1 && coverC2.length < 4; kc++) if (kc < pr.d5_0 || kc > pr.d5_1) coverC2.push(kc);
         coverW9 = coverC2.slice();
       }
       var coverChips = function (arr) {
-        var s = '<span style="font-size:10px;color:var(--text-dim);font-weight:700;margin-right:4px;">커버 +5</span>';
+        var s = '<span style="font-size:10px;color:var(--text-dim);font-weight:700;margin-right:4px;">커버 +4</span>';
         for (var q4 = 0; q4 < arr.length; q4++) s += '<span class="band-chip b3">' + arr[q4] + '</span>';
         return s;
       };
@@ -3366,9 +3384,9 @@ function render() {
         var chipsU = '';
         for (kk = 0; kk < arr.length; kk++) chipsU += '<span class="band-chip ' + (arr[kk] >= pr.d5_0 && arr[kk] <= pr.d5_1 ? 'b1' : (coverC2.indexOf(arr[kk]) >= 0 ? 'b3' : 'b2')) + '">' + arr[kk] + '</span>';
         html += '<div style="margin:-4px 0 10px;padding:11px 14px;border:1px solid rgba(226,232,240,0.35);background:rgba(226,232,240,0.05);border-radius:10px;">' +
-                '<div style="font-size:11px;font-weight:800;color:#e2e8f0;">🛡️ 미발생 저감 모드 — 상시 ' + arr.length + '개 (10개 + 커버5)</div>' +
+                '<div style="font-size:11px;font-weight:800;color:#e2e8f0;">🛡️ 미발생 저감 모드 — 상시 ' + arr.length + '개 (10개 + 커버4)</div>' +
                 '<div style="margin:4px 0 3px;">' + chipsU + '</div>' +
-                '<div style="font-size:10.5px;color:var(--text-dim);">640회 검증: <b>1·2등 35.6%</b>(10개 26.1%) · 1등 20.5% · 아무등수 43.4% · 회수율 143.2% · <b>회당 기대순익 +6.4만 — 10개(+4.8만)보다 높음</b>. 예산 되는 회차엔 이 15개가 최선</div></div>';
+                '<div style="font-size:10.5px;color:var(--text-dim);">640회 검증: <b>1·2등 34.1%</b>(10개 26.1%) · 1등 19.4% · 아무등수 41.9% · 회수율 144.3% · <b>회당 기대순익 +6.1만 — 10개(+4.8만)보다 높음</b>. 예산 되는 회차엔 이 구성이 최선</div></div>';
       })();
     })();
     // (v79: 트렌드 밴드 W25 박스·v61 겹침 박스 삭제 — 사용자 지시 "불필요한 정보")
@@ -3401,7 +3419,7 @@ function render() {
       }
     } catch (e) { console.error('W60 전이력 계산 실패:', e); }
     // 요약 카운트 (접힌 상태에서도 보이게) — v85: C2(메인) + W9(참고) (사용자 지시)
-    var q1 = 0, q2 = 0, q3 = 0, qm = 0, st = 0, x1 = 0, x2 = 0, x3 = 0, sl1 = 0, sl12 = 0;
+    var q1 = 0, q2 = 0, q3 = 0, qm = 0, st = 0, x1 = 0, x2 = 0, x3 = 0, sl1 = 0, sl12 = 0, cv1 = 0, cv12 = 0;
     for (var kq = 0; kq < sorted.length; kq++) {
       var km = w60map[sorted[kq].round];
       if (!km) continue;
@@ -3415,6 +3433,8 @@ function render() {
       else if (km.wrank === 3) x3++;
       if (km.selrank === 1) sl1++;
       if (km.selrank === 1 || km.selrank === 2) sl12++;
+      if (km.rank14 === 1) cv1++;
+      if (km.rank14 === 1 || km.rank14 === 2) cv12++;
     }
     var pctOf = function (x) { return st > 0 ? ' (' + (x / st * 100).toFixed(1) + '%)' : ''; };
     var roundsHtml = '<details class="fold" open><summary>총 ' + sorted.length + '회차 · 검증 ' + st +
@@ -3424,9 +3444,10 @@ function render() {
       '<br><span style="color:#5eead4;font-weight:800;">🌀 W9:</span> <span class="w-r1">1등 ' + x1 + '회' + pctOf(x1) + '</span> · <span class="w-r2">2등 ' + x2 + '회' + pctOf(x2) +
       '</span> · <span class="w-r3">3등 ' + x3 + '회' + pctOf(x3) + '</span> · <span style="color:#5eead4;">1·2등 ' + (st > 0 ? ((x1 + x2) / st * 100).toFixed(1) : '-') + '%</span>' +
       ' · <span style="color:#fbbf24;font-weight:800;">🎯 셀렉터: 1등 ' + sl1 + '회 · 1·2등 ' + (st > 0 ? (sl12 / st * 100).toFixed(1) : '-') + '%</span>' +
+      ' · <span style="color:#e2e8f0;font-weight:800;">🛡️ 상시14: 1등 ' + cv1 + '회 · 1·2등 ' + (st > 0 ? (cv12 / st * 100).toFixed(1) : '-') + '%</span>' +
       ' <span style="font-weight:400;color:var(--text-dim)">(펼치기/접기)</span></summary>';
     roundsHtml += '<table class="rounds-table"><thead><tr>' +
-      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>C2</th><th>결과</th><th>W9</th><th>결과</th><th>🎯셀렉터</th><th></th></tr></thead><tbody>';
+      '<th>회차</th><th>1등</th><th>2등</th><th>3등</th><th>C2</th><th>결과</th><th>W9</th><th>결과</th><th>🎯셀렉터</th><th>커버4</th><th>결과</th><th></th></tr></thead><tbody>';
     // 중복 행 감지 (오름차순 기준 직전 회차와 3개 동일 → 뒤 회차가 오류)
     var dupSet = {};
     (function () {
@@ -3464,6 +3485,14 @@ function render() {
         var selRes = srk === 1 ? '<span class="w-r1">1등</span>' : srk === 2 ? '<span class="w-r2">2등</span>' : srk === 3 ? '<span class="w-r3">3등</span>' : '<span class="w-miss">×</span>';
         selCell = selLab + ' ' + selRes;
       }
+      // v98: 커버4 픽·결과 (커버 4칸 단독 적중 여부)
+      var covPick = (wm && wm.cov != null) ? '<span style="color:#94a3b8;font-size:10px;white-space:nowrap;">' + wm.cov + '</span>' : '—';
+      var covRes;
+      if (!wm || wm.cov == null) covRes = '<span class="w-miss">—</span>';
+      else if (wm.covrank === 1) covRes = '<span class="w-r1">1등 ' + row.first + '</span>';
+      else if (wm.covrank === 2) covRes = '<span class="w-r2">2등 ' + row.second + '</span>';
+      else if (wm.covrank === 3) covRes = '<span class="w-r3">3등 ' + row.third + '</span>';
+      else covRes = '<span class="w-miss">×</span>';
       roundsHtml += '<tr>' +
         '<td class="rt-round">' + row.round + dupMark + '</td>' +
         '<td class="rt-n rt-1">' + row.first + '</td>' +
@@ -3474,6 +3503,8 @@ function render() {
         '<td>' + wPick + '</td>' +
         '<td>' + wRes9 + '</td>' +
         '<td>' + selCell + '</td>' +
+        '<td>' + covPick + '</td>' +
+        '<td>' + covRes + '</td>' +
         '<td class="rt-del"><button class="delete-btn" data-round="' + row.round + '">×</button></td>' +
         '</tr>';
     }
